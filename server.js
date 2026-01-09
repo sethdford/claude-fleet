@@ -499,6 +499,26 @@ app.post('/tasks', (req, res) => {
   res.json(task);
 });
 
+// Get task by ID
+app.get('/tasks/:taskId', (req, res) => {
+  const task = stmts.getTask.get(req.params.taskId);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+  res.json({
+    id: task.id,
+    teamName: task.team_name,
+    subject: task.subject,
+    description: task.description,
+    owner: task.owner_handle,
+    ownerUid: task.owner_uid,
+    createdBy: task.created_by_handle,
+    createdByUid: task.created_by_uid,
+    status: task.status,
+    blockedBy: task.blocked_by ? JSON.parse(task.blocked_by) : [],
+    createdAt: task.created_at,
+    updatedAt: task.updated_at
+  });
+});
+
 // Update task
 app.patch('/tasks/:taskId', (req, res) => {
   const { taskId } = req.params;

@@ -305,6 +305,62 @@ test_tasks() {
 }
 
 #######################################
+# Task dependency tests
+#######################################
+test_task_dependencies() {
+  section "Task Dependency Tests"
+
+  # Create a blocker task
+  echo -n "Creating blocker task... "
+  RESPONSE=$(api POST /tasks "{\"fromUid\":\"$LEAD_UID\",\"toHandle\":\"test-worker\",\"teamName\":\"test-team\",\"subject\":\"Blocker task for dep test\"}")
+  BLOCKER_TASK_ID=$(echo "$RESPONSE" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+  if [[ -n "$BLOCKER_TASK_ID" ]]; then
+    pass "Blocker task created"
+  else
+    fail "Blocker task creation failed"
+    return 1
+  fi
+
+  # Create a dependent task that is blocked by the blocker
+  echo -n "Creating dependent task... "
+  RESPONSE=$(api POST /tasks "{\"fromUid\":\"$LEAD_UID\",\"toHandle\":\"test-worker\",\"teamName\":\"test-team\",\"subject\":\"Dependent task for dep test\",\"blockedBy\":[\"$BLOCKER_TASK_ID\"]}")
+  DEPENDENT_TASK_ID=$(echo "$RESPONSE" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+  if [[ -n "$DEPENDENT_TASK_ID" ]]; then
+    pass "Dependent task created"
+  else
+    fail "Dependent task creation failed"
+    return 1
+  fi
+
+  # Try to resolve the dependent task (should fail)
+  echo -n "Testing blocked resolution... "
+  RESPONSE=$(api PATCH "/tasks/$DEPENDENT_TASK_ID" '{"status":"resolved"}')
+  if echo "$RESPONSE" | grep -q '"error".*blocked'; then
+    pass "Correctly prevents resolving blocked task"
+  else
+    fail "Should prevent resolving blocked task"
+  fi
+
+  # Resolve the blocker task
+  echo -n "Resolving blocker task... "
+  RESPONSE=$(api PATCH "/tasks/$BLOCKER_TASK_ID" '{"status":"resolved"}')
+  if echo "$RESPONSE" | grep -q '"resolved"'; then
+    pass "Blocker task resolved"
+  else
+    fail "Blocker task resolution failed"
+  fi
+
+  # Now resolving the dependent task should work
+  echo -n "Testing unblocked resolution... "
+  RESPONSE=$(api PATCH "/tasks/$DEPENDENT_TASK_ID" '{"status":"resolved"}')
+  if echo "$RESPONSE" | grep -q '"resolved"'; then
+    pass "Dependent task resolved after blocker"
+  else
+    fail "Dependent task should resolve after blocker is done"
+  fi
+}
+
+#######################################
 # Broadcast tests
 #######################################
 test_broadcast() {
@@ -415,6 +471,7 @@ main() {
   test_messages
   test_mark_read_validation
   test_tasks
+  test_task_dependencies
   test_broadcast
   test_websocket
   test_rate_limiting

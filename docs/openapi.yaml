@@ -1,0 +1,261 @@
+openapi: 3.0.3
+info:
+  title: Claude Code Collab API
+  description: |
+    Local collaboration server enabling hidden team mode features in Claude Code.
+    Allows multiple Claude Code instances to collaborate on tasks.
+  version: 1.2.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3847
+    description: Local development server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        uid:
+          type: string
+          description: Unique user identifier (SHA256 hash)
+        handle:
+          type: string
+          description: User's display handle
+        teamName:
+          type: string
+          description: Team the user belongs to
+        agentType:
+          type: string
+          enum: [team-lead, worker]
+        token:
+          type: string
+          description: JWT authentication token (only returned on auth)
+
+    Chat:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Chat identifier
+        participants:
+          type: array
+          items:
+            type: string
+        unread:
+          type: integer
+        lastMessage:
+          $ref: '#/components/schemas/Message'
+        updatedAt:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        chatId:
+          type: string
+        from:
+          type: string
+          description: "Format: collab:{handle}"
+        fromUid:
+          type: string
+        text:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pending, processed]
+        metadata:
+          type: object
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        teamName:
+          type: string
+        subject:
+          type: string
+        description:
+          type: string
+        owner:
+          type: string
+        ownerUid:
+          type: string
+        createdBy:
+          type: string
+        createdByUid:
+          type: string
+        status:
+          type: string
+          enum: [open, in_progress, resolved, blocked]
+        blockedBy:
+          type: array
+          items:
+            type: string
+          description: Task IDs that block this task
+        createdAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [System]
+      responses:
+        '200':
+          description: Server health status
+
+  /auth:
+    post:
+      summary: Authenticate/register agent
+      tags: [Authentication]
+      description: Returns JWT token for subsequent authenticated requests
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [handle, teamName]
+              properties:
+                handle:
+                  type: string
+                teamName:
+                  type: string
+                agentType:
+                  type: string
+                  enum: [team-lead, worker]
+      responses:
+        '200':
+          description: Authentication successful, includes JWT token
+
+  /users/{uid}:
+    get:
+      summary: Get user by ID
+      tags: [Users]
+      responses:
+        '200':
+          description: User details
+        '404':
+          description: User not found
+
+  /users/{uid}/chats:
+    get:
+      summary: List user's chats
+      tags: [Chats]
+      responses:
+        '200':
+          description: List of chats
+
+  /teams/{teamName}/agents:
+    get:
+      summary: List team agents
+      tags: [Teams]
+      responses:
+        '200':
+          description: List of agents
+
+  /teams/{teamName}/broadcast:
+    post:
+      summary: Broadcast message to team
+      tags: [Teams]
+      responses:
+        '200':
+          description: Broadcast sent
+
+  /teams/{teamName}/tasks:
+    get:
+      summary: List team tasks
+      tags: [Tasks]
+      responses:
+        '200':
+          description: List of tasks
+
+  /chats:
+    post:
+      summary: Create chat between two users
+      tags: [Chats]
+      responses:
+        '200':
+          description: Chat created
+
+  /chats/{chatId}/messages:
+    get:
+      summary: Get chat messages
+      tags: [Messages]
+      responses:
+        '200':
+          description: List of messages
+    post:
+      summary: Send message
+      tags: [Messages]
+      responses:
+        '200':
+          description: Message sent
+
+  /chats/{chatId}/read:
+    post:
+      summary: Mark chat as read
+      tags: [Chats]
+      responses:
+        '200':
+          description: Marked as read
+
+  /tasks:
+    post:
+      summary: Create task
+      tags: [Tasks]
+      description: Creates task and notifies assignee
+      responses:
+        '200':
+          description: Task created
+
+  /tasks/{taskId}:
+    get:
+      summary: Get task
+      tags: [Tasks]
+      responses:
+        '200':
+          description: Task details
+    patch:
+      summary: Update task status
+      tags: [Tasks]
+      description: |
+        Update task status. Task dependency enforcement:
+        Cannot resolve a task blocked by unresolved tasks.
+      responses:
+        '200':
+          description: Task updated
+        '400':
+          description: Blocked by unresolved tasks
+
+tags:
+  - name: System
+  - name: Authentication
+  - name: Users
+  - name: Teams
+  - name: Chats
+  - name: Messages
+  - name: Tasks
