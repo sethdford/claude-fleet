@@ -1,8 +1,24 @@
 {
-  "name": "claude-collab-local",
+  "name": "claude-code-collab",
   "version": "1.0.0",
-  "description": "Local collaboration server for Claude Code team mode",
+  "description": "Local collaboration server enabling hidden team mode features in Claude Code",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sethdford/claude-code-collab.git"
+  },
+  "keywords": [
+    "claude-code",
+    "multi-agent",
+    "collaboration",
+    "team-mode",
+    "ai-agents"
+  ],
+  "author": "Seth Ford",
+  "license": "MIT",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",

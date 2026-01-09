@@ -19,6 +19,35 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'collab.db');
 app.use(cors());
 app.use(express.json());
 
+// Input validation helpers
+function validateRequired(obj, fields) {
+  const missing = fields.filter(f => !obj[f] || (typeof obj[f] === 'string' && obj[f].trim() === ''));
+  if (missing.length > 0) {
+    return { valid: false, error: `Missing required fields: ${missing.join(', ')}` };
+  }
+  return { valid: true };
+}
+
+function validateString(value, name, minLen = 1, maxLen = 1000) {
+  if (typeof value !== 'string') {
+    return { valid: false, error: `${name} must be a string` };
+  }
+  if (value.length < minLen) {
+    return { valid: false, error: `${name} must be at least ${minLen} characters` };
+  }
+  if (value.length > maxLen) {
+    return { valid: false, error: `${name} must be at most ${maxLen} characters` };
+  }
+  return { valid: true };
+}
+
+function validateEnum(value, name, allowed) {
+  if (!allowed.includes(value)) {
+    return { valid: false, error: `${name} must be one of: ${allowed.join(', ')}` };
+  }
+  return { valid: true };
+}
+
 // Initialize SQLite database
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
@@ -157,9 +186,25 @@ app.get('/health', (req, res) => {
 // Authentication
 app.post('/auth', (req, res) => {
   const { handle, teamName, agentType } = req.body;
-  if (!handle || !teamName) {
-    return res.status(400).json({ error: 'handle and teamName required' });
+
+  // Validate required fields
+  const reqCheck = validateRequired(req.body, ['handle', 'teamName']);
+  if (!reqCheck.valid) return res.status(400).json({ error: reqCheck.error });
+
+  // Validate handle
+  const handleCheck = validateString(handle, 'handle', 1, 50);
+  if (!handleCheck.valid) return res.status(400).json({ error: handleCheck.error });
+
+  // Validate teamName
+  const teamCheck = validateString(teamName, 'teamName', 1, 50);
+  if (!teamCheck.valid) return res.status(400).json({ error: teamCheck.error });
+
+  // Validate agentType if provided
+  if (agentType) {
+    const typeCheck = validateEnum(agentType, 'agentType', ['team-lead', 'worker']);
+    if (!typeCheck.valid) return res.status(400).json({ error: typeCheck.error });
   }
+
   const uid = crypto.createHash('sha256').update(teamName + ':' + handle).digest('hex').slice(0, 24);
   const now = new Date().toISOString();
   stmts.insertUser.run(uid, handle, teamName, agentType || 'worker', now, now);
@@ -233,6 +278,15 @@ app.get('/chats/:chatId/messages', (req, res) => {
 app.post('/chats/:chatId/messages', (req, res) => {
   const { chatId } = req.params;
   const { from, text, metadata } = req.body;
+
+  // Validate required fields
+  const reqCheck = validateRequired(req.body, ['from', 'text']);
+  if (!reqCheck.valid) return res.status(400).json({ error: reqCheck.error });
+
+  // Validate text
+  const textCheck = validateString(text, 'text', 1, 50000);
+  if (!textCheck.valid) return res.status(400).json({ error: textCheck.error });
+
   const chat = stmts.getChat.get(chatId);
   if (!chat) return res.status(404).json({ error: 'Chat not found' });
   const fromUser = stmts.getUser.get(from);
@@ -289,6 +343,26 @@ app.post('/teams/:teamName/broadcast', (req, res) => {
 // Create task
 app.post('/tasks', (req, res) => {
   const { fromUid, toHandle, teamName, subject, description, blockedBy } = req.body;
+
+  // Validate required fields
+  const reqCheck = validateRequired(req.body, ['fromUid', 'toHandle', 'teamName', 'subject']);
+  if (!reqCheck.valid) return res.status(400).json({ error: reqCheck.error });
+
+  // Validate subject
+  const subjectCheck = validateString(subject, 'subject', 3, 200);
+  if (!subjectCheck.valid) return res.status(400).json({ error: subjectCheck.error });
+
+  // Validate description if provided
+  if (description) {
+    const descCheck = validateString(description, 'description', 0, 10000);
+    if (!descCheck.valid) return res.status(400).json({ error: descCheck.error });
+  }
+
+  // Validate blockedBy is array if provided
+  if (blockedBy && !Array.isArray(blockedBy)) {
+    return res.status(400).json({ error: 'blockedBy must be an array of task IDs' });
+  }
+
   const fromUser = stmts.getUser.get(fromUid);
   if (!fromUser) return res.status(404).json({ error: 'Sender not found' });
   const toUser = db.prepare('SELECT * FROM users WHERE handle = ? AND team_name = ?').get(toHandle, teamName);
@@ -316,10 +390,19 @@ app.post('/tasks', (req, res) => {
 app.patch('/tasks/:taskId', (req, res) => {
   const { taskId } = req.params;
   const { status } = req.body;
+
+  // Validate status
+  if (!status) {
+    return res.status(400).json({ error: 'status is required' });
+  }
+  const statusCheck = validateEnum(status, 'status', ['open', 'in_progress', 'resolved', 'blocked']);
+  if (!statusCheck.valid) return res.status(400).json({ error: statusCheck.error });
+
   const task = stmts.getTask.get(taskId);
   if (!task) return res.status(404).json({ error: 'Task not found' });
   const now = new Date().toISOString();
   stmts.updateTaskStatus.run(status, now, taskId);
+  console.log('[TASK] ' + taskId.slice(0, 8) + '... status -> ' + status);
   res.json({ ...task, status, updated_at: now });
 });
 
