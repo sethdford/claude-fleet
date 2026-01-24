@@ -24,17 +24,7 @@
       </feMerge>
     </filter>
 
-    <!-- Pulse animation -->
-    <style>
-      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-      @keyframes orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-      .pulse { animation: pulse 2s ease-in-out infinite; }
-      .orbit { animation: orbit 20s linear infinite; transform-origin: 400px 200px; }
-      .float { animation: float 3s ease-in-out infinite; }
-      .float-delayed { animation: float 3s ease-in-out infinite; animation-delay: -1s; }
-      .float-delayed-2 { animation: float 3s ease-in-out infinite; animation-delay: -2s; }
-    </style>
+    <!-- Animations using SMIL instead of CSS to avoid transform conflicts -->
   </defs>
 
   <!-- Background -->
@@ -49,7 +39,7 @@
   </g>
 
   <!-- Central codebase visualization -->
-  <g class="float" transform="translate(400, 200)">
+  <g transform="translate(400, 200)">
     <!-- Code repository icon -->
     <rect x="-60" y="-50" width="120" height="100" rx="8" fill="url(#codeGrad)" stroke="url(#heroGrad1)" stroke-width="2"/>
     <!-- Code lines -->
@@ -62,74 +52,92 @@
     </g>
     <!-- Glow effect -->
     <rect x="-60" y="-50" width="120" height="100" rx="8" fill="none" stroke="url(#heroGrad1)" stroke-width="1" filter="url(#glow)" opacity="0.5"/>
+    <!-- Float animation using SMIL -->
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,-8; 0,0" dur="3s" repeatCount="indefinite" additive="sum"/>
   </g>
 
   <!-- Team Lead (Orchestrator) - Top -->
-  <g class="float-delayed" transform="translate(400, 60)">
+  <g transform="translate(400, 60)">
     <circle r="24" fill="url(#heroGrad2)" filter="url(#glow)"/>
     <text y="4" fill="white" font-family="sans-serif" font-size="10" text-anchor="middle" font-weight="bold">LEAD</text>
     <!-- Connection to center -->
-    <line x1="0" y1="24" x2="0" y2="90" stroke="url(#heroGrad1)" stroke-width="2" stroke-dasharray="4,4" class="pulse"/>
+    <line x1="0" y1="24" x2="0" y2="90" stroke="url(#heroGrad1)" stroke-width="2" stroke-dasharray="4,4">
+      <animate attributeName="stroke-opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+    </line>
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,-6; 0,0" dur="3s" begin="-1s" repeatCount="indefinite" additive="sum"/>
   </g>
 
   <!-- Worker Agent 1 - Left -->
-  <g class="float-delayed-2" transform="translate(180, 200)">
+  <g transform="translate(180, 200)">
     <circle r="20" fill="#0066FF" filter="url(#glow)"/>
     <text y="4" fill="white" font-family="sans-serif" font-size="8" text-anchor="middle">W1</text>
     <!-- Connection line -->
-    <line x1="20" y1="0" x2="140" y2="0" stroke="#0066FF" stroke-width="2" stroke-dasharray="4,4" class="pulse"/>
+    <line x1="20" y1="0" x2="140" y2="0" stroke="#0066FF" stroke-width="2" stroke-dasharray="4,4">
+      <animate attributeName="stroke-opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+    </line>
     <!-- File being worked on -->
     <g transform="translate(-50, -40)">
       <rect width="40" height="30" rx="4" fill="#1a1a2e" stroke="#0066FF" stroke-width="1"/>
       <text x="20" y="18" fill="#00D4FF" font-family="monospace" font-size="8" text-anchor="middle">auth.ts</text>
     </g>
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,-6; 0,0" dur="3s" begin="-2s" repeatCount="indefinite" additive="sum"/>
   </g>
 
   <!-- Worker Agent 2 - Right -->
-  <g class="float" transform="translate(620, 200)">
+  <g transform="translate(620, 200)">
     <circle r="20" fill="#00D4FF" filter="url(#glow)"/>
     <text y="4" fill="black" font-family="sans-serif" font-size="8" text-anchor="middle">W2</text>
     <!-- Connection line -->
-    <line x1="-20" y1="0" x2="-140" y2="0" stroke="#00D4FF" stroke-width="2" stroke-dasharray="4,4" class="pulse"/>
+    <line x1="-20" y1="0" x2="-140" y2="0" stroke="#00D4FF" stroke-width="2" stroke-dasharray="4,4">
+      <animate attributeName="stroke-opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+    </line>
     <!-- File being worked on -->
     <g transform="translate(10, -40)">
       <rect width="40" height="30" rx="4" fill="#1a1a2e" stroke="#00D4FF" stroke-width="1"/>
       <text x="20" y="18" fill="#00FF94" font-family="monospace" font-size="8" text-anchor="middle">api.ts</text>
     </g>
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,-8; 0,0" dur="3s" repeatCount="indefinite" additive="sum"/>
   </g>
 
   <!-- Worker Agent 3 - Bottom Left -->
-  <g class="float-delayed" transform="translate(250, 320)">
+  <g transform="translate(250, 320)">
     <circle r="18" fill="#7C3AED" filter="url(#glow)"/>
     <text y="4" fill="white" font-family="sans-serif" font-size="8" text-anchor="middle">W3</text>
     <!-- Connection line -->
-    <line x1="20" y1="-15" x2="120" y2="-80" stroke="#7C3AED" stroke-width="2" stroke-dasharray="4,4" class="pulse"/>
+    <line x1="20" y1="-15" x2="120" y2="-80" stroke="#7C3AED" stroke-width="2" stroke-dasharray="4,4">
+      <animate attributeName="stroke-opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+    </line>
     <!-- File being worked on -->
     <g transform="translate(-60, 10)">
       <rect width="50" height="30" rx="4" fill="#1a1a2e" stroke="#7C3AED" stroke-width="1"/>
       <text x="25" y="18" fill="#a371f7" font-family="monospace" font-size="8" text-anchor="middle">test.ts</text>
     </g>
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,-6; 0,0" dur="3s" begin="-1s" repeatCount="indefinite" additive="sum"/>
   </g>
 
   <!-- Worker Agent 4 - Bottom Right -->
-  <g class="float-delayed-2" transform="translate(550, 320)">
+  <g transform="translate(550, 320)">
     <circle r="18" fill="#00FF94" filter="url(#glow)"/>
     <text y="4" fill="black" font-family="sans-serif" font-size="8" text-anchor="middle">W4</text>
     <!-- Connection line -->
-    <line x1="-20" y1="-15" x2="-120" y2="-80" stroke="#00FF94" stroke-width="2" stroke-dasharray="4,4" class="pulse"/>
+    <line x1="-20" y1="-15" x2="-120" y2="-80" stroke="#00FF94" stroke-width="2" stroke-dasharray="4,4">
+      <animate attributeName="stroke-opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+    </line>
     <!-- File being worked on -->
     <g transform="translate(10, 10)">
       <rect width="50" height="30" rx="4" fill="#1a1a2e" stroke="#00FF94" stroke-width="1"/>
       <text x="25" y="18" fill="#00FF94" font-family="monospace" font-size="8" text-anchor="middle">db.ts</text>
     </g>
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,-6; 0,0" dur="3s" begin="-2s" repeatCount="indefinite" additive="sum"/>
   </g>
 
   <!-- Orbiting particles -->
-  <g class="orbit" opacity="0.6">
+  <g opacity="0.6">
     <circle cx="400" cy="80" r="3" fill="#00D4FF"/>
     <circle cx="520" cy="200" r="2" fill="#00FF94"/>
     <circle cx="400" cy="320" r="3" fill="#7C3AED"/>
     <circle cx="280" cy="200" r="2" fill="#0066FF"/>
+    <animateTransform attributeName="transform" type="rotate" from="0 400 200" to="360 400 200" dur="20s" repeatCount="indefinite"/>
   </g>
 
   <!-- Title text -->
