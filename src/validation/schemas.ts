@@ -130,6 +130,8 @@ export const spawnWorkerSchema = z.object({
   workingDir: z.string().max(500).optional(),
   initialPrompt: z.string().max(10000).optional(),
   sessionId: z.string().max(100).optional(),
+  swarmId: z.string().max(100).optional(),
+  depthLevel: z.number().int().min(0).max(10).optional(),
 });
 
 export type SpawnWorkerInput = z.infer<typeof spawnWorkerSchema>;

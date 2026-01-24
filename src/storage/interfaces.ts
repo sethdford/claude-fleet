@@ -331,6 +331,17 @@ export interface ITLDRStorage {
 /**
  * Composite storage - combines all storage interfaces
  */
+/**
+ * Swarm data type
+ */
+export interface SwarmData {
+  id: string;
+  name: string;
+  description: string | null;
+  maxAgents: number;
+  createdAt: number;
+}
+
 export interface IStorage {
   team: ITeamStorage;
   worker: IWorkerStorage;
@@ -344,6 +355,12 @@ export interface IStorage {
   initialize(): Promise<void>;
   close(): Promise<void>;
   isHealthy(): Promise<boolean>;
+
+  // Swarm storage methods (persisted to SQLite)
+  insertSwarm(swarm: { id: string; name: string; description?: string; maxAgents?: number }): void;
+  getSwarm(swarmId: string): SwarmData | null;
+  getAllSwarms(): SwarmData[];
+  deleteSwarm(swarmId: string): void;
 
   /**
    * Get the raw SpawnQueueStorage for SpawnController (SQLite-specific).

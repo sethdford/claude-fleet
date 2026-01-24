@@ -89,6 +89,11 @@ export class SQLiteStorage implements TeamStorage {
     getHandoff: Database.Statement;
     getPendingHandoffs: Database.Statement;
     acceptHandoff: Database.Statement;
+    // Swarms
+    insertSwarm: Database.Statement;
+    getSwarm: Database.Statement;
+    getAllSwarms: Database.Statement;
+    deleteSwarm: Database.Statement;
   };
 
   constructor(dbPath: string) {
@@ -390,6 +395,17 @@ export class SQLiteStorage implements TeamStorage {
 
       CREATE INDEX IF NOT EXISTS idx_workflow_events_execution ON workflow_events(execution_id);
       CREATE INDEX IF NOT EXISTS idx_workflow_events_step ON workflow_events(step_id);
+
+      -- Swarms table (persistent swarm storage)
+      CREATE TABLE IF NOT EXISTS swarms (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        max_agents INTEGER DEFAULT 50,
+        created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_swarms_name ON swarms(name);
     `);
   }
 
@@ -509,6 +525,15 @@ export class SQLiteStorage implements TeamStorage {
         'SELECT * FROM handoffs WHERE to_handle = ? AND accepted_at IS NULL ORDER BY created_at ASC'
       ),
       acceptHandoff: this.db.prepare('UPDATE handoffs SET accepted_at = ? WHERE id = ?'),
+
+      // Swarms
+      insertSwarm: this.db.prepare(`
+        INSERT INTO swarms (id, name, description, max_agents, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `),
+      getSwarm: this.db.prepare('SELECT * FROM swarms WHERE id = ?'),
+      getAllSwarms: this.db.prepare('SELECT * FROM swarms ORDER BY created_at DESC'),
+      deleteSwarm: this.db.prepare('DELETE FROM swarms WHERE id = ?'),
     };
   }
 
@@ -1315,6 +1340,61 @@ export class SQLiteStorage implements TeamStorage {
   acceptHandoff(handoffId: number): void {
     const now = Math.floor(Date.now() / 1000);
     this.stmts.acceptHandoff.run(now, handoffId);
+  }
+
+  // ============================================================================
+  // Swarms
+  // ============================================================================
+
+  insertSwarm(swarm: { id: string; name: string; description?: string; maxAgents?: number }): void {
+    this.stmts.insertSwarm.run(
+      swarm.id,
+      swarm.name,
+      swarm.description || null,
+      swarm.maxAgents ?? 50,
+      Date.now()
+    );
+  }
+
+  getSwarm(swarmId: string): { id: string; name: string; description: string | null; maxAgents: number; createdAt: number } | null {
+    const row = this.stmts.getSwarm.get(swarmId) as {
+      id: string;
+      name: string;
+      description: string | null;
+      max_agents: number;
+      created_at: number;
+    } | undefined;
+
+    if (!row) return null;
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      maxAgents: row.max_agents,
+      createdAt: row.created_at,
+    };
+  }
+
+  getAllSwarms(): Array<{ id: string; name: string; description: string | null; maxAgents: number; createdAt: number }> {
+    const rows = this.stmts.getAllSwarms.all() as Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      max_agents: number;
+      created_at: number;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      maxAgents: row.max_agents,
+      createdAt: row.created_at,
+    }));
+  }
+
+  deleteSwarm(swarmId: string): void {
+    this.stmts.deleteSwarm.run(swarmId);
   }
 
   // ============================================================================

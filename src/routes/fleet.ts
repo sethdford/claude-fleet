@@ -595,10 +595,13 @@ export function createSwarmCreateHandler(deps: RouteDependencies) {
       id,
       name,
       description,
-      maxAgents,
+      maxAgents: maxAgents ?? 50,
       createdAt: Date.now(),
     };
 
+    // Persist to SQLite
+    deps.storage.insertSwarm(swarm);
+    // Also keep in memory for fast access
     deps.swarms.set(id, swarm);
     console.log(`[SWARM] Created ${id}: ${name}`);
     res.json(swarm);
@@ -615,7 +618,8 @@ export function createSwarmListHandler(deps: RouteDependencies) {
     }
 
     const { includeAgents } = queryValidation.data;
-    const swarms = Array.from(deps.swarms.values());
+    // Load from SQLite for persistence across restarts
+    const swarms = deps.storage.getAllSwarms();
 
     if (includeAgents === 'true') {
       const workers = deps.workerManager.getWorkers();
@@ -643,7 +647,8 @@ export function createSwarmGetHandler(deps: RouteDependencies) {
       return;
     }
 
-    const swarm = deps.swarms.get(id);
+    // Load from SQLite
+    const swarm = deps.storage.getSwarm(id);
 
     if (!swarm) {
       res.status(404).json({ error: 'Swarm not found' } as ErrorResponse);
@@ -679,7 +684,8 @@ export function createSwarmKillHandler(deps: RouteDependencies) {
     }
 
     const { graceful } = validation.data;
-    const swarm = deps.swarms.get(id);
+    // Load from SQLite
+    const swarm = deps.storage.getSwarm(id);
     if (!swarm) {
       res.status(404).json({ error: 'Swarm not found' } as ErrorResponse);
       return;
@@ -698,6 +704,8 @@ export function createSwarmKillHandler(deps: RouteDependencies) {
     }
 
     if (!graceful) {
+      // Delete from both SQLite and memory
+      deps.storage.deleteSwarm(id);
       deps.swarms.delete(id);
     }
 
