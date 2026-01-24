@@ -276,6 +276,7 @@ export class SQLiteStorage implements TeamStorage {
         requester_handle TEXT NOT NULL,
         target_agent_type TEXT NOT NULL,
         depth_level INTEGER NOT NULL DEFAULT 1,
+        swarm_id TEXT,
         priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'critical')),
         status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'spawned')),
         payload TEXT NOT NULL,
@@ -289,6 +290,7 @@ export class SQLiteStorage implements TeamStorage {
       CREATE INDEX IF NOT EXISTS idx_spawn_queue_status ON spawn_queue(status, priority, created_at);
       CREATE INDEX IF NOT EXISTS idx_spawn_queue_ready ON spawn_queue(status, blocked_by_count);
       CREATE INDEX IF NOT EXISTS idx_spawn_queue_requester ON spawn_queue(requester_handle);
+      CREATE INDEX IF NOT EXISTS idx_spawn_queue_swarm ON spawn_queue(swarm_id);
     `);
   }
 

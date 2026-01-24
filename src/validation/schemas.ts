@@ -329,6 +329,38 @@ export const swarmKillSchema = z.object({
 export type SwarmKillInput = z.infer<typeof swarmKillSchema>;
 
 // ============================================================================
+// PATH PARAMETER SCHEMAS
+// ============================================================================
+
+/** Swarm ID path parameter (alphanumeric with dashes) */
+export const swarmIdParamSchema = z.object({
+  swarmId: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, 'Invalid swarm ID format'),
+});
+
+export type SwarmIdParam = z.infer<typeof swarmIdParamSchema>;
+
+/** Handle path parameter */
+export const handleParamSchema = z.object({
+  handle: handleSchema,
+});
+
+export type HandleParam = z.infer<typeof handleParamSchema>;
+
+/** Numeric ID path parameter */
+export const numericIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+export type NumericIdParam = z.infer<typeof numericIdParamSchema>;
+
+/** UUID ID path parameter */
+export const uuidIdParamSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export type UuidIdParam = z.infer<typeof uuidIdParamSchema>;
+
+// ============================================================================
 // QUERY PARAM SCHEMAS
 // ============================================================================
 
@@ -338,6 +370,32 @@ export const getMessagesQuerySchema = z.object({
 });
 
 export type GetMessagesQuery = z.infer<typeof getMessagesQuerySchema>;
+
+/** Blackboard read query parameters */
+export const blackboardReadQuerySchema = z.object({
+  messageType: messageTypeSchema.optional(),
+  unreadOnly: z.enum(['true', 'false']).optional(),
+  readerHandle: handleSchema.optional(),
+  priority: messagePrioritySchema.optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
+});
+
+export type BlackboardReadQuery = z.infer<typeof blackboardReadQuerySchema>;
+
+/** Checkpoint list query parameters */
+export const checkpointListQuerySchema = z.object({
+  status: z.enum(['pending', 'accepted', 'rejected']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export type CheckpointListQuery = z.infer<typeof checkpointListQuerySchema>;
+
+/** Swarm list query parameters */
+export const swarmListQuerySchema = z.object({
+  includeAgents: z.enum(['true', 'false']).optional(),
+});
+
+export type SwarmListQuery = z.infer<typeof swarmListQuerySchema>;
 
 export const listWorkItemsQuerySchema = z.object({
   status: workItemStatusSchema.optional(),

@@ -1,7 +1,7 @@
 /**
- * Claude Code Collab - Type Definitions
+ * Claude Fleet - Type Definitions
  *
- * Core types for team coordination, task management, and worker orchestration.
+ * Core types for fleet coordination, task management, and worker orchestration.
  */
 
 import type { ChildProcess } from 'child_process';
@@ -259,6 +259,9 @@ export interface ClaudeEvent {
 // ============================================================================
 
 export type WebSocketMessageType =
+  | 'auth'
+  | 'authenticated'
+  | 'error'
   | 'subscribe'
   | 'unsubscribe'
   | 'ping'
@@ -286,6 +289,7 @@ export interface ExtendedWebSocket extends WebSocket {
   isAlive: boolean;
   subscribedChats: Set<string>;
   uid?: string;
+  authenticated?: boolean;
 }
 
 // ============================================================================
@@ -558,6 +562,7 @@ export interface SpawnQueueItem {
   requesterHandle: string;
   targetAgentType: string;  // FleetAgentRole
   depthLevel: number;
+  swarmId: string | null;   // Swarm the spawned agent will belong to
   priority: MessagePriority;
   status: SpawnQueueStatus;
   payload: {

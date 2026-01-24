@@ -288,7 +288,8 @@ export class SpawnController extends EventEmitter {
 
       try {
         // Spawn the worker with swarmId and depthLevel + 1 (child is one level deeper)
-        const swarmId = context?.swarmId as string | undefined;
+        // Use first-class swarmId, falling back to context for backwards compatibility
+        const swarmId = item.swarmId ?? (context?.swarmId as string | undefined);
         const worker = await this.workerManager.spawnWorker({
           handle: `${item.targetAgentType}-${item.id.slice(0, 8)}`,
           initialPrompt: item.payload.task,
@@ -325,6 +326,7 @@ export class SpawnController extends EventEmitter {
     options: {
       priority?: 'low' | 'normal' | 'high' | 'critical';
       dependsOn?: string[];
+      swarmId?: string;
       context?: Record<string, unknown>;
     } = {}
   ): string | null {
@@ -345,7 +347,12 @@ export class SpawnController extends EventEmitter {
       targetAgentType,
       depthLevel,
       task,
-      options
+      {
+        priority: options.priority,
+        dependsOn: options.dependsOn,
+        swarmId: options.swarmId,
+        context: options.context,
+      }
     );
 
     this.emit('spawn:queued', { requestId: item.id, targetType: targetAgentType });

@@ -20,6 +20,7 @@ import type {
 export interface EnqueueOptions {
   priority?: MessagePriority;
   dependsOn?: string[];  // IDs of spawn requests that must complete first
+  swarmId?: string;      // Swarm to spawn the agent into
   context?: Record<string, unknown>;
   checkpoint?: Record<string, unknown>;
 }
@@ -41,6 +42,7 @@ interface SpawnQueueRow {
   requester_handle: string;
   target_agent_type: string;
   depth_level: number;
+  swarm_id: string | null;
   priority: string;
   status: string;
   payload: string;
@@ -76,6 +78,7 @@ export class SpawnQueueStorage {
     const now = Date.now();
     const priority = options.priority ?? 'normal';
     const dependsOn = options.dependsOn ?? [];
+    const swarmId = options.swarmId ?? null;
 
     // Calculate initial blocked_by_count
     const blockedByCount = this.countPendingDependencies(dependsOn);
@@ -88,8 +91,8 @@ export class SpawnQueueStorage {
 
     const db = this.storage.getDatabase();
     const stmt = db.prepare(`
-      INSERT INTO spawn_queue (id, requester_handle, target_agent_type, depth_level, priority, status, payload, depends_on, blocked_by_count, created_at)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+      INSERT INTO spawn_queue (id, requester_handle, target_agent_type, depth_level, swarm_id, priority, status, payload, depends_on, blocked_by_count, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -97,6 +100,7 @@ export class SpawnQueueStorage {
       requesterHandle,
       targetAgentType,
       depthLevel,
+      swarmId,
       priority,
       JSON.stringify(payload),
       JSON.stringify(dependsOn),
@@ -109,6 +113,7 @@ export class SpawnQueueStorage {
       requesterHandle,
       targetAgentType,
       depthLevel,
+      swarmId,
       priority,
       status: 'pending',
       payload,
@@ -376,6 +381,7 @@ export class SpawnQueueStorage {
       requesterHandle: row.requester_handle,
       targetAgentType: row.target_agent_type,
       depthLevel: row.depth_level,
+      swarmId: row.swarm_id,
       priority: row.priority as MessagePriority,
       status: row.status as SpawnQueueStatus,
       payload: JSON.parse(row.payload),
@@ -385,5 +391,21 @@ export class SpawnQueueStorage {
       processedAt: row.processed_at,
       spawnedWorkerId: row.spawned_worker_id,
     };
+  }
+
+  /**
+   * Get spawn requests by swarm
+   */
+  getBySwarm(swarmId: string, limit: number = 50): SpawnQueueItem[] {
+    const db = this.storage.getDatabase();
+    const stmt = db.prepare(`
+      SELECT * FROM spawn_queue
+      WHERE swarm_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `);
+
+    const rows = stmt.all(swarmId, limit) as SpawnQueueRow[];
+    return rows.map((row) => this.rowToItem(row));
   }
 }

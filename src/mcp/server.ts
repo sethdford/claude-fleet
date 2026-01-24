@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * MCP Bridge Server for Claude Code Collab
+ * MCP Bridge Server for Claude Fleet
  *
- * Exposes team coordination and orchestration as MCP tools.
+ * Exposes fleet coordination and orchestration as MCP tools.
  * This allows Claude Code instances with MCP support to participate in teams
- * without requiring the custom CLI patches.
+ * and swarms without requiring custom CLI patches.
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -16,7 +16,11 @@ import {
 import type { AgentRole } from '../types.js';
 import { hasPermission } from '../workers/roles.js';
 
-const COLLAB_URL = process.env.COLLAB_SERVER_URL ?? 'http://localhost:3847';
+const COLLAB_URL = process.env.CLAUDE_FLEET_URL ?? process.env.COLLAB_SERVER_URL ?? 'http://localhost:3847';
+
+// Cached auth token
+let authToken: string | null = null;
+let authTokenExpiry: number = 0;
 
 /**
  * Get current agent's role from environment
@@ -24,6 +28,51 @@ const COLLAB_URL = process.env.COLLAB_SERVER_URL ?? 'http://localhost:3847';
 function getAgentRole(): AgentRole {
   const role = process.env.CLAUDE_CODE_AGENT_TYPE ?? 'worker';
   return role as AgentRole;
+}
+
+/**
+ * Get or refresh authentication token
+ */
+async function getAuthToken(): Promise<string | null> {
+  // Return cached token if still valid (with 5 min buffer)
+  if (authToken && Date.now() < authTokenExpiry - 5 * 60 * 1000) {
+    return authToken;
+  }
+
+  const handle = process.env.CLAUDE_CODE_AGENT_NAME;
+  const teamName = process.env.CLAUDE_CODE_TEAM_NAME ?? 'default';
+  const agentType = process.env.CLAUDE_CODE_AGENT_TYPE ?? 'worker';
+
+  if (!handle) {
+    console.error('[MCP] Cannot authenticate: CLAUDE_CODE_AGENT_NAME not set');
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${COLLAB_URL}/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ handle, teamName, agentType }),
+    });
+
+    if (!response.ok) {
+      console.error('[MCP] Authentication failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json() as { token: string; uid: string };
+    authToken = data.token;
+    // Assume 24h expiry, cache for 23h
+    authTokenExpiry = Date.now() + 23 * 60 * 60 * 1000;
+
+    // Store UID for other tools
+    process.env.CLAUDE_CODE_AGENT_UID = data.uid;
+
+    return authToken;
+  } catch (error) {
+    console.error('[MCP] Authentication error:', (error as Error).message);
+    return null;
+  }
 }
 
 /**
@@ -82,17 +131,30 @@ interface ToolResponse {
 }
 
 /**
- * HTTP client for collab server
+ * HTTP client for collab server with authentication
  */
 async function callApi(
   method: string,
   path: string,
-  body?: unknown
+  body?: unknown,
+  skipAuth = false
 ): Promise<unknown> {
   const url = `${COLLAB_URL}${path}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add auth token for authenticated requests
+  if (!skipAuth) {
+    const token = await getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
   const options: RequestInit = {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers,
   };
 
   if (body) {
@@ -100,6 +162,23 @@ async function callApi(
   }
 
   const response = await fetch(url, options);
+
+  // Handle auth errors
+  if (response.status === 401 || response.status === 403) {
+    // Clear cached token and retry once
+    authToken = null;
+    authTokenExpiry = 0;
+
+    if (!skipAuth) {
+      const retryToken = await getAuthToken();
+      if (retryToken) {
+        headers['Authorization'] = `Bearer ${retryToken}`;
+        const retryResponse = await fetch(url, { ...options, headers });
+        return retryResponse.json();
+      }
+    }
+  }
+
   return response.json();
 }
 
@@ -873,6 +952,143 @@ function createServer(): Server {
         },
       },
 
+      // ============================================================================
+      // TLDR (Token-Efficient Code Analysis)
+      // ============================================================================
+      {
+        name: 'tldr_get_summary',
+        description: 'Get a cached summary of a file (token-efficient)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            file_path: {
+              type: 'string',
+              description: 'Path to the file to get summary for',
+            },
+          },
+          required: ['file_path'],
+        },
+      },
+      {
+        name: 'tldr_store_summary',
+        description: 'Store a file summary for future token-efficient retrieval',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            file_path: {
+              type: 'string',
+              description: 'Path to the file',
+            },
+            content_hash: {
+              type: 'string',
+              description: 'Hash of file content for cache invalidation',
+            },
+            summary: {
+              type: 'string',
+              description: 'Summary of the file',
+            },
+            exports: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Exported functions/classes/constants',
+            },
+            imports: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Import paths',
+            },
+            line_count: {
+              type: 'number',
+              description: 'Number of lines in the file',
+            },
+            language: {
+              type: 'string',
+              description: 'Programming language',
+            },
+          },
+          required: ['file_path', 'content_hash', 'summary'],
+        },
+      },
+      {
+        name: 'tldr_get_codebase',
+        description: 'Get a cached codebase overview (token-efficient)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            root_path: {
+              type: 'string',
+              description: 'Root path of the codebase',
+            },
+          },
+          required: ['root_path'],
+        },
+      },
+      {
+        name: 'tldr_store_codebase',
+        description: 'Store a codebase overview for future token-efficient retrieval',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            root_path: {
+              type: 'string',
+              description: 'Root path of the codebase',
+            },
+            name: {
+              type: 'string',
+              description: 'Name of the codebase/project',
+            },
+            description: {
+              type: 'string',
+              description: 'Brief description of the codebase',
+            },
+            key_files: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Important files (entry points, configs)',
+            },
+            patterns: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Detected patterns (MVC, microservices, etc.)',
+            },
+            tech_stack: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Languages, frameworks, tools',
+            },
+          },
+          required: ['root_path', 'name'],
+        },
+      },
+      {
+        name: 'tldr_dependency_graph',
+        description: 'Get dependency graph for files',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            root_files: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Starting files to trace dependencies from',
+            },
+            depth: {
+              type: 'number',
+              description: 'How deep to trace dependencies (default: 3)',
+            },
+          },
+          required: ['root_files'],
+        },
+      },
+      {
+        name: 'tldr_stats',
+        description: 'Get TLDR cache statistics',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+      },
+
     ],
   }));
 
@@ -1591,6 +1807,83 @@ function createServer(): Server {
 
           const { request_id } = args as { request_id: string };
           const result = await callApi('DELETE', `/spawn-queue/${encodeURIComponent(request_id)}`);
+          return formatResponse(result);
+        }
+
+        // ============================================================================
+        // TLDR (Token-Efficient Code Analysis)
+        // ============================================================================
+        case 'tldr_get_summary': {
+          const { file_path } = args as { file_path: string };
+          const result = await callApi('POST', '/tldr/summary/get', { filePath: file_path });
+          return formatResponse(result);
+        }
+
+        case 'tldr_store_summary': {
+          const { file_path, content_hash, summary, exports, imports, line_count, language } = args as {
+            file_path: string;
+            content_hash: string;
+            summary: string;
+            exports?: string[];
+            imports?: string[];
+            line_count?: number;
+            language?: string;
+          };
+
+          const result = await callApi('POST', '/tldr/summary/store', {
+            filePath: file_path,
+            contentHash: content_hash,
+            summary,
+            exports,
+            imports,
+            lineCount: line_count,
+            language,
+          });
+          return formatResponse(result);
+        }
+
+        case 'tldr_get_codebase': {
+          const { root_path } = args as { root_path: string };
+          const result = await callApi('POST', '/tldr/codebase/get', { rootPath: root_path });
+          return formatResponse(result);
+        }
+
+        case 'tldr_store_codebase': {
+          const { root_path, name, description, key_files, patterns, tech_stack } = args as {
+            root_path: string;
+            name: string;
+            description?: string;
+            key_files?: string[];
+            patterns?: string[];
+            tech_stack?: string[];
+          };
+
+          const result = await callApi('POST', '/tldr/codebase/store', {
+            rootPath: root_path,
+            name,
+            description,
+            keyFiles: key_files,
+            patterns,
+            techStack: tech_stack,
+          });
+          return formatResponse(result);
+        }
+
+        case 'tldr_dependency_graph': {
+          const { root_files, depth } = args as {
+            root_files: string[];
+            depth?: number;
+          };
+
+          const result = await callApi('POST', '/tldr/dependency/graph', {
+            rootFiles: root_files,
+            depth: depth ?? 3,
+          });
+          return formatResponse(result);
+        }
+
+        case 'tldr_stats': {
+          const result = await callApi('GET', '/tldr/stats');
           return formatResponse(result);
         }
 
