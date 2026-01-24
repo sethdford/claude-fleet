@@ -6,10 +6,15 @@
   <title>Claude Fleet - Multi-Agent Orchestration Platform</title>
   <meta name="description" content="The infrastructure for coordinating AI agent fleets. Build, orchestrate, and scale multi-agent systems with Claude Code.">
 
-  <!-- Fonts -->
+  <!-- Premium Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Geist (Vercel's font) for headings, Inter for body -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- JetBrains Mono for code -->
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Outfit for modern display headings -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Open Graph -->
   <meta property="og:title" content="Claude Fleet - Multi-Agent Orchestration">
@@ -47,10 +52,20 @@
       color: var(--text-primary);
       line-height: 1.6;
       overflow-x: hidden;
+      font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     }
 
     /* Typography */
-    h1, h2, h3, h4 { font-weight: 700; letter-spacing: -0.02em; }
+    h1, h2, h3, h4 {
+      font-family: 'Outfit', 'Inter', sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    code, .code-body, .install-code {
+      font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      font-feature-settings: 'liga' on, 'calt' on;
+    }
 
     /* Container */
     .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
@@ -268,10 +283,12 @@
     }
 
     .hero h1 {
-      font-size: clamp(48px, 8vw, 80px);
-      line-height: 1.05;
-      margin-bottom: 24px;
-      letter-spacing: -0.03em;
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(52px, 9vw, 88px);
+      font-weight: 800;
+      line-height: 1.0;
+      margin-bottom: 28px;
+      letter-spacing: -0.04em;
     }
 
     .hero h1 .gradient-text {
@@ -318,6 +335,29 @@
     .hero-stat-label {
       font-size: 14px;
       color: var(--text-muted);
+    }
+
+    /* Hero Visualization */
+    .hero-visual {
+      padding: 40px 0 80px;
+      position: relative;
+    }
+
+    .hero-visual-frame {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.05),
+        0 25px 80px -20px rgba(0,102,255,0.3),
+        0 40px 100px -40px rgba(0,0,0,0.8);
+    }
+
+    .hero-visual-img {
+      width: 100%;
+      height: auto;
+      display: block;
     }
 
     /* Code Preview */
@@ -835,6 +875,15 @@
             <span class="hero-stat-label">Licensed</span>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Hero Visualization -->
+  <section class="hero-visual">
+    <div class="container">
+      <div class="hero-visual-frame">
+        <img src="images/hero-animation.svg" alt="Fleet orchestration visualization" class="hero-visual-img">
       </div>
     </div>
   </section>
