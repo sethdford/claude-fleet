@@ -280,7 +280,7 @@ export function createBlackboardArchiveOldHandler(deps: RouteDependencies) {
 // ============================================================================
 
 export function createSpawnEnqueueHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(spawnEnqueueSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -310,7 +310,7 @@ export function createSpawnEnqueueHandler(deps: RouteDependencies) {
 
     console.log(`[SPAWN] Queued ${targetAgentType} by ${requesterHandle} (depth: ${depthLevel})`);
     res.json({ requestId, status: 'pending', targetAgentType, task });
-  };
+  });
 }
 
 export function createSpawnStatusHandler(deps: RouteDependencies) {
@@ -321,7 +321,7 @@ export function createSpawnStatusHandler(deps: RouteDependencies) {
 }
 
 export function createSpawnGetHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validate path parameter (UUID)
     const paramValidation = validateQuery(uuidIdParamSchema, req.params);
     if (!paramValidation.success) {
@@ -338,7 +338,7 @@ export function createSpawnGetHandler(deps: RouteDependencies) {
     }
 
     res.json(item);
-  };
+  });
 }
 
 export function createSpawnCancelHandler(deps: RouteDependencies) {
