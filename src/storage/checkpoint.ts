@@ -196,7 +196,7 @@ export class CheckpointStorage {
   /**
    * Accept a checkpoint (mark as accepted)
    */
-  acceptCheckpoint(checkpointId: number): boolean {
+  acceptCheckpoint(checkpointId: number, outcome?: CheckpointOutcome): boolean {
     const db = this.storage.getDatabase();
     const stmt = db.prepare(`
       UPDATE handoffs SET status = 'accepted', accepted_at = ?
@@ -204,13 +204,20 @@ export class CheckpointStorage {
     `);
 
     const result = stmt.run(Date.now(), checkpointId);
-    return result.changes > 0;
+    const success = result.changes > 0;
+
+    // Set outcome if provided and checkpoint was updated
+    if (success && outcome) {
+      this.setOutcome(checkpointId, outcome);
+    }
+
+    return success;
   }
 
   /**
    * Reject a checkpoint
    */
-  rejectCheckpoint(checkpointId: number): boolean {
+  rejectCheckpoint(checkpointId: number, outcome?: CheckpointOutcome): boolean {
     const db = this.storage.getDatabase();
     const stmt = db.prepare(`
       UPDATE handoffs SET status = 'rejected'
@@ -218,7 +225,14 @@ export class CheckpointStorage {
     `);
 
     const result = stmt.run(checkpointId);
-    return result.changes > 0;
+    const success = result.changes > 0;
+
+    // Set outcome if provided and checkpoint was updated
+    if (success && outcome) {
+      this.setOutcome(checkpointId, outcome);
+    }
+
+    return success;
   }
 
   /**

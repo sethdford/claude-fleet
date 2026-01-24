@@ -5,31 +5,31 @@
  */
 
 import type { Request, Response } from 'express';
+import type { IStorage } from '../storage/interfaces.js';
 import type { SQLiteStorage } from '../storage/sqlite.js';
 import type { WorkerManager } from '../workers/manager.js';
-import type { WorkItemStorage } from '../storage/workitems.js';
-import type { MailStorage } from '../storage/mail.js';
-import type { BlackboardStorage } from '../storage/blackboard.js';
-import type { SpawnQueueStorage } from '../storage/spawn-queue.js';
-import type { CheckpointStorage } from '../storage/checkpoint.js';
 import type { SpawnController } from '../workers/spawn-controller.js';
-import type { TLDRStorage } from '../storage/tldr.js';
+import type { WorkflowStorage } from '../storage/workflow.js';
+import type { WorkflowEngine } from '../workers/workflow-engine.js';
 import type { ServerConfig } from '../types.js';
 
 /**
  * Dependencies required by route handlers
+ *
+ * Uses IStorage abstraction for storage backend flexibility.
+ * Individual storage accessors (workItemStorage, mailStorage, etc.) are
+ * provided for backward compatibility but delegate to storage.workItem, etc.
  */
 export interface RouteDependencies {
   config: ServerConfig;
-  storage: SQLiteStorage;
+  /** Unified storage interface - preferred for new code */
+  storage: IStorage;
+  /** Legacy: direct SQLiteStorage access (for operations not yet in IStorage) */
+  legacyStorage: SQLiteStorage;
   workerManager: WorkerManager;
-  workItemStorage: WorkItemStorage;
-  mailStorage: MailStorage;
-  blackboardStorage: BlackboardStorage;
-  spawnQueueStorage: SpawnQueueStorage;
-  checkpointStorage: CheckpointStorage;
   spawnController: SpawnController;
-  tldrStorage?: TLDRStorage;
+  workflowStorage?: WorkflowStorage;
+  workflowEngine?: WorkflowEngine;
   swarms: Map<string, { id: string; name: string; description?: string; maxAgents: number; createdAt: number }>;
   startTime: number;
 }

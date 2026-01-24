@@ -406,6 +406,220 @@ export const listWorkItemsQuerySchema = z.object({
 export type ListWorkItemsQuery = z.infer<typeof listWorkItemsQuerySchema>;
 
 // ============================================================================
+// WORKFLOW SCHEMAS (Phase 5)
+// ============================================================================
+
+export const workflowStatusSchema = z.enum(['pending', 'running', 'paused', 'completed', 'failed', 'cancelled']);
+export const workflowStepStatusSchema = z.enum(['pending', 'ready', 'running', 'completed', 'failed', 'skipped', 'blocked']);
+export const workflowStepTypeSchema = z.enum(['task', 'spawn', 'checkpoint', 'gate', 'parallel', 'script']);
+export const workflowTriggerTypeSchema = z.enum(['event', 'schedule', 'webhook', 'blackboard']);
+
+/** Guard condition for step execution */
+export const workflowGuardSchema = z.object({
+  type: z.enum(['expression', 'script', 'output_check']),
+  condition: z.string().min(1).max(1000),
+  variables: z.array(z.string()).optional(),
+});
+
+/** Hook for workflow lifecycle events */
+export const workflowHookSchema = z.object({
+  type: z.enum(['blackboard', 'mail', 'callback']),
+  config: z.record(z.string(), z.unknown()),
+});
+
+/** Task step config */
+export const taskStepConfigSchema = z.object({
+  type: z.literal('task'),
+  title: z.string().min(1).max(200),
+  description: z.string().max(10000).optional(),
+  assignTo: z.string().max(50).optional(),
+});
+
+/** Spawn step config */
+export const spawnStepConfigSchema = z.object({
+  type: z.literal('spawn'),
+  agentRole: z.string().min(1).max(50),
+  task: z.string().min(1).max(10000),
+  swarmId: z.string().max(100).optional(),
+});
+
+/** Checkpoint step config */
+export const checkpointStepConfigSchema = z.object({
+  type: z.literal('checkpoint'),
+  goal: z.string().min(1).max(1000),
+  toHandle: z.string().max(50),
+  waitForAcceptance: z.boolean().optional(),
+});
+
+/** Gate step config */
+export const gateStepConfigSchema = z.object({
+  type: z.literal('gate'),
+  condition: workflowGuardSchema,
+  onTrue: z.array(z.string().max(50)).optional(),
+  onFalse: z.array(z.string().max(50)).optional(),
+});
+
+/** Parallel step config - references step keys to run in parallel */
+export const parallelStepConfigSchema = z.object({
+  type: z.literal('parallel'),
+  stepKeys: z.array(z.string().max(50)).max(20),
+  strategy: z.enum(['all', 'any', 'race']),
+});
+
+/** Script step config */
+export const scriptStepConfigSchema = z.object({
+  type: z.literal('script'),
+  script: z.string().min(1).max(10000),
+  outputKey: z.string().max(50).optional(),
+});
+
+/** Union of all step configs */
+export const workflowStepConfigSchema = z.union([
+  taskStepConfigSchema,
+  spawnStepConfigSchema,
+  checkpointStepConfigSchema,
+  gateStepConfigSchema,
+  parallelStepConfigSchema,
+  scriptStepConfigSchema,
+]);
+
+/** Step definition */
+export const workflowStepDefinitionSchema = z.object({
+  key: z.string().min(1).max(50).regex(/^[a-zA-Z0-9_-]+$/, 'Key must be alphanumeric with dashes/underscores'),
+  name: z.string().min(1).max(100),
+  type: workflowStepTypeSchema,
+  dependsOn: z.array(z.string().max(50)).max(20).optional(),
+  config: workflowStepConfigSchema,
+  guard: workflowGuardSchema.optional(),
+  onFailure: z.enum(['fail', 'skip', 'retry', 'continue']).optional(),
+  maxRetries: z.number().int().min(0).max(10).optional(),
+  timeoutMs: z.number().int().positive().optional(),
+});
+
+/** Complete workflow definition */
+export const workflowDefinitionSchema = z.object({
+  steps: z.array(workflowStepDefinitionSchema).min(1).max(100),
+  inputs: z.record(z.string(), z.object({
+    type: z.string(),
+    required: z.boolean().optional(),
+    default: z.unknown().optional(),
+  })).optional(),
+  outputs: z.record(z.string(), z.string()).optional(),
+  timeoutMs: z.number().int().positive().optional(),
+  onComplete: workflowHookSchema.optional(),
+  onFailure: workflowHookSchema.optional(),
+});
+
+export type WorkflowDefinitionInput = z.infer<typeof workflowDefinitionSchema>;
+
+/** Create workflow request */
+export const createWorkflowSchema = z.object({
+  name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, 'Name must be alphanumeric with dashes/underscores'),
+  description: z.string().max(500).optional(),
+  definition: workflowDefinitionSchema,
+  isTemplate: z.boolean().optional(),
+});
+
+export type CreateWorkflowInput = z.infer<typeof createWorkflowSchema>;
+
+/** Update workflow request */
+export const updateWorkflowSchema = z.object({
+  definition: workflowDefinitionSchema.optional(),
+  description: z.string().max(500).optional(),
+}).refine(data => data.definition || data.description, {
+  message: 'At least one of definition or description must be provided',
+});
+
+export type UpdateWorkflowInput = z.infer<typeof updateWorkflowSchema>;
+
+/** Start workflow request */
+export const startWorkflowSchema = z.object({
+  inputs: z.record(z.string(), z.unknown()).optional(),
+  swarmId: z.string().max(100).optional(),
+});
+
+export type StartWorkflowInput = z.infer<typeof startWorkflowSchema>;
+
+/** Trigger config schemas */
+export const eventTriggerConfigSchema = z.object({
+  type: z.literal('event'),
+  eventType: z.string().min(1).max(100),
+  filter: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const scheduleTriggerConfigSchema = z.object({
+  type: z.literal('schedule'),
+  cron: z.string().max(100).optional(),
+  intervalMs: z.number().int().positive().optional(),
+}).refine(data => data.cron || data.intervalMs, {
+  message: 'Either cron or intervalMs must be provided',
+});
+
+export const webhookTriggerConfigSchema = z.object({
+  type: z.literal('webhook'),
+  path: z.string().min(1).max(200),
+  method: z.enum(['GET', 'POST']).optional(),
+  secret: z.string().max(100).optional(),
+});
+
+export const blackboardTriggerConfigSchema = z.object({
+  type: z.literal('blackboard'),
+  swarmId: z.string().min(1).max(100),
+  messageType: messageTypeSchema,
+  filter: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const workflowTriggerConfigSchema = z.union([
+  eventTriggerConfigSchema,
+  scheduleTriggerConfigSchema,
+  webhookTriggerConfigSchema,
+  blackboardTriggerConfigSchema,
+]);
+
+/** Create trigger request */
+export const createTriggerSchema = z.object({
+  triggerType: workflowTriggerTypeSchema,
+  config: workflowTriggerConfigSchema,
+  isEnabled: z.boolean().optional(),
+});
+
+export type CreateTriggerInput = z.infer<typeof createTriggerSchema>;
+
+/** Update trigger request */
+export const updateTriggerSchema = z.object({
+  isEnabled: z.boolean().optional(),
+  config: workflowTriggerConfigSchema.optional(),
+});
+
+export type UpdateTriggerInput = z.infer<typeof updateTriggerSchema>;
+
+/** Complete step manually */
+export const completeStepSchema = z.object({
+  output: z.record(z.string(), z.unknown()).optional(),
+  error: z.string().max(1000).optional(),
+});
+
+export type CompleteStepInput = z.infer<typeof completeStepSchema>;
+
+/** List workflows query */
+export const listWorkflowsQuerySchema = z.object({
+  isTemplate: z.enum(['true', 'false']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export type ListWorkflowsQuery = z.infer<typeof listWorkflowsQuerySchema>;
+
+/** List executions query */
+export const listExecutionsQuerySchema = z.object({
+  workflowId: z.string().uuid().optional(),
+  status: workflowStatusSchema.optional(),
+  swarmId: z.string().max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export type ListExecutionsQuery = z.infer<typeof listExecutionsQuerySchema>;
+
+// ============================================================================
 // VALIDATION HELPER
 // ============================================================================
 

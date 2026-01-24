@@ -148,7 +148,7 @@ export class BlackboardStorage {
 
     if (options.unreadOnly && options.readerHandle) {
       // Messages not yet read by this handle
-      conditions.push(`NOT (read_by LIKE '%"' || ? || '"%')`);
+      conditions.push('NOT (read_by LIKE \'%"\' || ? || \'"%\')');
       params.push(options.readerHandle);
     }
 
@@ -203,6 +203,13 @@ export class BlackboardStorage {
     }
 
     return updated;
+  }
+
+  /**
+   * Archive a single message (soft delete)
+   */
+  archiveMessage(messageId: string): void {
+    this.archiveMessages([messageId]);
   }
 
   /**

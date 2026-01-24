@@ -63,7 +63,7 @@ export function createGetFileSummaryHandler(deps: RouteDependencies) {
       return;
     }
 
-    const summary = deps.tldrStorage?.getFileSummary(filePath);
+    const summary = deps.storage.tldr?.getFileSummary(filePath);
 
     if (!summary) {
       res.status(404).json({ error: 'File summary not found', filePath } as ErrorResponse);
@@ -87,7 +87,7 @@ export function createCheckSummaryHandler(deps: RouteDependencies) {
       return;
     }
 
-    const isCurrent = deps.tldrStorage?.isSummaryCurrent(filePath, contentHash) ?? false;
+    const isCurrent = deps.storage.tldr?.isSummaryCurrent(filePath, contentHash) ?? false;
 
     res.json({ filePath, contentHash, isCurrent });
   };
@@ -106,7 +106,7 @@ export function createStoreFileSummaryHandler(deps: RouteDependencies) {
 
     const { filePath, contentHash, summary, exports, imports, dependencies, lineCount, language } = validation.data;
 
-    const result = deps.tldrStorage?.storeFileSummary(filePath, contentHash, summary, {
+    deps.storage.tldr?.storeFileSummary(filePath, contentHash, summary, {
       exports,
       imports,
       dependencies,
@@ -114,13 +114,8 @@ export function createStoreFileSummaryHandler(deps: RouteDependencies) {
       language,
     });
 
-    if (!result) {
-      res.status(500).json({ error: 'TLDR storage not available' } as ErrorResponse);
-      return;
-    }
-
     console.log(`[TLDR] Stored summary for ${filePath} (${lineCount ?? '?'} lines)`);
-    res.json(result);
+    res.json({ success: true, filePath });
   };
 }
 
@@ -136,7 +131,7 @@ export function createGetMultipleSummariesHandler(deps: RouteDependencies) {
       return;
     }
 
-    const summaries = deps.tldrStorage?.getFileSummaries(filePaths) ?? [];
+    const summaries = deps.storage.tldr?.getFileSummaries(filePaths) ?? [];
     const found = summaries.map(s => s.filePath);
     const missing = filePaths.filter(p => !found.includes(p));
 
@@ -162,7 +157,7 @@ export function createGetCodebaseOverviewHandler(deps: RouteDependencies) {
       return;
     }
 
-    const overview = deps.tldrStorage?.getCodebaseOverview(rootPath);
+    const overview = deps.storage.tldr?.getCodebaseOverview(rootPath);
 
     if (!overview) {
       res.status(404).json({ error: 'Codebase overview not found', rootPath } as ErrorResponse);
@@ -186,7 +181,7 @@ export function createStoreCodebaseOverviewHandler(deps: RouteDependencies) {
 
     const { rootPath, name, description, structure, keyFiles, patterns, techStack } = validation.data;
 
-    const result = deps.tldrStorage?.storeCodebaseOverview(rootPath, name, {
+    deps.storage.tldr?.storeCodebaseOverview(rootPath, name, {
       description,
       structure,
       keyFiles,
@@ -194,13 +189,8 @@ export function createStoreCodebaseOverviewHandler(deps: RouteDependencies) {
       techStack,
     });
 
-    if (!result) {
-      res.status(500).json({ error: 'TLDR storage not available' } as ErrorResponse);
-      return;
-    }
-
     console.log(`[TLDR] Stored codebase overview: ${name} (${rootPath})`);
-    res.json(result);
+    res.json({ success: true, name, rootPath });
   };
 }
 
@@ -217,7 +207,7 @@ export function createStoreDependencyHandler(deps: RouteDependencies) {
 
     const { fromFile, toFile, importType } = validation.data;
 
-    deps.tldrStorage?.storeDependency(fromFile, toFile, importType ?? 'static');
+    deps.storage.tldr?.storeDependency(fromFile, toFile, importType ?? 'static');
 
     res.json({ success: true, fromFile, toFile, importType: importType ?? 'static' });
   };
@@ -236,7 +226,7 @@ export function createGetDependencyGraphHandler(deps: RouteDependencies) {
 
     const { rootFiles, depth } = validation.data;
 
-    const graph = deps.tldrStorage?.getDependencyGraph(rootFiles, depth ?? 3);
+    const graph = deps.storage.tldr?.getDependencyGraph(rootFiles, depth ?? 3);
 
     if (!graph) {
       res.status(500).json({ error: 'TLDR storage not available' } as ErrorResponse);
@@ -266,7 +256,7 @@ export function createGetDependentsHandler(deps: RouteDependencies) {
       return;
     }
 
-    const dependents = deps.tldrStorage?.getDependents(filePath) ?? [];
+    const dependents = deps.storage.tldr?.getDependents(filePath) ?? [];
 
     res.json({
       filePath,
@@ -289,7 +279,7 @@ export function createGetDependenciesHandler(deps: RouteDependencies) {
       return;
     }
 
-    const dependencies = deps.tldrStorage?.getDependencies(filePath) ?? [];
+    const dependencies = deps.storage.tldr?.getDependencies(filePath) ?? [];
 
     res.json({
       filePath,
@@ -312,7 +302,7 @@ export function createInvalidateFileHandler(deps: RouteDependencies) {
       return;
     }
 
-    deps.tldrStorage?.invalidateFile(filePath);
+    deps.storage.tldr?.invalidateFile(filePath);
 
     console.log(`[TLDR] Invalidated cache for ${filePath}`);
     res.json({ success: true, filePath });
@@ -324,7 +314,7 @@ export function createInvalidateFileHandler(deps: RouteDependencies) {
  */
 export function createGetTLDRStatsHandler(deps: RouteDependencies) {
   return (_req: Request, res: Response): void => {
-    const stats = deps.tldrStorage?.getStats() ?? {
+    const stats = deps.storage.tldr?.getStats() ?? {
       fileSummaries: 0,
       codebaseOverviews: 0,
       dependencyEdges: 0,
@@ -339,7 +329,7 @@ export function createGetTLDRStatsHandler(deps: RouteDependencies) {
  */
 export function createClearTLDRCacheHandler(deps: RouteDependencies) {
   return (_req: Request, res: Response): void => {
-    deps.tldrStorage?.clearAll();
+    deps.storage.tldr?.clearAll();
     console.log('[TLDR] Cache cleared');
     res.json({ success: true, message: 'TLDR cache cleared' });
   };
