@@ -577,7 +577,7 @@ fi
 
 # Get TLDR stats
 TLDR_STATS=$(api GET /tldr/stats "" "$LEAD_TOKEN")
-TLDR_COUNT=$(echo "$TLDR_STATS" | jq -r '.fileSummaries // 0')
+TLDR_COUNT=$(echo "$TLDR_STATS" | jq -r '.files // 0')
 
 if [[ "$TLDR_COUNT" -lt 1 ]]; then
   echo "[E2E] FAIL: TLDR stats should show at least 1 summary"

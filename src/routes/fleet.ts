@@ -270,7 +270,7 @@ export function createBlackboardArchiveOldHandler(deps: RouteDependencies) {
 // ============================================================================
 
 export function createSpawnEnqueueHandler(deps: RouteDependencies) {
-  return (req: Request, res: Response): void => {
+  return async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(spawnEnqueueSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -285,7 +285,7 @@ export function createSpawnEnqueueHandler(deps: RouteDependencies) {
     const authReq = req as AuthenticatedRequest;
     const requesterRole = authReq.user?.agentType === 'team-lead' ? 'lead' : 'worker';
 
-    const requestId = deps.spawnController.queueSpawn(
+    const requestId = await deps.spawnController.queueSpawn(
       requesterHandle,
       targetAgentType as FleetAgentRole,
       depthLevel,
