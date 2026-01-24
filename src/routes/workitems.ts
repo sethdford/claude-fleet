@@ -18,13 +18,14 @@ import type {
   WorkItem,
 } from '../types.js';
 import type { RouteDependencies } from './types.js';
+import { asyncHandler } from './types.js';
 
 // ============================================================================
 // WORK ITEM HANDLERS
 // ============================================================================
 
 export function createCreateWorkItemHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(createWorkItemSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -39,11 +40,11 @@ export function createCreateWorkItemHandler(deps: RouteDependencies) {
     });
     console.log(`[WORKITEM] Created ${workItem.id}: ${title}`);
     res.json(workItem);
-  };
+  });
 }
 
 export function createListWorkItemsHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { status, assignee, batch } = req.query as {
       status?: string;
       assignee?: string;
@@ -57,11 +58,11 @@ export function createListWorkItemsHandler(deps: RouteDependencies) {
 
     const workItems = await deps.storage.workItem.listWorkItems(options);
     res.json(workItems);
-  };
+  });
 }
 
 export function createGetWorkItemHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const workItem = await deps.storage.workItem.getWorkItem(id);
 
@@ -71,11 +72,11 @@ export function createGetWorkItemHandler(deps: RouteDependencies) {
     }
 
     res.json(workItem);
-  };
+  });
 }
 
 export function createUpdateWorkItemHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
     const validation = validateBody(updateWorkItemSchema, req.body);
@@ -99,7 +100,7 @@ export function createUpdateWorkItemHandler(deps: RouteDependencies) {
     const updated = await deps.storage.workItem.getWorkItem(id);
     console.log(`[WORKITEM] ${id} -> ${status}`);
     res.json(updated);
-  };
+  });
 }
 
 // ============================================================================
@@ -107,7 +108,7 @@ export function createUpdateWorkItemHandler(deps: RouteDependencies) {
 // ============================================================================
 
 export function createCreateBatchHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(createBatchSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -118,18 +119,18 @@ export function createCreateBatchHandler(deps: RouteDependencies) {
     const batch = await deps.storage.workItem.createBatch(name, workItemIds);
     console.log(`[BATCH] Created ${batch.id}: ${name}`);
     res.json(batch);
-  };
+  });
 }
 
 export function createListBatchesHandler(deps: RouteDependencies) {
-  return async (_req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const batches = await deps.storage.workItem.listBatches();
     res.json(batches);
-  };
+  });
 }
 
 export function createGetBatchHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const batch = await deps.storage.workItem.getBatch(id);
 
@@ -140,11 +141,11 @@ export function createGetBatchHandler(deps: RouteDependencies) {
 
     const workItems = await deps.storage.workItem.listWorkItems({ batchId: id });
     res.json({ ...batch, workItems });
-  };
+  });
 }
 
 export function createDispatchBatchHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
     const validation = validateBody(dispatchBatchSchema, req.body);
@@ -162,5 +163,5 @@ export function createDispatchBatchHandler(deps: RouteDependencies) {
     const result = await deps.storage.workItem.dispatchBatch(id);
     console.log(`[BATCH] Dispatched ${id} (${result.dispatchedCount} items)`);
     res.json(result);
-  };
+  });
 }

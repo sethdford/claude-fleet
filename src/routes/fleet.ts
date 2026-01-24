@@ -363,7 +363,7 @@ export function createSpawnCancelHandler(deps: RouteDependencies) {
 // ============================================================================
 
 export function createCheckpointCreateHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(checkpointCreateSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -403,11 +403,11 @@ export function createCheckpointCreateHandler(deps: RouteDependencies) {
 
     console.log(`[CHECKPOINT] ${fromHandle} -> ${toHandle}: ${goal.slice(0, 50)}...`);
     res.json(checkpoint);
-  };
+  });
 }
 
 export function createCheckpointLoadHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validate path parameter
     const paramValidation = validateQuery(numericIdParamSchema, req.params);
     if (!paramValidation.success) {
@@ -443,11 +443,11 @@ export function createCheckpointLoadHandler(deps: RouteDependencies) {
     }
 
     res.json(checkpoint);
-  };
+  });
 }
 
 export function createCheckpointLatestHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validate path parameter
     const paramValidation = validateQuery(handleParamSchema, req.params);
     if (!paramValidation.success) {
@@ -470,11 +470,11 @@ export function createCheckpointLatestHandler(deps: RouteDependencies) {
     }
 
     res.json(checkpoint);
-  };
+  });
 }
 
 export function createCheckpointListHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validate path parameter
     const paramValidation = validateQuery(handleParamSchema, req.params);
     if (!paramValidation.success) {
@@ -499,11 +499,11 @@ export function createCheckpointListHandler(deps: RouteDependencies) {
     const { limit } = queryValidation.data;
     const checkpoints = deps.storage.checkpoint.listCheckpoints(handle, { limit });
     res.json(checkpoints);
-  };
+  });
 }
 
 export function createCheckpointAcceptHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validate path parameter
     const paramValidation = validateQuery(numericIdParamSchema, req.params);
     if (!paramValidation.success) {
@@ -541,11 +541,11 @@ export function createCheckpointAcceptHandler(deps: RouteDependencies) {
 
     console.log(`[CHECKPOINT] Accepted ${id}`);
     res.json({ success: true, id });
-  };
+  });
 }
 
 export function createCheckpointRejectHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validate path parameter
     const paramValidation = validateQuery(numericIdParamSchema, req.params);
     if (!paramValidation.success) {
@@ -583,7 +583,7 @@ export function createCheckpointRejectHandler(deps: RouteDependencies) {
 
     console.log(`[CHECKPOINT] Rejected ${id}`);
     res.json({ success: true, id });
-  };
+  });
 }
 
 // ============================================================================
@@ -688,7 +688,7 @@ export function createSwarmGetHandler(deps: RouteDependencies) {
 }
 
 export function createSwarmKillHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validate path parameter
     const { id } = req.params;
     if (!id || id.length > 100 || !/^[a-zA-Z0-9_-]+$/.test(id)) {
@@ -740,5 +740,5 @@ export function createSwarmKillHandler(deps: RouteDependencies) {
 
     console.log(`[SWARM] Killed ${id}: dismissed ${dismissed.length} agents`);
     res.json({ success: true, swarmId: id, dismissed });
-  };
+  });
 }

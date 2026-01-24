@@ -21,6 +21,7 @@ import {
 import type { AuthenticatedRequest } from '../middleware/auth.js';
 import type { ErrorResponse } from '../types.js';
 import type { RouteDependencies } from './types.js';
+import { asyncHandler } from './types.js';
 
 // ============================================================================
 // WORKFLOW CRUD HANDLERS
@@ -193,7 +194,7 @@ export function createDeleteWorkflowHandler(deps: RouteDependencies) {
  * POST /workflows/:id/start - Start workflow execution
  */
 export function createStartWorkflowHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const paramValidation = validateQuery(uuidIdParamSchema, req.params);
     if (!paramValidation.success) {
       res.status(400).json({ error: 'Invalid workflow ID format' } as ErrorResponse);
@@ -227,7 +228,7 @@ export function createStartWorkflowHandler(deps: RouteDependencies) {
     } catch (error) {
       res.status(400).json({ error: (error as Error).message } as ErrorResponse);
     }
-  };
+  });
 }
 
 /**
@@ -294,7 +295,7 @@ export function createGetExecutionHandler(deps: RouteDependencies) {
  * POST /executions/:id/pause - Pause execution
  */
 export function createPauseExecutionHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const paramValidation = validateQuery(uuidIdParamSchema, req.params);
     if (!paramValidation.success) {
       res.status(400).json({ error: 'Invalid execution ID format' } as ErrorResponse);
@@ -314,14 +315,14 @@ export function createPauseExecutionHandler(deps: RouteDependencies) {
 
     console.log(`[WORKFLOW] Paused execution ${paramValidation.data.id}`);
     res.json({ success: true, id: paramValidation.data.id });
-  };
+  });
 }
 
 /**
  * POST /executions/:id/resume - Resume execution
  */
 export function createResumeExecutionHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const paramValidation = validateQuery(uuidIdParamSchema, req.params);
     if (!paramValidation.success) {
       res.status(400).json({ error: 'Invalid execution ID format' } as ErrorResponse);
@@ -341,14 +342,14 @@ export function createResumeExecutionHandler(deps: RouteDependencies) {
 
     console.log(`[WORKFLOW] Resumed execution ${paramValidation.data.id}`);
     res.json({ success: true, id: paramValidation.data.id });
-  };
+  });
 }
 
 /**
  * POST /executions/:id/cancel - Cancel execution
  */
 export function createCancelExecutionHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const paramValidation = validateQuery(uuidIdParamSchema, req.params);
     if (!paramValidation.success) {
       res.status(400).json({ error: 'Invalid execution ID format' } as ErrorResponse);
@@ -368,7 +369,7 @@ export function createCancelExecutionHandler(deps: RouteDependencies) {
 
     console.log(`[WORKFLOW] Cancelled execution ${paramValidation.data.id}`);
     res.json({ success: true, id: paramValidation.data.id });
-  };
+  });
 }
 
 // ============================================================================
@@ -406,7 +407,7 @@ export function createGetExecutionStepsHandler(deps: RouteDependencies) {
  * POST /steps/:id/retry - Retry a failed step
  */
 export function createRetryStepHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const paramValidation = validateQuery(uuidIdParamSchema, req.params);
     if (!paramValidation.success) {
       res.status(400).json({ error: 'Invalid step ID format' } as ErrorResponse);
@@ -426,14 +427,14 @@ export function createRetryStepHandler(deps: RouteDependencies) {
 
     console.log(`[WORKFLOW] Retrying step ${paramValidation.data.id}`);
     res.json({ success: true, id: paramValidation.data.id });
-  };
+  });
 }
 
 /**
  * POST /steps/:id/complete - Manually complete a step
  */
 export function createCompleteStepHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const paramValidation = validateQuery(uuidIdParamSchema, req.params);
     if (!paramValidation.success) {
       res.status(400).json({ error: 'Invalid step ID format' } as ErrorResponse);
@@ -464,7 +465,7 @@ export function createCompleteStepHandler(deps: RouteDependencies) {
 
     console.log(`[WORKFLOW] Completed step ${paramValidation.data.id}`);
     res.json({ success: true, id: paramValidation.data.id });
-  };
+  });
 }
 
 // ============================================================================
