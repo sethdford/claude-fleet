@@ -33,6 +33,7 @@ import type {
 } from '../types.js';
 import type { FleetAgentRole } from '../workers/agent-roles.js';
 import type { RouteDependencies } from './types.js';
+import { asyncHandler } from './types.js';
 
 // ============================================================================
 // ACCESS CONTROL HELPERS
@@ -114,7 +115,7 @@ export function verifyCheckpointHandleAccess(
 // ============================================================================
 
 export function createBlackboardPostHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(blackboardPostSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -163,11 +164,11 @@ export function createBlackboardPostHandler(deps: RouteDependencies) {
 
     console.log(`[BLACKBOARD] ${senderHandle} -> ${targetHandle ?? 'all'} (${messageType})`);
     res.json(message);
-  };
+  });
 }
 
 export function createBlackboardReadHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validate path parameter
     const paramValidation = validateQuery(swarmIdParamSchema, req.params);
     if (!paramValidation.success) {
@@ -209,11 +210,11 @@ export function createBlackboardReadHandler(deps: RouteDependencies) {
 
     const messages = deps.storage.blackboard.readMessages(swarmId, options);
     res.json(messages);
-  };
+  });
 }
 
 export function createBlackboardMarkReadHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(blackboardMarkReadSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -225,11 +226,11 @@ export function createBlackboardMarkReadHandler(deps: RouteDependencies) {
     // Mark messages as read (access control handled by swarm membership)
     deps.storage.blackboard.markRead(messageIds, readerHandle);
     res.json({ success: true, marked: messageIds.length });
-  };
+  });
 }
 
 export function createBlackboardArchiveHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(blackboardArchiveSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -242,11 +243,11 @@ export function createBlackboardArchiveHandler(deps: RouteDependencies) {
       deps.storage.blackboard.archiveMessage(id);
     }
     res.json({ success: true, archived: messageIds.length });
-  };
+  });
 }
 
 export function createBlackboardArchiveOldHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validate path parameter
     const paramValidation = validateQuery(swarmIdParamSchema, req.params);
     if (!paramValidation.success) {
@@ -271,7 +272,7 @@ export function createBlackboardArchiveOldHandler(deps: RouteDependencies) {
     const ageThreshold = maxAgeMs ?? 24 * 60 * 60 * 1000;
     const count = deps.storage.blackboard.archiveOldMessages(swarmId, ageThreshold);
     res.json({ success: true, archived: count, swarmId });
-  };
+  });
 }
 
 // ============================================================================

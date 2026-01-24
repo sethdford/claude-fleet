@@ -208,7 +208,7 @@ export function createWorktreePRHandler(deps: RouteDependencies) {
 }
 
 export function createWorktreeStatusHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { handle } = req.params;
 
     const worker = deps.workerManager.getWorkerByHandle(handle);
@@ -230,5 +230,5 @@ export function createWorktreeStatusHandler(deps: RouteDependencies) {
       const err = error as Error;
       res.status(500).json({ error: err.message } as ErrorResponse);
     }
-  };
+  });
 }
