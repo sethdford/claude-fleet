@@ -152,6 +152,15 @@ export function createBlackboardPostHandler(deps: RouteDependencies) {
       { targetHandle, priority }
     );
 
+    // Broadcast WebSocket event for real-time dashboard updates
+    if (deps.broadcastToAll) {
+      deps.broadcastToAll({
+        type: 'blackboard_message',
+        swarmId,
+        message,
+      });
+    }
+
     console.log(`[BLACKBOARD] ${senderHandle} -> ${targetHandle ?? 'all'} (${messageType})`);
     res.json(message);
   };
@@ -603,6 +612,15 @@ export function createSwarmCreateHandler(deps: RouteDependencies) {
     deps.storage.insertSwarm(swarm);
     // Also keep in memory for fast access
     deps.swarms.set(id, swarm);
+
+    // Broadcast WebSocket event for real-time dashboard updates
+    if (deps.broadcastToAll) {
+      deps.broadcastToAll({
+        type: 'swarm_created',
+        swarm,
+      });
+    }
+
     console.log(`[SWARM] Created ${id}: ${name}`);
     res.json(swarm);
   };
@@ -707,6 +725,16 @@ export function createSwarmKillHandler(deps: RouteDependencies) {
       // Delete from both SQLite and memory
       deps.storage.deleteSwarm(id);
       deps.swarms.delete(id);
+    }
+
+    // Broadcast WebSocket event for real-time dashboard updates
+    if (deps.broadcastToAll) {
+      deps.broadcastToAll({
+        type: 'swarm_killed',
+        swarmId: id,
+        dismissed,
+        deleted: !graceful,
+      });
     }
 
     console.log(`[SWARM] Killed ${id}: dismissed ${dismissed.length} agents`);

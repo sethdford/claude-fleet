@@ -16,6 +16,7 @@ import type {
   ICheckpointStorage,
   ISpawnQueueStorage,
   ITLDRStorage,
+  SwarmData,
 } from '../interfaces.js';
 import { SQLiteStorage } from '../sqlite.js';
 import { BlackboardStorage } from '../blackboard.js';
@@ -826,5 +827,22 @@ export class SQLiteStorageAdapter implements IStorage {
    */
   getRawSpawnQueue(): SpawnQueueStorage {
     return this.spawnQueueStorage;
+  }
+
+  // Swarm storage methods (delegating to SQLiteStorage)
+  insertSwarm(swarm: { id: string; name: string; description?: string; maxAgents?: number }): void {
+    this.storage.insertSwarm(swarm);
+  }
+
+  getSwarm(swarmId: string): SwarmData | null {
+    return this.storage.getSwarm(swarmId);
+  }
+
+  getAllSwarms(): SwarmData[] {
+    return this.storage.getAllSwarms();
+  }
+
+  deleteSwarm(swarmId: string): void {
+    this.storage.deleteSwarm(swarmId);
   }
 }

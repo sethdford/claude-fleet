@@ -108,6 +108,22 @@ class WebSocketManager {
         this.emit('task:assigned', data);
         break;
 
+      case 'task_updated':
+        this.emit('task:updated', data);
+        break;
+
+      case 'blackboard_message':
+        this.emit('blackboard:message', data);
+        break;
+
+      case 'swarm_created':
+        this.emit('swarm:created', data.swarm);
+        break;
+
+      case 'swarm_killed':
+        this.emit('swarm:killed', data);
+        break;
+
       case 'subscribed':
         this.emit('subscribed', { chatId: data.chatId });
         break;

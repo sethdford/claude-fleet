@@ -14,6 +14,7 @@ import {
 import { tasksCreated, tasksCompleted } from '../metrics/prometheus.js';
 import type { TeamTask, Message, Chat, ErrorResponse, TaskStatus } from '../types.js';
 import type { RouteDependencies, BroadcastToChat } from './types.js';
+import { asyncHandler } from './types.js';
 import { generateChatId } from './core.js';
 
 // ============================================================================
@@ -21,7 +22,7 @@ import { generateChatId } from './core.js';
 // ============================================================================
 
 export function createCreateTaskHandler(deps: RouteDependencies, broadcastToChat: BroadcastToChat) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(createTaskSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -97,22 +98,22 @@ export function createCreateTaskHandler(deps: RouteDependencies, broadcastToChat
     console.log(`[TASK] ${fromUser.handle} -> ${toHandle}: ${subject}`);
     broadcastToChat(chatId, { type: 'task_assigned', task, handle: fromUser.handle });
     res.json(task);
-  };
+  });
 }
 
 export function createGetTaskHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const task = await deps.storage.team.getTask(req.params.taskId);
     if (!task) {
       res.status(404).json({ error: 'Task not found' } as ErrorResponse);
       return;
     }
     res.json(task);
-  };
+  });
 }
 
 export function createUpdateTaskHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { taskId } = req.params;
 
     const validation = validateBody(updateTaskSchema, req.body);
@@ -151,7 +152,19 @@ export function createUpdateTaskHandler(deps: RouteDependencies) {
     if (status === 'resolved') {
       tasksCompleted.inc();
     }
+
+    // Broadcast WebSocket event for real-time dashboard updates
+    if (deps.broadcastToAll) {
+      deps.broadcastToAll({
+        type: 'task_updated',
+        taskId,
+        status,
+        teamName: task.teamName,
+        ownerHandle: task.ownerHandle,
+      });
+    }
+
     console.log(`[TASK] ${taskId.slice(0, 8)}... status -> ${status}`);
     res.json({ ...task, status, updatedAt: now });
-  };
+  });
 }

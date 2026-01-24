@@ -284,6 +284,79 @@ function setupWebSocketHandlers() {
     // Refresh data on reconnect
     refreshAll();
   });
+
+  // Swarm events
+  wsManager.on('swarm:created', (swarm) => {
+    const swarms = store.get('swarms') || [];
+    if (!swarms.find(s => s.id === swarm.id)) {
+      store.set('swarms', [...swarms, swarm]);
+    }
+    store.addActivity({
+      type: 'spawn',
+      title: `Swarm created: ${escapeHtml(swarm.name)}`,
+      preview: swarm.description || null,
+    });
+    updateSidebarLists();
+  });
+
+  wsManager.on('swarm:killed', ({ swarmId, dismissed, deleted }) => {
+    if (deleted) {
+      const swarms = store.get('swarms') || [];
+      store.set('swarms', swarms.filter(s => s.id !== swarmId));
+    }
+    store.addActivity({
+      type: 'dismiss',
+      title: `Swarm ${deleted ? 'deleted' : 'cleared'}: ${escapeHtml(swarmId)}`,
+      preview: `${dismissed.length} agents dismissed`,
+    });
+    updateSidebarLists();
+  });
+
+  // Task events
+  wsManager.on('task:assigned', (data) => {
+    const tasks = store.get('tasks') || [];
+    if (!tasks.find(t => t.id === data.task?.id)) {
+      store.set('tasks', [...tasks, data.task]);
+    }
+    store.addActivity({
+      type: 'message',
+      title: `Task assigned: ${escapeHtml(data.task?.subject || 'Unknown')}`,
+      preview: data.task?.ownerHandle ? `Assigned to ${escapeHtml(data.task.ownerHandle)}` : null,
+    });
+    updateSidebarLists();
+  });
+
+  wsManager.on('task:updated', ({ taskId, status, ownerHandle }) => {
+    const tasks = store.get('tasks') || [];
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      task.status = status;
+      store.set('tasks', [...tasks]);
+    }
+    store.addActivity({
+      type: 'message',
+      title: `Task ${escapeHtml(status)}: ${escapeHtml(taskId.slice(0, 8))}`,
+      preview: ownerHandle ? `Updated by ${escapeHtml(ownerHandle)}` : null,
+    });
+    updateSidebarLists();
+  });
+
+  // Blackboard events
+  wsManager.on('blackboard:message', ({ swarmId, message }) => {
+    store.addActivity({
+      type: 'message',
+      title: `Blackboard: ${escapeHtml(message.messageType)}`,
+      preview: `${escapeHtml(message.senderHandle)} → ${escapeHtml(message.targetHandle || 'all')} in ${escapeHtml(swarmId)}`,
+    });
+
+    // Store blackboard messages for swarm view
+    const blackboard = store.get('blackboard') || {};
+    if (!blackboard[swarmId]) {
+      blackboard[swarmId] = [];
+    }
+    blackboard[swarmId] = [message, ...blackboard[swarmId]].slice(0, 100);
+    store.set('blackboard', blackboard);
+  });
 }
 
 // ============================================================================
@@ -296,6 +369,46 @@ function showLoginModal() {
 
 function hideLoginModal() {
   document.getElementById('login-modal').classList.remove('active');
+}
+
+// Spawn Modal
+function showSpawnModal() {
+  // Populate swarm dropdown
+  const swarmSelect = document.getElementById('spawn-swarm');
+  const swarms = store.get('swarms') || [];
+  swarmSelect.innerHTML = '<option value="">None</option>' +
+    swarms.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('');
+  document.getElementById('spawn-modal').classList.add('active');
+}
+
+function hideSpawnModal() {
+  document.getElementById('spawn-modal').classList.remove('active');
+  document.getElementById('spawn-form').reset();
+}
+
+// Swarm Modal
+function showSwarmModal() {
+  document.getElementById('swarm-modal').classList.add('active');
+}
+
+function hideSwarmModal() {
+  document.getElementById('swarm-modal').classList.remove('active');
+  document.getElementById('swarm-form').reset();
+}
+
+// Task Modal
+function showTaskModal() {
+  // Populate assignee dropdown with workers
+  const assigneeSelect = document.getElementById('task-assignee');
+  const workers = store.get('workers') || [];
+  assigneeSelect.innerHTML = '<option value="">Select worker...</option>' +
+    workers.map(w => `<option value="${escapeHtml(w.handle)}">${escapeHtml(w.handle)}</option>`).join('');
+  document.getElementById('task-modal').classList.add('active');
+}
+
+function hideTaskModal() {
+  document.getElementById('task-modal').classList.remove('active');
+  document.getElementById('task-form').reset();
 }
 
 function setupLoginForm() {
@@ -405,6 +518,120 @@ async function initializeApp() {
       router.handleRoute();
     });
 
+    // Logout button
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      ApiClient.logout();
+      wsManager.disconnect();
+      store.clear();
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+      showLoginModal();
+      updateUserInfo();
+    });
+
+    // Spawn modal
+    document.getElementById('spawn-btn').addEventListener('click', showSpawnModal);
+    document.getElementById('spawn-modal-close').addEventListener('click', hideSpawnModal);
+    document.getElementById('spawn-cancel').addEventListener('click', hideSpawnModal);
+    document.getElementById('spawn-submit').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const handle = document.getElementById('spawn-handle').value.trim();
+      const prompt = document.getElementById('spawn-prompt').value.trim();
+      const swarmId = document.getElementById('spawn-swarm').value || undefined;
+      const workingDir = document.getElementById('spawn-workdir').value.trim() || undefined;
+
+      if (!handle) {
+        alert('Handle is required');
+        return;
+      }
+
+      try {
+        document.getElementById('spawn-submit').disabled = true;
+        document.getElementById('spawn-submit').textContent = 'Spawning...';
+        await ApiClient.spawnWorker(handle, prompt || undefined, { swarmId, workingDir });
+        hideSpawnModal();
+        await fetchWorkers();
+        store.addActivity({
+          type: 'spawn',
+          title: `Spawned worker: ${handle}`,
+          handle,
+        });
+      } catch (err) {
+        alert('Failed to spawn worker: ' + err.message);
+      } finally {
+        document.getElementById('spawn-submit').disabled = false;
+        document.getElementById('spawn-submit').textContent = 'Spawn';
+      }
+    });
+
+    // Swarm modal
+    document.getElementById('swarm-modal-close').addEventListener('click', hideSwarmModal);
+    document.getElementById('swarm-cancel').addEventListener('click', hideSwarmModal);
+    document.getElementById('swarm-submit').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('swarm-name').value.trim();
+      const description = document.getElementById('swarm-description').value.trim() || undefined;
+      const maxAgents = parseInt(document.getElementById('swarm-max-agents').value, 10) || 10;
+
+      if (!name) {
+        alert('Name is required');
+        return;
+      }
+
+      try {
+        document.getElementById('swarm-submit').disabled = true;
+        document.getElementById('swarm-submit').textContent = 'Creating...';
+        await ApiClient.createSwarm(name, description, maxAgents);
+        hideSwarmModal();
+        await fetchSwarms();
+      } catch (err) {
+        alert('Failed to create swarm: ' + err.message);
+      } finally {
+        document.getElementById('swarm-submit').disabled = false;
+        document.getElementById('swarm-submit').textContent = 'Create';
+      }
+    });
+
+    // Task modal
+    document.getElementById('task-modal-close').addEventListener('click', hideTaskModal);
+    document.getElementById('task-cancel').addEventListener('click', hideTaskModal);
+    document.getElementById('task-submit').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const subject = document.getElementById('task-subject').value.trim();
+      const description = document.getElementById('task-description').value.trim() || undefined;
+      const toHandle = document.getElementById('task-assignee').value;
+      const user = ApiClient.getUser();
+
+      if (!subject || !toHandle) {
+        alert('Subject and assignee are required');
+        return;
+      }
+
+      try {
+        document.getElementById('task-submit').disabled = true;
+        document.getElementById('task-submit').textContent = 'Creating...';
+        await ApiClient.request('/tasks', {
+          method: 'POST',
+          body: JSON.stringify({
+            fromUid: user.uid,
+            toHandle,
+            teamName: user.teamName,
+            subject,
+            description,
+          }),
+        });
+        hideTaskModal();
+        await fetchTasks();
+      } catch (err) {
+        alert('Failed to create task: ' + err.message);
+      } finally {
+        document.getElementById('task-submit').disabled = false;
+        document.getElementById('task-submit').textContent = 'Create';
+      }
+    });
+
     // Handle logout events
     window.addEventListener('auth:logout', () => {
       wsManager.disconnect();
@@ -464,11 +691,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// Export for debugging
+// Export for debugging and access from views
 window.fleetDashboard = {
   store,
   wsManager,
   ApiClient,
   router,
   refreshAll,
+  showSpawnModal,
+  showSwarmModal,
+  showTaskModal,
 };

@@ -948,7 +948,7 @@ export class WorkflowStorage {
                 type: 'gate' as const,
                 condition: {
                   type: 'expression' as const,
-                  condition: "steps.approval.output.approved === true",
+                  condition: 'steps.approval.output.approved === true',
                 },
                 onTrue: ['execute'],
                 onFalse: ['reject'],

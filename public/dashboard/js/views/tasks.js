@@ -352,6 +352,14 @@ export async function renderTasks(container) {
       }
     </style>
 
+    <div style="display: flex; justify-content: flex-end; margin-bottom: var(--space-md);">
+      <button class="btn btn-primary btn-sm" onclick="window.fleetDashboard.showTaskModal()">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
+        Create Task
+      </button>
+    </div>
     <div class="kanban-board" id="kanban-board">
       ${['open', 'in_progress', 'blocked', 'resolved'].map(status => renderColumn(status, tasks)).join('')}
     </div>

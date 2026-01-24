@@ -217,7 +217,15 @@ export async function renderOverview(container) {
     </section>
 
     <section class="mb-md">
-      <h2 class="card-subtitle mb-md">Active Swarms</h2>
+      <div style="display: flex; justify-content: space-between; align-items: center;" class="mb-md">
+        <h2 class="card-subtitle">Active Swarms</h2>
+        <button class="btn btn-secondary btn-sm" onclick="window.fleetDashboard.showSwarmModal()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Create Swarm
+        </button>
+      </div>
       <div id="swarms-container">
         ${renderSwarmTiles(swarms)}
       </div>

@@ -22,6 +22,7 @@ import type {
   WorkerState,
 } from '../types.js';
 import type { RouteDependencies } from './types.js';
+import { asyncHandler } from './types.js';
 
 // ============================================================================
 // HASH HELPERS
@@ -45,7 +46,7 @@ export function generateTeamChatId(teamName: string): string {
 // ============================================================================
 
 export function createHealthHandler(deps: RouteDependencies) {
-  return async (_req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const debug = await deps.storage.team.getDebugInfo();
     const response: HealthResponse = {
       status: 'ok',
@@ -58,11 +59,11 @@ export function createHealthHandler(deps: RouteDependencies) {
       workers: deps.workerManager.getWorkerCount(),
     };
     res.json(response);
-  };
+  });
 }
 
 export function createMetricsJsonHandler(deps: RouteDependencies) {
-  return async (_req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const debug = await deps.storage.team.getDebugInfo();
     const healthStats = deps.workerManager.getHealthStats();
     const restartStats = deps.workerManager.getRestartStats();
@@ -109,11 +110,11 @@ export function createMetricsJsonHandler(deps: RouteDependencies) {
     };
 
     res.json(metrics);
-  };
+  });
 }
 
 export function createAuthHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(agentRegistrationSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -151,11 +152,11 @@ export function createAuthHandler(deps: RouteDependencies) {
       token,
     };
     res.json(response);
-  };
+  });
 }
 
 export function createDebugHandler(deps: RouteDependencies) {
-  return async (_req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const debug = await deps.storage.team.getDebugInfo();
     const workers = deps.workerManager.getWorkers().map(w => ({
       id: w.id,
@@ -163,5 +164,5 @@ export function createDebugHandler(deps: RouteDependencies) {
       state: w.state,
     }));
     res.json({ ...debug, workers });
-  };
+  });
 }

@@ -15,13 +15,14 @@ import {
 import { workerSpawns, workerDismissals } from '../metrics/prometheus.js';
 import type { ErrorResponse } from '../types.js';
 import type { RouteDependencies, BroadcastToAll } from './types.js';
+import { asyncHandler } from './types.js';
 
 // ============================================================================
 // WORKER HANDLERS
 // ============================================================================
 
 export function createSpawnWorkerHandler(deps: RouteDependencies, broadcastToAll: BroadcastToAll) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(spawnWorkerSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -36,11 +37,11 @@ export function createSpawnWorkerHandler(deps: RouteDependencies, broadcastToAll
     } catch (error) {
       res.status(400).json({ error: (error as Error).message } as ErrorResponse);
     }
-  };
+  });
 }
 
 export function createDismissWorkerHandler(deps: RouteDependencies, broadcastToAll: BroadcastToAll) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { handle } = req.params;
 
     const worker = deps.workerManager.getWorkerByHandle(handle);
@@ -53,7 +54,7 @@ export function createDismissWorkerHandler(deps: RouteDependencies, broadcastToA
     workerDismissals.inc();
     broadcastToAll({ type: 'worker_dismissed', handle });
     res.json({ success: true, handle });
-  };
+  });
 }
 
 export function createSendToWorkerHandler(deps: RouteDependencies) {
@@ -115,7 +116,7 @@ export function createGetWorkerOutputHandler(deps: RouteDependencies) {
 // ============================================================================
 
 export function createWorktreeCommitHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { handle } = req.params;
 
     const validation = validateBody(worktreeCommitSchema, req.body);
@@ -144,11 +145,11 @@ export function createWorktreeCommitHandler(deps: RouteDependencies) {
       const err = error as Error;
       res.status(500).json({ error: err.message } as ErrorResponse);
     }
-  };
+  });
 }
 
 export function createWorktreePushHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { handle } = req.params;
 
     const worker = deps.workerManager.getWorkerByHandle(handle);
@@ -170,11 +171,11 @@ export function createWorktreePushHandler(deps: RouteDependencies) {
       const err = error as Error;
       res.status(500).json({ error: err.message } as ErrorResponse);
     }
-  };
+  });
 }
 
 export function createWorktreePRHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { handle } = req.params;
 
     const validation = validateBody(worktreePRSchema, req.body);
@@ -203,7 +204,7 @@ export function createWorktreePRHandler(deps: RouteDependencies) {
       const err = error as Error;
       res.status(500).json({ error: err.message } as ErrorResponse);
     }
-  };
+  });
 }
 
 export function createWorktreeStatusHandler(deps: RouteDependencies) {

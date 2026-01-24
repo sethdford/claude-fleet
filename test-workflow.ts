@@ -143,7 +143,7 @@ async function testWorkflowCompletion() {
   });
 
   const exec = await engine.startWorkflow(workflow.id, 'test');
-  let steps = wf.getStepsByExecution(exec.id);
+  const steps = wf.getStepsByExecution(exec.id);
   const step = steps[0];
 
   // Complete the only step
@@ -175,7 +175,7 @@ async function testGateStepRouting() {
         type: 'gate',
         condition: {
           type: 'expression' as const,
-          condition: "steps.check.output.approved === true"
+          condition: 'steps.check.output.approved === true'
         },
         onTrue: ['proceed'],
         onFalse: ['reject']
@@ -329,7 +329,7 @@ async function testGateFalseCondition() {
         type: 'gate',
         condition: {
           type: 'expression' as const,
-          condition: "steps.check.output.approved === true"
+          condition: 'steps.check.output.approved === true'
         },
         onTrue: ['proceed'],
         onFalse: ['reject']
@@ -418,7 +418,7 @@ async function testContextPropagation() {
         type: 'gate',
         condition: {
           type: 'expression' as const,
-          condition: "steps.producer.output.value > 10"
+          condition: 'steps.producer.output.value > 10'
         },
         onTrue: ['high'],
         onFalse: ['low']
@@ -445,10 +445,10 @@ async function testContextPropagation() {
   console.log('  low:', low.status);
 
   if (high.status !== 'ready' && high.blockedByCount !== 0) {
-    throw new Error(`FAIL: High should be ready when value>10`);
+    throw new Error('FAIL: High should be ready when value>10');
   }
   if (low.status !== 'skipped') {
-    throw new Error(`FAIL: Low should be skipped when value>10`);
+    throw new Error('FAIL: Low should be skipped when value>10');
   }
 
   db.close();
@@ -559,7 +559,7 @@ async function testParallelStep() {
   });
 
   const exec = await engine.startWorkflow(workflow.id, 'test');
-  let steps = wf.getStepsByExecution(exec.id);
+  const steps = wf.getStepsByExecution(exec.id);
 
   console.log('Initial state:');
   steps.forEach(s => console.log(`  ${s.stepKey}: blocked=${s.blockedByCount}, status=${s.status}`));

@@ -16,6 +16,7 @@ import {
 import { messagesSent, broadcastsSent } from '../metrics/prometheus.js';
 import type { Chat, Message, ErrorResponse } from '../types.js';
 import type { RouteDependencies, BroadcastToChat } from './types.js';
+import { asyncHandler } from './types.js';
 import { generateChatId, generateTeamChatId } from './core.js';
 
 // ============================================================================
@@ -23,18 +24,18 @@ import { generateChatId, generateTeamChatId } from './core.js';
 // ============================================================================
 
 export function createGetUserHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const user = await deps.storage.team.getUser(req.params.uid);
     if (!user) {
       res.status(404).json({ error: 'User not found' } as ErrorResponse);
       return;
     }
     res.json(user);
-  };
+  });
 }
 
 export function createGetUserChatsHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { uid } = req.params;
     const chats = await deps.storage.team.getChatsByUser(uid);
     const result = await Promise.all(chats.map(async (chat: Chat) => {
@@ -50,7 +51,7 @@ export function createGetUserChatsHandler(deps: RouteDependencies) {
       };
     }));
     res.json(result);
-  };
+  });
 }
 
 // ============================================================================
@@ -58,13 +59,13 @@ export function createGetUserChatsHandler(deps: RouteDependencies) {
 // ============================================================================
 
 export function createGetTeamAgentsHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     res.json(await deps.storage.team.getUsersByTeam(req.params.teamName));
-  };
+  });
 }
 
 export function createBroadcastHandler(deps: RouteDependencies, broadcastToChat: BroadcastToChat) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { teamName } = req.params;
 
     const validation = validateBody(broadcastSchema, req.body);
@@ -123,14 +124,14 @@ export function createBroadcastHandler(deps: RouteDependencies, broadcastToChat:
     console.log(`[BROADCAST] ${fromUser.handle} -> ${teamName}: ${text.slice(0, 50)}...`);
     broadcastToChat(teamChatId, { type: 'broadcast', message, handle: fromUser.handle });
     res.json(message);
-  };
+  });
 }
 
 export function createGetTeamTasksHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const tasks = await deps.storage.team.getTasksByTeam(req.params.teamName);
     res.json(tasks);
-  };
+  });
 }
 
 // ============================================================================
@@ -138,7 +139,7 @@ export function createGetTeamTasksHandler(deps: RouteDependencies) {
 // ============================================================================
 
 export function createCreateChatHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const validation = validateBody(createChatSchema, req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error } as ErrorResponse);
@@ -176,11 +177,11 @@ export function createCreateChatHandler(deps: RouteDependencies) {
       console.log(`[CHAT] Created ${chatId}`);
     }
     res.json({ chatId });
-  };
+  });
 }
 
 export function createGetMessagesHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { chatId } = req.params;
     const { limit = '50', after } = req.query;
 
@@ -202,11 +203,11 @@ export function createGetMessagesHandler(deps: RouteDependencies) {
     }
 
     res.json(messages);
-  };
+  });
 }
 
 export function createSendMessageHandler(deps: RouteDependencies, broadcastToChat: BroadcastToChat) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { chatId } = req.params;
 
     const validation = validateBody(sendMessageSchema, req.body);
@@ -253,11 +254,11 @@ export function createSendMessageHandler(deps: RouteDependencies, broadcastToCha
     console.log(`[MSG] ${fromUser.handle}: ${text.slice(0, 50)}...`);
     broadcastToChat(chatId, { type: 'new_message', message, handle: fromUser.handle });
     res.json(message);
-  };
+  });
 }
 
 export function createMarkReadHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { chatId } = req.params;
 
     const validation = validateBody(markReadSchema, req.body);
@@ -275,5 +276,5 @@ export function createMarkReadHandler(deps: RouteDependencies) {
 
     await deps.storage.team.clearUnread(chatId, uid);
     res.json({ success: true });
-  };
+  });
 }

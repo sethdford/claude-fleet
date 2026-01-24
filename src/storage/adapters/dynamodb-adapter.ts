@@ -186,6 +186,7 @@ export class DynamoDBStorageAdapter implements IStorage {
   public tldr: ITLDRStorage;
 
   private config: DynamoDBConfig;
+  private swarms = new Map<string, { id: string; name: string; description: string | null; maxAgents: number; createdAt: number }>();
 
   constructor(config: DynamoDBConfig) {
     this.config = config;
@@ -212,5 +213,28 @@ export class DynamoDBStorageAdapter implements IStorage {
   async isHealthy(): Promise<boolean> {
     // Would perform a DescribeTable or similar health check
     return true;
+  }
+
+  // Swarm methods (in-memory fallback for stub implementation)
+  insertSwarm(swarm: { id: string; name: string; description?: string; maxAgents?: number }): void {
+    this.swarms.set(swarm.id, {
+      id: swarm.id,
+      name: swarm.name,
+      description: swarm.description ?? null,
+      maxAgents: swarm.maxAgents ?? 50,
+      createdAt: Date.now(),
+    });
+  }
+
+  getSwarm(swarmId: string): { id: string; name: string; description: string | null; maxAgents: number; createdAt: number } | null {
+    return this.swarms.get(swarmId) ?? null;
+  }
+
+  getAllSwarms(): { id: string; name: string; description: string | null; maxAgents: number; createdAt: number }[] {
+    return Array.from(this.swarms.values());
+  }
+
+  deleteSwarm(swarmId: string): void {
+    this.swarms.delete(swarmId);
   }
 }

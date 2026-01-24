@@ -192,6 +192,7 @@ export class PostgreSQLStorageAdapter implements IStorage {
   public tldr: ITLDRStorage;
 
   private config: PostgreSQLConfig;
+  private swarms = new Map<string, { id: string; name: string; description: string | null; maxAgents: number; createdAt: number }>();
 
   constructor(config: PostgreSQLConfig) {
     this.config = config;
@@ -220,5 +221,28 @@ export class PostgreSQLStorageAdapter implements IStorage {
   async isHealthy(): Promise<boolean> {
     // Would perform SELECT 1 to verify connectivity
     return true;
+  }
+
+  // Swarm methods (in-memory fallback for stub implementation)
+  insertSwarm(swarm: { id: string; name: string; description?: string; maxAgents?: number }): void {
+    this.swarms.set(swarm.id, {
+      id: swarm.id,
+      name: swarm.name,
+      description: swarm.description ?? null,
+      maxAgents: swarm.maxAgents ?? 50,
+      createdAt: Date.now(),
+    });
+  }
+
+  getSwarm(swarmId: string): { id: string; name: string; description: string | null; maxAgents: number; createdAt: number } | null {
+    return this.swarms.get(swarmId) ?? null;
+  }
+
+  getAllSwarms(): { id: string; name: string; description: string | null; maxAgents: number; createdAt: number }[] {
+    return Array.from(this.swarms.values());
+  }
+
+  deleteSwarm(swarmId: string): void {
+    this.swarms.delete(swarmId);
   }
 }

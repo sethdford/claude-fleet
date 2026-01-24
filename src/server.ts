@@ -145,6 +145,7 @@ export class CollabServer {
       spawnController: this.spawnController,
       swarms: this.swarms,
       startTime: this.startTime,
+      broadcastToAll: this.broadcastToAll.bind(this),
     };
 
     this.setupMiddleware();
