@@ -342,7 +342,7 @@ export function createSpawnGetHandler(deps: RouteDependencies) {
 }
 
 export function createSpawnCancelHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     // Validate path parameter (UUID)
     const paramValidation = validateQuery(uuidIdParamSchema, req.params);
     if (!paramValidation.success) {
@@ -355,7 +355,7 @@ export function createSpawnCancelHandler(deps: RouteDependencies) {
 
     console.log(`[SPAWN] Cancelled ${id}`);
     res.json({ success: true, id });
-  };
+  });
 }
 
 // ============================================================================
