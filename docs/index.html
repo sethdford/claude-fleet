@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Fleet - Multi-Agent Orchestration for Claude Code</title>
+  <meta name="description" content="Coordinate multiple Claude Code instances with fleet orchestration, swarm intelligence, and real-time collaboration.">
+  <meta name="keywords" content="claude, claude-code, multi-agent, orchestration, AI, fleet, swarm">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Claude Fleet - Multi-Agent Orchestration">
+  <meta property="og:description" content="Coordinate multiple Claude Code instances with fleet orchestration and swarm intelligence.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sethdford.github.io/claude-fleet/">
+
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-secondary: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --purple: #a371f7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+    /* Hero */
+    .hero {
+      padding: 80px 0;
+      text-align: center;
+      background: linear-gradient(135deg, var(--bg) 0%, #1a1f2e 100%);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 800;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero .tagline {
+      font-size: 1.5rem;
+      color: var(--text-muted);
+      margin-bottom: 40px;
+    }
+
+    .badges {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .badge.green { border-color: var(--green); color: var(--green); }
+    .badge.blue { border-color: var(--accent); color: var(--accent); }
+
+    .cta-buttons {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #4d9aef;
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+    }
+
+    /* Demo GIF */
+    .demo {
+      padding: 60px 0;
+      text-align: center;
+    }
+
+    .demo h2 {
+      font-size: 2rem;
+      margin-bottom: 30px;
+      color: var(--accent);
+    }
+
+    .demo-gif {
+      max-width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    /* Features */
+    .features {
+      padding: 80px 0;
+      background: var(--bg-secondary);
+    }
+
+    .features h2 {
+      font-size: 2.5rem;
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+    }
+
+    .feature {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 30px;
+    }
+
+    .feature-icon {
+      font-size: 2.5rem;
+      margin-bottom: 15px;
+    }
+
+    .feature h3 {
+      font-size: 1.3rem;
+      margin-bottom: 10px;
+      color: var(--accent);
+    }
+
+    .feature p {
+      color: var(--text-muted);
+    }
+
+    /* Install */
+    .install {
+      padding: 80px 0;
+    }
+
+    .install h2 {
+      font-size: 2.5rem;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .code-block {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 14px;
+      overflow-x: auto;
+      max-width: 600px;
+      margin: 0 auto 20px;
+    }
+
+    .code-block .comment { color: var(--text-muted); }
+    .code-block .cmd { color: var(--green); }
+
+    /* Architecture */
+    .architecture {
+      padding: 80px 0;
+      background: var(--bg-secondary);
+    }
+
+    .architecture h2 {
+      font-size: 2.5rem;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .arch-diagram {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .arch-diagram pre {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      overflow-x: auto;
+    }
+
+    /* Footer */
+    footer {
+      padding: 40px 0;
+      text-align: center;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2.5rem; }
+      .hero .tagline { font-size: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <h1>Claude Fleet</h1>
+      <p class="tagline">Multi-Agent Orchestration for Claude Code</p>
+
+      <div class="badges">
+        <span class="badge green">v2.0.0</span>
+        <span class="badge blue">MIT License</span>
+        <span class="badge">Node.js 18+</span>
+        <span class="badge">TypeScript</span>
+      </div>
+
+      <div class="cta-buttons">
+        <a href="https://github.com/sethdford/claude-fleet" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+        <a href="https://www.npmjs.com/package/claude-fleet" class="btn btn-secondary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M0 7.334v8h6.666v1.332H12v-1.332h12v-8H0zm6.666 6.664H5.334v-4H3.999v4H1.335V8.667h5.331v5.331zm4 0v1.336H8.001V8.667h5.334v5.332h-2.669v-.001zm12.001 0h-1.33v-4h-1.336v4h-1.335v-4h-1.33v4h-2.671V8.667h8.002v5.331zM10.665 10H12v2.667h-1.335V10z"/></svg>
+          npm install
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Demo -->
+  <section class="demo">
+    <div class="container">
+      <h2>Real-Time Fleet Dashboard</h2>
+      <img src="dashboard-demo.gif" alt="Claude Fleet Dashboard Demo" class="demo-gif">
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features">
+    <div class="container">
+      <h2>Features</h2>
+      <div class="feature-grid">
+        <div class="feature">
+          <div class="feature-icon">🚀</div>
+          <h3>Worker Orchestration</h3>
+          <p>Spawn, manage, and coordinate multiple Claude Code worker instances with automatic worktree isolation.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🐝</div>
+          <h3>Swarm Intelligence</h3>
+          <p>Coordinate agent swarms with blackboard messaging, shared context, and intelligent spawn queuing.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📊</div>
+          <h3>Real-Time Dashboard</h3>
+          <p>Monitor fleet health, worker status, and system metrics through an interactive web dashboard.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🔐</div>
+          <h3>Role-Based Access</h3>
+          <p>Team-lead and worker roles with JWT authentication and permission-based API access.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">💾</div>
+          <h3>Persistent Storage</h3>
+          <p>SQLite-based persistence for workers, checkpoints, messages, and work items with crash recovery.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🔌</div>
+          <h3>MCP Integration</h3>
+          <p>Model Context Protocol server for seamless integration with Claude Code and other AI tools.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section class="install">
+    <div class="container">
+      <h2>Quick Start</h2>
+
+      <div class="code-block">
+        <span class="comment"># Install globally</span><br>
+        <span class="cmd">npm install -g claude-fleet</span><br><br>
+        <span class="comment"># Start the fleet server</span><br>
+        <span class="cmd">claude-fleet</span>
+      </div>
+
+      <div class="code-block">
+        <span class="comment"># Or use npx</span><br>
+        <span class="cmd">npx claude-fleet</span>
+      </div>
+
+      <div class="code-block">
+        <span class="comment"># Access the dashboard</span><br>
+        <span class="cmd">open http://localhost:3847/dashboard.html</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section class="architecture">
+    <div class="container">
+      <h2>Architecture</h2>
+      <div class="arch-diagram">
+<pre>
+┌─────────────────────────────────────────────────────────────────┐
+│                     Claude Fleet Server                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
+│  │  Team Lead   │────│   Workers    │────│   Swarms     │       │
+│  │  (Agent)     │    │  (Agents)    │    │  (Groups)    │       │
+│  └──────────────┘    └──────────────┘    └──────────────┘       │
+│         │                   │                   │                │
+│         ▼                   ▼                   ▼                │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                   Coordination Layer                     │    │
+│  │  • Spawn Queue    • Blackboard    • Checkpoints         │    │
+│  │  • Work Items     • Mail System   • Handoffs            │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                              │                                   │
+│         ┌────────────────────┼────────────────────┐             │
+│         ▼                    ▼                    ▼             │
+│  ┌────────────┐      ┌────────────┐      ┌────────────┐        │
+│  │   SQLite   │      │  WebSocket │      │    MCP     │        │
+│  │  Storage   │      │   Server   │      │   Server   │        │
+│  └────────────┘      └────────────┘      └────────────┘        │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <p>
+        Built by <a href="https://github.com/sethdford">Seth Ford</a> |
+        <a href="https://github.com/sethdford/claude-fleet">GitHub</a> |
+        <a href="https://www.npmjs.com/package/claude-fleet">NPM</a> |
+        MIT License
+      </p>
+    </div>
+  </footer>
+</body>
+</html>
