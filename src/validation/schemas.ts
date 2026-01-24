@@ -183,7 +183,7 @@ export const createWorkItemSchema = z.object({
     .max(200, 'Title must be at most 200 characters'),
   description: z.string().max(10000).optional().nullable(),
   assignedTo: handleSchema.optional(),
-  batchId: z.string().max(20).optional(),
+  batchId: z.string().uuid().optional(),
 });
 
 export type CreateWorkItemInput = z.infer<typeof createWorkItemSchema>;

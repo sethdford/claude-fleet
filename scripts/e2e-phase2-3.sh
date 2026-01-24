@@ -114,7 +114,7 @@ echo "[E2E]   Work Item 3 ID: $WI3_ID"
 # Step 4: List work items
 echo "[E2E] Step 4: Listing all work items..."
 LIST_RESPONSE=$(api GET /workitems)
-COUNT=$(echo "$LIST_RESPONSE" | grep -o '"id":"wi-' | wc -l | tr -d ' ')
+COUNT=$(echo "$LIST_RESPONSE" | grep -o '"id":"[a-f0-9-]\{36\}"' | wc -l | tr -d ' ')
 if [[ "$COUNT" -lt 3 ]]; then
   echo "[E2E] FAIL: Expected at least 3 work items, got $COUNT"
   echo "$LIST_RESPONSE"

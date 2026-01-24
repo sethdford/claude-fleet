@@ -231,7 +231,7 @@ describe('Validation Schemas', () => {
         title: 'Implement user auth',
         description: 'Add JWT-based authentication',
         assignedTo: 'worker-1',
-        batchId: 'batch-123',
+        batchId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       });
       expect(result.success).toBe(true);
     });

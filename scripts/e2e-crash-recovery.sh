@@ -125,8 +125,8 @@ echo "[E2E]   Token obtained"
 # Each worker gets a different secret so we can verify individual context restoration
 SECRET_1="PHOENIX-$(date +%s)-ALPHA"
 SECRET_2="DRAGON-$(date +%s)-BETA"
-PROMPT_1="IMPORTANT: Remember this secret code exactly: $SECRET_1. You MUST remember this code. When anyone asks 'what is the secret?' or 'recall the secret', respond with ONLY the secret code. Now, while keeping that secret in memory, explain the fibonacci sequence briefly."
-PROMPT_2="IMPORTANT: Remember this secret code exactly: $SECRET_2. You MUST remember this code. When anyone asks 'what is the secret?' or 'recall the secret', respond with ONLY the secret code. Now, while keeping that secret in memory, explain the fibonacci sequence briefly."
+PROMPT_1="IMPORTANT: Remember this secret code exactly: $SECRET_1. You MUST remember this code. When anyone asks for the secret or to recall the secret, respond with ONLY the secret code. Now, while keeping that secret in memory, explain the fibonacci sequence briefly."
+PROMPT_2="IMPORTANT: Remember this secret code exactly: $SECRET_2. You MUST remember this code. When anyone asks for the secret or to recall the secret, respond with ONLY the secret code. Now, while keeping that secret in memory, explain the fibonacci sequence briefly."
 echo "[E2E]   Secret 1: $SECRET_1"
 echo "[E2E]   Secret 2: $SECRET_2"
 
