@@ -1,15 +1,34 @@
 # Claude Fleet
 
-[![NPM Version](https://img.shields.io/npm/v/claude-fleet)](https://www.npmjs.com/package/claude-fleet)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
+<p align="center">
+  <img src="docs/images/logo.svg" alt="Claude Fleet Logo" width="120">
+</p>
 
-**Multi-agent fleet orchestration for Claude Code.**
+<p align="center">
+  <strong>The infrastructure for AI agent fleets</strong>
+</p>
 
-Claude Fleet enables team collaboration, task management, and worker orchestration across multiple Claude Code instances. Spawn agent swarms, coordinate work via blackboard messaging, and manage distributed AI workflows.
+<p align="center">
+  <a href="https://www.npmjs.com/package/claude-fleet"><img src="https://img.shields.io/npm/v/claude-fleet" alt="NPM Version"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen" alt="Node.js Version"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.3-blue" alt="TypeScript"></a>
+</p>
 
-![Demo](demo.gif)
+<p align="center">
+  <a href="https://sethdford.github.io/claude-fleet/">Documentation</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#features">Features</a> •
+  <a href="https://github.com/sethdford/claude-fleet/issues">Issues</a>
+</p>
+
+---
+
+Orchestrate multiple Claude Code instances with intelligent coordination, swarm intelligence, and real-time collaboration. Build production-grade multi-agent systems.
+
+<p align="center">
+  <img src="demo.gif" alt="Claude Fleet Dashboard" width="800">
+</p>
 
 ---
 
