@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Claude Code Collab Server - Entry Point
+ * Claude Fleet Server - Entry Point
  *
- * Team coordination and worker orchestration for Claude Code instances.
+ * Multi-agent fleet coordination and worker orchestration for Claude Code instances.
  */
 
 import { CollabServer } from './server.js';
@@ -23,4 +23,7 @@ process.on('SIGTERM', async () => {
 });
 
 // Start the server
-server.start();
+server.start().catch((err) => {
+  console.error('[SERVER] Failed to start:', err);
+  process.exit(1);
+});

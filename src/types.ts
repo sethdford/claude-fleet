@@ -341,6 +341,7 @@ export interface TeamStorage {
 export interface ServerConfig {
   port: number;
   dbPath: string;
+  storageBackend?: 'sqlite' | 'dynamodb' | 's3' | 'firestore' | 'postgresql';
   jwtSecret: string;
   jwtExpiresIn: string;
   maxWorkers: number;
@@ -449,6 +450,8 @@ export interface PersistentWorker {
   lastHeartbeat: number | null;
   restartCount: number;
   role: AgentRole;
+  swarmId: string | null;
+  depthLevel: number;
   createdAt: number;
   dismissedAt: number | null;
 }
@@ -619,4 +622,228 @@ export interface FleetHandoff extends Handoff {
   checkpoint: Checkpoint | null;
   status: 'pending' | 'accepted' | 'rejected';
   outcome: CheckpointOutcome | null;
+}
+
+// ============================================================================
+// WORKFLOW TYPES (Phase 5)
+// ============================================================================
+
+export type WorkflowStatus = 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+export type WorkflowStepStatus = 'pending' | 'ready' | 'running' | 'completed' | 'failed' | 'skipped' | 'blocked';
+export type WorkflowStepType = 'task' | 'spawn' | 'checkpoint' | 'gate' | 'parallel' | 'script';
+export type WorkflowTriggerType = 'event' | 'schedule' | 'webhook' | 'blackboard';
+
+/** Guard condition for step execution */
+export interface WorkflowGuard {
+  /** Expression type */
+  type: 'expression' | 'script' | 'output_check';
+  /** The condition to evaluate */
+  condition: string;
+  /** Variables available in the condition */
+  variables?: string[];
+}
+
+/** Hook for workflow lifecycle events */
+export interface WorkflowHook {
+  type: 'blackboard' | 'mail' | 'callback';
+  config: Record<string, unknown>;
+}
+
+/** Config for 'task' step - creates a work item */
+export interface TaskStepConfig {
+  type: 'task';
+  title: string;
+  description?: string;
+  assignTo?: string | '@spawned' | '@requester';
+}
+
+/** Config for 'spawn' step - spawns a worker agent */
+export interface SpawnStepConfig {
+  type: 'spawn';
+  agentRole: string;
+  task: string;
+  swarmId?: string | '@context';
+}
+
+/** Config for 'checkpoint' step - creates a checkpoint for handoff */
+export interface CheckpointStepConfig {
+  type: 'checkpoint';
+  goal: string;
+  toHandle: string | '@lead' | '@requester';
+  waitForAcceptance?: boolean;
+}
+
+/** Config for 'gate' step - conditional branching */
+export interface GateStepConfig {
+  type: 'gate';
+  condition: WorkflowGuard;
+  onTrue?: string[];
+  onFalse?: string[];
+}
+
+/** Config for 'parallel' step - references step keys to run in parallel */
+export interface ParallelStepConfig {
+  type: 'parallel';
+  stepKeys: string[];
+  strategy: 'all' | 'any' | 'race';
+}
+
+/** Config for 'script' step - run arbitrary logic */
+export interface ScriptStepConfig {
+  type: 'script';
+  script: string;
+  outputKey?: string;
+}
+
+/** Union type for step configs */
+export type WorkflowStepConfig =
+  | TaskStepConfig
+  | SpawnStepConfig
+  | CheckpointStepConfig
+  | GateStepConfig
+  | ParallelStepConfig
+  | ScriptStepConfig;
+
+/** Step definition within a workflow */
+export interface WorkflowStepDefinition {
+  /** Unique key within the workflow */
+  key: string;
+  /** Human-readable name */
+  name: string;
+  /** Step type */
+  type: WorkflowStepType;
+  /** Steps this depends on (keys) */
+  dependsOn?: string[];
+  /** Type-specific configuration */
+  config: WorkflowStepConfig;
+  /** Guard condition for execution */
+  guard?: WorkflowGuard;
+  /** On failure behavior */
+  onFailure?: 'fail' | 'skip' | 'retry' | 'continue';
+  /** Max retry attempts */
+  maxRetries?: number;
+  /** Timeout in milliseconds */
+  timeoutMs?: number;
+}
+
+/** Complete workflow definition */
+export interface WorkflowDefinition {
+  /** Workflow steps */
+  steps: WorkflowStepDefinition[];
+  /** Input parameters schema */
+  inputs?: Record<string, { type: string; required?: boolean; default?: unknown }>;
+  /** Output mappings (key -> step.output.path) */
+  outputs?: Record<string, string>;
+  /** Global timeout */
+  timeoutMs?: number;
+  /** On complete hook */
+  onComplete?: WorkflowHook;
+  /** On failure hook */
+  onFailure?: WorkflowHook;
+}
+
+/** Stored workflow */
+export interface Workflow {
+  id: string;
+  name: string;
+  description: string | null;
+  version: number;
+  definition: WorkflowDefinition;
+  isTemplate: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Workflow execution instance */
+export interface WorkflowExecution {
+  id: string;
+  workflowId: string;
+  swarmId: string | null;
+  status: WorkflowStatus;
+  context: Record<string, unknown>;
+  startedAt: number | null;
+  completedAt: number | null;
+  error: string | null;
+  createdAt: number;
+  createdBy: string;
+}
+
+/** Workflow step instance */
+export interface WorkflowStep {
+  id: string;
+  executionId: string;
+  stepKey: string;
+  name: string | null;
+  stepType: WorkflowStepType;
+  status: WorkflowStepStatus;
+  config: WorkflowStepConfig;
+  dependsOn: string[];
+  blockedByCount: number;
+  output: Record<string, unknown> | null;
+  assignedTo: string | null;
+  startedAt: number | null;
+  completedAt: number | null;
+  error: string | null;
+  retryCount: number;
+  maxRetries: number;
+}
+
+/** Event trigger config */
+export interface EventTriggerConfig {
+  type: 'event';
+  eventType: string;
+  filter?: Record<string, unknown>;
+}
+
+/** Schedule trigger config */
+export interface ScheduleTriggerConfig {
+  type: 'schedule';
+  cron?: string;
+  intervalMs?: number;
+}
+
+/** Webhook trigger config */
+export interface WebhookTriggerConfig {
+  type: 'webhook';
+  path: string;
+  method?: 'GET' | 'POST';
+  secret?: string;
+}
+
+/** Blackboard trigger config */
+export interface BlackboardTriggerConfig {
+  type: 'blackboard';
+  swarmId: string;
+  messageType: BlackboardMessageType;
+  filter?: Record<string, unknown>;
+}
+
+/** Union type for trigger configs */
+export type WorkflowTriggerConfig =
+  | EventTriggerConfig
+  | ScheduleTriggerConfig
+  | WebhookTriggerConfig
+  | BlackboardTriggerConfig;
+
+/** Workflow trigger */
+export interface WorkflowTrigger {
+  id: string;
+  workflowId: string;
+  triggerType: WorkflowTriggerType;
+  config: WorkflowTriggerConfig;
+  isEnabled: boolean;
+  lastFiredAt: number | null;
+  fireCount: number;
+  createdAt: number;
+}
+
+/** Workflow event (audit log) */
+export interface WorkflowEvent {
+  id: number;
+  executionId: string;
+  stepId: string | null;
+  eventType: string;
+  actor: string | null;
+  details: Record<string, unknown> | null;
+  createdAt: number;
 }

@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-SERVER_URL="${CLAUDE_CODE_COLLAB_URL:-http://localhost:3847}"
+SERVER_URL="${CLAUDE_FLEET_URL:-http://localhost:3847}"
 
 ERRORS=0
 WARNINGS=0
@@ -148,7 +148,7 @@ fi
 
 # Check database
 echo -n "Checking database... "
-DB_PATH="${DB_PATH:-$PROJECT_ROOT/collab.db}"
+DB_PATH="${DB_PATH:-$PROJECT_ROOT/fleet.db}"
 if [[ -f "$DB_PATH" ]]; then
   SIZE=$(du -h "$DB_PATH" | cut -f1)
   echo "EXISTS ($SIZE)"

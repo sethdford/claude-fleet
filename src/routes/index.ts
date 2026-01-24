@@ -112,3 +112,25 @@ export {
   createGetTLDRStatsHandler,
   createClearTLDRCacheHandler,
 } from './tldr.js';
+
+// Workflow routes (DAG-based workflow execution)
+export {
+  createCreateWorkflowHandler,
+  createListWorkflowsHandler,
+  createGetWorkflowHandler,
+  createUpdateWorkflowHandler,
+  createDeleteWorkflowHandler,
+  createStartWorkflowHandler,
+  createListExecutionsHandler,
+  createGetExecutionHandler,
+  createPauseExecutionHandler,
+  createResumeExecutionHandler,
+  createCancelExecutionHandler,
+  createGetExecutionStepsHandler,
+  createRetryStepHandler,
+  createCompleteStepHandler,
+  createCreateTriggerHandler,
+  createListTriggersHandler,
+  createDeleteTriggerHandler,
+  createGetExecutionEventsHandler,
+} from './workflows.js';

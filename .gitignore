@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Build output
+dist/
+
 # Database files
 *.db
 *.db-shm
@@ -15,12 +18,15 @@ ui-debug.log
 # Environment
 .env
 .env.local
+.env.*.local
 
 # OS
 .DS_Store
 Thumbs.db
+.worktrees/
 
 # Logs
+logs/
 *.log
 npm-debug.log*
 
@@ -32,3 +38,18 @@ npm-debug.log*
 
 # Backups
 *.backup.*
+
+# Test artifacts
+coverage/
+.nyc_output/
+
+# Temp files
+*.tmp
+*.temp
+
+# NPM package
+*.tgz
+
+# Local config
+.mcp.json
+.claude/

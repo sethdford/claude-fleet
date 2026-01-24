@@ -1,10 +1,10 @@
 openapi: 3.0.3
 info:
-  title: Claude Code Collab API
+  title: Claude Fleet API
   description: |
-    Local collaboration server enabling hidden team mode features in Claude Code.
-    Allows multiple Claude Code instances to collaborate on tasks.
-  version: 1.2.0
+    Multi-agent fleet orchestration server for Claude Code.
+    Provides worker spawning, swarm coordination, and inter-agent communication.
+  version: 2.0.0
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -26,34 +26,52 @@ components:
       properties:
         uid:
           type: string
-          description: Unique user identifier (SHA256 hash)
         handle:
           type: string
-          description: User's display handle
         teamName:
           type: string
-          description: Team the user belongs to
         agentType:
           type: string
           enum: [team-lead, worker]
+        createdAt:
+          type: string
+          format: date-time
+        lastSeen:
+          type: string
+          format: date-time
+
+    AuthResponse:
+      type: object
+      properties:
+        uid:
+          type: string
+        handle:
+          type: string
+        teamName:
+          type: string
+        agentType:
+          type: string
         token:
           type: string
-          description: JWT authentication token (only returned on auth)
+          description: JWT authentication token
 
     Chat:
       type: object
       properties:
         id:
           type: string
-          description: Chat identifier
         participants:
           type: array
           items:
             type: string
-        unread:
-          type: integer
-        lastMessage:
-          $ref: '#/components/schemas/Message'
+        isTeamChat:
+          type: boolean
+        teamName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
         updatedAt:
           type: string
           format: date-time
@@ -65,9 +83,8 @@ components:
           type: string
         chatId:
           type: string
-        from:
+        fromHandle:
           type: string
-          description: "Format: collab:{handle}"
         fromUid:
           type: string
         text:
@@ -92,11 +109,12 @@ components:
           type: string
         description:
           type: string
-        owner:
+          nullable: true
+        ownerHandle:
           type: string
         ownerUid:
           type: string
-        createdBy:
+        createdByHandle:
           type: string
         createdByUid:
           type: string
@@ -107,10 +125,226 @@ components:
           type: array
           items:
             type: string
-          description: Task IDs that block this task
         createdAt:
           type: string
           format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Worker:
+      type: object
+      properties:
+        id:
+          type: string
+        handle:
+          type: string
+        teamName:
+          type: string
+        state:
+          type: string
+          enum: [starting, ready, working, stopping, stopped]
+        workingDir:
+          type: string
+        sessionId:
+          type: string
+        spawnedAt:
+          type: string
+          format: date-time
+        currentTaskId:
+          type: string
+          nullable: true
+        swarmId:
+          type: string
+          nullable: true
+        depthLevel:
+          type: integer
+
+    WorkItem:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, in_progress, completed, blocked, cancelled]
+        assignedTo:
+          type: string
+          nullable: true
+        batchId:
+          type: string
+          nullable: true
+        createdAt:
+          type: integer
+        updatedAt:
+          type: integer
+
+    Batch:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pending, dispatched, completed]
+        createdAt:
+          type: integer
+        workItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkItem'
+
+    Mail:
+      type: object
+      properties:
+        id:
+          type: integer
+        fromHandle:
+          type: string
+        toHandle:
+          type: string
+        subject:
+          type: string
+          nullable: true
+        body:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: integer
+
+    Handoff:
+      type: object
+      properties:
+        id:
+          type: integer
+        fromHandle:
+          type: string
+        toHandle:
+          type: string
+        context:
+          type: string
+        status:
+          type: string
+          enum: [pending, accepted]
+        createdAt:
+          type: integer
+
+    BlackboardMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        swarmId:
+          type: string
+        senderHandle:
+          type: string
+        messageType:
+          type: string
+          enum: [directive, status, question, answer, discovery, alert]
+        payload:
+          type: object
+        targetHandle:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+        isArchived:
+          type: boolean
+        createdAt:
+          type: integer
+
+    SpawnQueueItem:
+      type: object
+      properties:
+        id:
+          type: string
+        requesterHandle:
+          type: string
+        targetAgentType:
+          type: string
+        task:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected, spawned]
+        depthLevel:
+          type: integer
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+        createdAt:
+          type: integer
+
+    Checkpoint:
+      type: object
+      properties:
+        id:
+          type: integer
+        fromHandle:
+          type: string
+        toHandle:
+          type: string
+        goal:
+          type: string
+        now:
+          type: string
+        test:
+          type: string
+        doneThisSession:
+          type: array
+          items:
+            type: string
+        blockers:
+          type: array
+          items:
+            type: string
+        questions:
+          type: array
+          items:
+            type: string
+        next:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, accepted, rejected]
+        createdAt:
+          type: integer
+
+    Swarm:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        maxAgents:
+          type: integer
+        createdAt:
+          type: integer
+        agents:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              handle:
+                type: string
+              state:
+                type: string
 
     Error:
       type: object
@@ -118,20 +352,57 @@ components:
         error:
           type: string
 
+security:
+  - BearerAuth: []
+
 paths:
+  # ============================================================================
+  # SYSTEM
+  # ============================================================================
   /health:
     get:
       summary: Health check
       tags: [System]
+      security: []
       responses:
         '200':
           description: Server health status
 
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: Prometheus format metrics
+
+  /metrics/json:
+    get:
+      summary: JSON metrics
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: JSON format metrics
+
+  /debug:
+    get:
+      summary: Debug information
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: Debug info including users, chats, workers
+
+  # ============================================================================
+  # AUTHENTICATION
+  # ============================================================================
   /auth:
     post:
       summary: Authenticate/register agent
       tags: [Authentication]
-      description: Returns JWT token for subsequent authenticated requests
+      security: []
       requestBody:
         required: true
         content:
@@ -147,14 +418,28 @@ paths:
                 agentType:
                   type: string
                   enum: [team-lead, worker]
+                  default: worker
       responses:
         '200':
-          description: Authentication successful, includes JWT token
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
 
+  # ============================================================================
+  # USERS
+  # ============================================================================
   /users/{uid}:
     get:
       summary: Get user by ID
       tags: [Users]
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: User details
@@ -164,53 +449,148 @@ paths:
   /users/{uid}/chats:
     get:
       summary: List user's chats
-      tags: [Chats]
+      tags: [Users]
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
-          description: List of chats
+          description: List of chats with unread counts
 
+  # ============================================================================
+  # TEAMS
+  # ============================================================================
   /teams/{teamName}/agents:
     get:
       summary: List team agents
       tags: [Teams]
+      parameters:
+        - name: teamName
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
-          description: List of agents
+          description: List of team agents
 
   /teams/{teamName}/broadcast:
     post:
       summary: Broadcast message to team
       tags: [Teams]
+      description: Requires team-lead role
+      parameters:
+        - name: teamName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, text]
+              properties:
+                from:
+                  type: string
+                  description: Sender UID
+                text:
+                  type: string
+                metadata:
+                  type: object
       responses:
         '200':
           description: Broadcast sent
+        '403':
+          description: Requires team-lead role
 
   /teams/{teamName}/tasks:
     get:
       summary: List team tasks
-      tags: [Tasks]
+      tags: [Teams]
+      parameters:
+        - name: teamName
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: List of tasks
 
+  # ============================================================================
+  # CHATS
+  # ============================================================================
   /chats:
     post:
       summary: Create chat between two users
       tags: [Chats]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [uid1, uid2]
+              properties:
+                uid1:
+                  type: string
+                uid2:
+                  type: string
       responses:
         '200':
-          description: Chat created
+          description: Chat created or existing chat returned
 
   /chats/{chatId}/messages:
     get:
       summary: Get chat messages
-      tags: [Messages]
+      tags: [Chats]
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: after
+          in: query
+          schema:
+            type: string
       responses:
         '200':
           description: List of messages
     post:
       summary: Send message
-      tags: [Messages]
+      tags: [Chats]
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, text]
+              properties:
+                from:
+                  type: string
+                text:
+                  type: string
+                metadata:
+                  type: object
       responses:
         '200':
           description: Message sent
@@ -219,15 +599,55 @@ paths:
     post:
       summary: Mark chat as read
       tags: [Chats]
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [uid]
+              properties:
+                uid:
+                  type: string
       responses:
         '200':
           description: Marked as read
 
+  # ============================================================================
+  # TASKS
+  # ============================================================================
   /tasks:
     post:
       summary: Create task
       tags: [Tasks]
-      description: Creates task and notifies assignee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fromUid, toHandle, teamName, subject]
+              properties:
+                fromUid:
+                  type: string
+                toHandle:
+                  type: string
+                teamName:
+                  type: string
+                subject:
+                  type: string
+                description:
+                  type: string
+                blockedBy:
+                  type: array
+                  items:
+                    type: string
       responses:
         '200':
           description: Task created
@@ -236,26 +656,964 @@ paths:
     get:
       summary: Get task
       tags: [Tasks]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Task details
+        '404':
+          description: Task not found
     patch:
       summary: Update task status
       tags: [Tasks]
-      description: |
-        Update task status. Task dependency enforcement:
-        Cannot resolve a task blocked by unresolved tasks.
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [open, in_progress, resolved, blocked]
       responses:
         '200':
           description: Task updated
         '400':
           description: Blocked by unresolved tasks
 
+  # ============================================================================
+  # WORKER ORCHESTRATION
+  # ============================================================================
+  /orchestrate/spawn:
+    post:
+      summary: Spawn a new worker
+      tags: [Orchestration]
+      description: Requires team-lead role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [handle, initialPrompt]
+              properties:
+                handle:
+                  type: string
+                initialPrompt:
+                  type: string
+                role:
+                  type: string
+                  enum: [coordinator, worker, monitor]
+                  default: worker
+                swarmId:
+                  type: string
+                depthLevel:
+                  type: integer
+                  default: 1
+      responses:
+        '200':
+          description: Worker spawned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Worker'
+        '403':
+          description: Requires team-lead role
+
+  /orchestrate/dismiss/{handle}:
+    post:
+      summary: Dismiss a worker
+      tags: [Orchestration]
+      description: Requires team-lead role
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Worker dismissed
+        '403':
+          description: Requires team-lead role
+        '404':
+          description: Worker not found
+
+  /orchestrate/send/{handle}:
+    post:
+      summary: Send message to worker
+      tags: [Orchestration]
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+      responses:
+        '200':
+          description: Message sent
+        '404':
+          description: Worker not found
+
+  /orchestrate/workers:
+    get:
+      summary: List all workers
+      tags: [Orchestration]
+      responses:
+        '200':
+          description: List of workers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Worker'
+
+  /orchestrate/output/{handle}:
+    get:
+      summary: Get worker output
+      tags: [Orchestration]
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Worker output
+        '404':
+          description: Worker not found
+
+  # ============================================================================
+  # WORKTREE
+  # ============================================================================
+  /orchestrate/worktree/{handle}/commit:
+    post:
+      summary: Commit changes in worker's worktree
+      tags: [Worktree]
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+      responses:
+        '200':
+          description: Commit created
+
+  /orchestrate/worktree/{handle}/push:
+    post:
+      summary: Push worker's branch
+      tags: [Worktree]
+      description: Requires team-lead role
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pushed successfully
+        '403':
+          description: Requires team-lead role
+
+  /orchestrate/worktree/{handle}/pr:
+    post:
+      summary: Create PR from worker's branch
+      tags: [Worktree]
+      description: Requires team-lead role
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                body:
+                  type: string
+                base:
+                  type: string
+                  default: main
+      responses:
+        '200':
+          description: PR created
+        '403':
+          description: Requires team-lead role
+
+  /orchestrate/worktree/{handle}/status:
+    get:
+      summary: Get worktree status
+      tags: [Worktree]
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Worktree status
+
+  # ============================================================================
+  # WORK ITEMS
+  # ============================================================================
+  /workitems:
+    get:
+      summary: List work items
+      tags: [WorkItems]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: assignee
+          in: query
+          schema:
+            type: string
+        - name: batch
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of work items
+    post:
+      summary: Create work item
+      tags: [WorkItems]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                assignedTo:
+                  type: string
+                batchId:
+                  type: string
+      responses:
+        '200':
+          description: Work item created
+
+  /workitems/{id}:
+    get:
+      summary: Get work item
+      tags: [WorkItems]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Work item details
+        '404':
+          description: Work item not found
+    patch:
+      summary: Update work item
+      tags: [WorkItems]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, in_progress, completed, blocked, cancelled]
+                reason:
+                  type: string
+                actor:
+                  type: string
+      responses:
+        '200':
+          description: Work item updated
+
+  # ============================================================================
+  # BATCHES
+  # ============================================================================
+  /batches:
+    get:
+      summary: List batches
+      tags: [Batches]
+      responses:
+        '200':
+          description: List of batches
+    post:
+      summary: Create batch
+      tags: [Batches]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                workItemIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Batch created
+
+  /batches/{id}:
+    get:
+      summary: Get batch with work items
+      tags: [Batches]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch with work items
+        '404':
+          description: Batch not found
+
+  /batches/{id}/dispatch:
+    post:
+      summary: Dispatch batch to worker
+      tags: [Batches]
+      description: Requires team-lead role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workerHandle]
+              properties:
+                workerHandle:
+                  type: string
+      responses:
+        '200':
+          description: Batch dispatched
+        '403':
+          description: Requires team-lead role
+
+  # ============================================================================
+  # MAIL
+  # ============================================================================
+  /mail:
+    post:
+      summary: Send mail
+      tags: [Mail]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to, body]
+              properties:
+                from:
+                  type: string
+                to:
+                  type: string
+                subject:
+                  type: string
+                body:
+                  type: string
+      responses:
+        '200':
+          description: Mail sent
+
+  /mail/{handle}:
+    get:
+      summary: Get all mail for handle
+      tags: [Mail]
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of mail
+
+  /mail/{handle}/unread:
+    get:
+      summary: Get unread mail for handle
+      tags: [Mail]
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of unread mail
+
+  /mail/{id}/read:
+    post:
+      summary: Mark mail as read
+      tags: [Mail]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Marked as read
+
+  # ============================================================================
+  # HANDOFFS
+  # ============================================================================
+  /handoffs:
+    post:
+      summary: Create handoff
+      tags: [Handoffs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to, context]
+              properties:
+                from:
+                  type: string
+                to:
+                  type: string
+                context:
+                  type: string
+      responses:
+        '200':
+          description: Handoff created
+
+  /handoffs/{handle}:
+    get:
+      summary: Get pending handoffs for handle
+      tags: [Handoffs]
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of pending handoffs
+
+  # ============================================================================
+  # BLACKBOARD
+  # ============================================================================
+  /blackboard:
+    post:
+      summary: Post message to blackboard
+      tags: [Blackboard]
+      description: Requires team-lead role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [swarmId, senderHandle, messageType, payload]
+              properties:
+                swarmId:
+                  type: string
+                senderHandle:
+                  type: string
+                messageType:
+                  type: string
+                  enum: [directive, status, question, answer, discovery, alert]
+                payload:
+                  type: object
+                targetHandle:
+                  type: string
+                priority:
+                  type: string
+                  enum: [low, normal, high, critical]
+                  default: normal
+      responses:
+        '200':
+          description: Message posted
+        '403':
+          description: Requires team-lead role
+
+  /blackboard/{swarmId}:
+    get:
+      summary: Read blackboard messages
+      tags: [Blackboard]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: messageType
+          in: query
+          schema:
+            type: string
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+        - name: readerHandle
+          in: query
+          schema:
+            type: string
+        - name: priority
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of messages
+
+  /blackboard/mark-read:
+    post:
+      summary: Mark messages as read
+      tags: [Blackboard]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messageIds, readerHandle]
+              properties:
+                messageIds:
+                  type: array
+                  items:
+                    type: string
+                readerHandle:
+                  type: string
+      responses:
+        '200':
+          description: Messages marked as read
+
+  /blackboard/archive:
+    post:
+      summary: Archive blackboard messages
+      tags: [Blackboard]
+      description: Requires team-lead role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messageIds]
+              properties:
+                messageIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Messages archived
+
+  /blackboard/{swarmId}/archive-old:
+    post:
+      summary: Archive old messages in swarm
+      tags: [Blackboard]
+      description: Requires team-lead role
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maxAgeMs:
+                  type: integer
+                  default: 86400000
+      responses:
+        '200':
+          description: Old messages archived
+
+  # ============================================================================
+  # SPAWN QUEUE
+  # ============================================================================
+  /spawn-queue:
+    post:
+      summary: Enqueue spawn request
+      tags: [SpawnQueue]
+      description: Requires team-lead role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requesterHandle, targetAgentType, task]
+              properties:
+                requesterHandle:
+                  type: string
+                targetAgentType:
+                  type: string
+                  enum: [lead, worker, scout, kraken, oracle, critic, architect]
+                task:
+                  type: string
+                swarmId:
+                  type: string
+                priority:
+                  type: string
+                  enum: [low, normal, high, critical]
+                dependsOn:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Spawn request queued
+
+  /spawn-queue/status:
+    get:
+      summary: Get spawn queue status
+      tags: [SpawnQueue]
+      responses:
+        '200':
+          description: Queue status with limits
+
+  /spawn-queue/{id}:
+    get:
+      summary: Get spawn request details
+      tags: [SpawnQueue]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Spawn request details
+        '404':
+          description: Not found
+    delete:
+      summary: Cancel spawn request
+      tags: [SpawnQueue]
+      description: Requires team-lead role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Spawn request cancelled
+
+  # ============================================================================
+  # CHECKPOINTS
+  # ============================================================================
+  /checkpoints:
+    post:
+      summary: Create checkpoint
+      tags: [Checkpoints]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fromHandle, toHandle, goal, now, test]
+              properties:
+                fromHandle:
+                  type: string
+                toHandle:
+                  type: string
+                goal:
+                  type: string
+                now:
+                  type: string
+                test:
+                  type: string
+                doneThisSession:
+                  type: array
+                  items:
+                    type: string
+                blockers:
+                  type: array
+                  items:
+                    type: string
+                questions:
+                  type: array
+                  items:
+                    type: string
+                next:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Checkpoint created
+
+  /checkpoints/{id}:
+    get:
+      summary: Load checkpoint
+      tags: [Checkpoints]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Checkpoint details
+        '404':
+          description: Not found
+
+  /checkpoints/latest/{handle}:
+    get:
+      summary: Get latest checkpoint for handle
+      tags: [Checkpoints]
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest checkpoint
+        '404':
+          description: No checkpoint found
+
+  /checkpoints/list/{handle}:
+    get:
+      summary: List checkpoints for handle
+      tags: [Checkpoints]
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, accepted, rejected]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of checkpoints
+
+  /checkpoints/{id}/accept:
+    post:
+      summary: Accept checkpoint
+      tags: [Checkpoints]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Checkpoint accepted
+
+  /checkpoints/{id}/reject:
+    post:
+      summary: Reject checkpoint
+      tags: [Checkpoints]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Checkpoint rejected
+
+  # ============================================================================
+  # SWARMS
+  # ============================================================================
+  /swarms:
+    get:
+      summary: List swarms
+      tags: [Swarms]
+      parameters:
+        - name: includeAgents
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of swarms
+    post:
+      summary: Create swarm
+      tags: [Swarms]
+      description: Requires team-lead role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, maxAgents]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                maxAgents:
+                  type: integer
+      responses:
+        '200':
+          description: Swarm created
+
+  /swarms/{id}:
+    get:
+      summary: Get swarm details
+      tags: [Swarms]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Swarm with agents
+        '404':
+          description: Not found
+
+  /swarms/{id}/kill:
+    post:
+      summary: Kill swarm
+      tags: [Swarms]
+      description: Requires team-lead role. Dismisses all agents in the swarm.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                graceful:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: Swarm killed
+
 tags:
   - name: System
+    description: Health and metrics endpoints
   - name: Authentication
+    description: Agent authentication
   - name: Users
+    description: User management
   - name: Teams
+    description: Team operations
   - name: Chats
-  - name: Messages
+    description: Chat management
   - name: Tasks
+    description: Task management
+  - name: Orchestration
+    description: Worker spawn/dismiss/communication
+  - name: Worktree
+    description: Git worktree operations
+  - name: WorkItems
+    description: Work item management
+  - name: Batches
+    description: Batch operations
+  - name: Mail
+    description: Inter-agent mail
+  - name: Handoffs
+    description: Context handoffs
+  - name: Blackboard
+    description: Fleet coordination messaging
+  - name: SpawnQueue
+    description: Spawn request queue
+  - name: Checkpoints
+    description: Session continuity
+  - name: Swarms
+    description: Swarm management

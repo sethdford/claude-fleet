@@ -8,20 +8,20 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
 import crypto from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, type WebSocket } from 'ws';
 
 import { SQLiteStorage } from './storage/sqlite.js';
-import { WorkerManager } from './workers/manager.js';
-import { WorkItemStorage } from './storage/workitems.js';
-import { MailStorage } from './storage/mail.js';
-import { BlackboardStorage } from './storage/blackboard.js';
 import { SpawnQueueStorage } from './storage/spawn-queue.js';
-import { CheckpointStorage } from './storage/checkpoint.js';
+import { WorkerManager } from './workers/manager.js';
 import { SpawnController } from './workers/spawn-controller.js';
-import { TLDRStorage } from './storage/tldr.js';
+import { WorkflowStorage } from './storage/workflow.js';
+import { WorkflowEngine } from './workers/workflow-engine.js';
+import { createStorage, getStorageConfigFromEnv } from './storage/factory.js';
+import type { IStorage } from './storage/interfaces.js';
 import { createAuthMiddleware, requireRole } from './middleware/auth.js';
 import { metricsMiddleware, metricsHandler, updateGauges } from './metrics/prometheus.js';
 import type {
@@ -40,9 +40,11 @@ const __dirname = path.dirname(__filename);
 // ============================================================================
 
 export function getConfig(): ServerConfig {
+  const storageConfig = getStorageConfigFromEnv();
   return {
     port: parseInt(process.env.PORT ?? '3847', 10),
-    dbPath: process.env.DB_PATH ?? path.join(__dirname, '..', 'collab.db'),
+    dbPath: storageConfig.backend === 'sqlite' ? storageConfig.path : path.join(__dirname, '..', 'fleet.db'),
+    storageBackend: storageConfig.backend,
     jwtSecret: process.env.JWT_SECRET ?? crypto.randomBytes(32).toString('hex'),
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '24h',
     maxWorkers: parseInt(process.env.MAX_WORKERS ?? '5', 10),
@@ -59,63 +61,87 @@ export class CollabServer {
   private app: express.Application;
   private server: http.Server;
   private wss: WebSocketServer;
-  private storage: SQLiteStorage;
-  private workItemStorage: WorkItemStorage;
-  private mailStorage: MailStorage;
-  private blackboardStorage: BlackboardStorage;
-  private spawnQueueStorage: SpawnQueueStorage;
-  private checkpointStorage: CheckpointStorage;
-  private tldrStorage: TLDRStorage;
+  private storage!: IStorage;
+  private legacyStorage!: SQLiteStorage;
+  private workflowStorage!: WorkflowStorage;
+  private workflowEngine!: WorkflowEngine;
   private spawnController: SpawnController;
-  private workerManager: WorkerManager;
+  private workerManager!: WorkerManager;
   private config: ServerConfig;
   private subscriptions = new Map<string, Set<ExtendedWebSocket>>();
   private rateLimits = new Map<string, { count: number; windowStart: number }>();
   private startTime = Date.now();
   private swarms = new Map<string, { id: string; name: string; description?: string; maxAgents: number; createdAt: number }>();
-  private deps: RouteDependencies;
+  private deps!: RouteDependencies;
+  private initialized = false;
 
   constructor(config?: Partial<ServerConfig>) {
     this.config = { ...getConfig(), ...config };
     this.app = express();
     this.server = http.createServer(this.app);
     this.wss = new WebSocketServer({ server: this.server, path: '/ws' });
-    this.storage = new SQLiteStorage(this.config.dbPath);
-    this.workItemStorage = new WorkItemStorage(this.storage);
-    this.mailStorage = new MailStorage(this.storage);
-    this.blackboardStorage = new BlackboardStorage(this.storage);
-    this.spawnQueueStorage = new SpawnQueueStorage(this.storage);
-    this.checkpointStorage = new CheckpointStorage(this.storage);
-    this.tldrStorage = new TLDRStorage(this.storage);
     this.spawnController = new SpawnController({
       softLimit: 50,
       hardLimit: 100,
       maxDepth: 3,
       autoProcess: true,
     });
+  }
+
+  /**
+   * Initialize the server asynchronously.
+   * Must be called before start().
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+
+    // Create storage using factory pattern
+    const storageConfig = getStorageConfigFromEnv();
+    this.storage = await createStorage(storageConfig);
+    await this.storage.initialize();
+
+    // Keep legacy storage for operations not yet in IStorage (workflow)
+    // For SQLite, we can access the underlying storage; for other backends, create a new instance
+    if (storageConfig.backend === 'sqlite') {
+      this.legacyStorage = new SQLiteStorage(storageConfig.path);
+    } else {
+      // For non-SQLite backends, create SQLite as fallback for workflow
+      this.legacyStorage = new SQLiteStorage(this.config.dbPath);
+    }
+
+    // Workflow storage still uses legacy storage (not yet abstracted)
+    this.workflowStorage = new WorkflowStorage(this.legacyStorage);
+    this.workflowStorage.seedTemplates();
+
+    // Initialize worker manager with legacy storage (needs direct SQLite access)
     this.workerManager = new WorkerManager({
       maxWorkers: this.config.maxWorkers,
       serverUrl: `http://localhost:${this.config.port}`,
-      storage: this.storage,
+      storage: this.legacyStorage,
       injectMail: true,
       useWorktrees: true,
     });
 
     // Connect SpawnController to WorkerManager
-    this.spawnController.initialize(this.spawnQueueStorage, this.workerManager);
+    // Use the abstracted storage interface for spawn queue
+    this.spawnController.initialize(this.storage.spawnQueue, this.workerManager);
     this.workerManager.setSpawnController(this.spawnController);
 
-    // Create route dependencies
+    // Initialize workflow engine with abstracted storage interfaces
+    this.workflowEngine = new WorkflowEngine({
+      workflowStorage: this.workflowStorage,
+      workItemStorage: this.storage.workItem,
+      blackboardStorage: this.storage.blackboard,
+    });
+
+    // Create route dependencies using IStorage
     this.deps = {
       config: this.config,
       storage: this.storage,
+      legacyStorage: this.legacyStorage,
       workerManager: this.workerManager,
-      workItemStorage: this.workItemStorage,
-      mailStorage: this.mailStorage,
-      blackboardStorage: this.blackboardStorage,
-      spawnQueueStorage: this.spawnQueueStorage,
-      checkpointStorage: this.checkpointStorage,
-      tldrStorage: this.tldrStorage,
+      workflowStorage: this.workflowStorage,
+      workflowEngine: this.workflowEngine,
       spawnController: this.spawnController,
       swarms: this.swarms,
       startTime: this.startTime,
@@ -126,6 +152,8 @@ export class CollabServer {
     this.setupWebSocket();
     this.setupWorkerEvents();
     this.setupCleanup();
+
+    this.initialized = true;
   }
 
   // ============================================================================
@@ -137,8 +165,9 @@ export class CollabServer {
     this.app.use(express.json({ limit: '1mb' }));
     this.app.use(metricsMiddleware);
     this.app.use(this.rateLimitMiddleware.bind(this));
-    this.app.use(createAuthMiddleware(this.config.jwtSecret));
+    // Serve static files BEFORE auth middleware
     this.app.use(express.static(path.join(__dirname, '..', 'public')));
+    this.app.use(createAuthMiddleware(this.config.jwtSecret));
   }
 
   private rateLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -278,6 +307,32 @@ export class CollabServer {
     this.app.post('/tldr/invalidate', requireRole('team-lead'), routes.createInvalidateFileHandler(this.deps));
     this.app.get('/tldr/stats', requireRole('team-lead', 'worker'), routes.createGetTLDRStatsHandler(this.deps));
     this.app.delete('/tldr/cache', requireRole('team-lead'), routes.createClearTLDRCacheHandler(this.deps));
+
+    // Workflow routes
+    this.app.post('/workflows', requireRole('team-lead'), routes.createCreateWorkflowHandler(this.deps));
+    this.app.get('/workflows', requireRole('team-lead', 'worker'), routes.createListWorkflowsHandler(this.deps));
+    this.app.get('/workflows/:id', requireRole('team-lead', 'worker'), routes.createGetWorkflowHandler(this.deps));
+    this.app.patch('/workflows/:id', requireRole('team-lead'), routes.createUpdateWorkflowHandler(this.deps));
+    this.app.delete('/workflows/:id', requireRole('team-lead'), routes.createDeleteWorkflowHandler(this.deps));
+    this.app.post('/workflows/:id/start', requireRole('team-lead'), routes.createStartWorkflowHandler(this.deps));
+    this.app.post('/workflows/:id/triggers', requireRole('team-lead'), routes.createCreateTriggerHandler(this.deps));
+    this.app.get('/workflows/:id/triggers', requireRole('team-lead', 'worker'), routes.createListTriggersHandler(this.deps));
+
+    // Workflow execution routes
+    this.app.get('/executions', requireRole('team-lead', 'worker'), routes.createListExecutionsHandler(this.deps));
+    this.app.get('/executions/:id', requireRole('team-lead', 'worker'), routes.createGetExecutionHandler(this.deps));
+    this.app.post('/executions/:id/pause', requireRole('team-lead'), routes.createPauseExecutionHandler(this.deps));
+    this.app.post('/executions/:id/resume', requireRole('team-lead'), routes.createResumeExecutionHandler(this.deps));
+    this.app.post('/executions/:id/cancel', requireRole('team-lead'), routes.createCancelExecutionHandler(this.deps));
+    this.app.get('/executions/:id/steps', requireRole('team-lead', 'worker'), routes.createGetExecutionStepsHandler(this.deps));
+    this.app.get('/executions/:id/events', requireRole('team-lead', 'worker'), routes.createGetExecutionEventsHandler(this.deps));
+
+    // Workflow step routes
+    this.app.post('/steps/:id/retry', requireRole('team-lead'), routes.createRetryStepHandler(this.deps));
+    this.app.post('/steps/:id/complete', requireRole('team-lead', 'worker'), routes.createCompleteStepHandler(this.deps));
+
+    // Workflow trigger routes
+    this.app.delete('/triggers/:id', requireRole('team-lead'), routes.createDeleteTriggerHandler(this.deps));
   }
 
   // ============================================================================
@@ -303,7 +358,6 @@ export class CollabServer {
           // Handle authentication
           if (msg.type === 'auth' && msg.token) {
             try {
-              const jwt = require('jsonwebtoken');
               const decoded = jwt.verify(msg.token, this.config.jwtSecret) as { uid: string; handle: string };
               extWs.authenticated = true;
               extWs.uid = decoded.uid;
@@ -424,9 +478,19 @@ export class CollabServer {
   // ============================================================================
 
   async start(): Promise<void> {
+    // Initialize storage, managers, routes if not already done
+    await this.initialize();
+
+    // Initialize worker manager (restores workers from DB)
     await this.workerManager.initialize();
 
+    // Start workflow engine processing
+    this.workflowEngine.start();
+
     this.server.listen(this.config.port, () => {
+      const storageInfo = this.config.storageBackend === 'sqlite'
+        ? `SQLite: ${this.config.dbPath}`
+        : `${this.config.storageBackend?.toUpperCase() ?? 'SQLite'}`;
       console.log('\n' +
         '==============================================================\n' +
         '         Claude Fleet Server v2.0\n' +
@@ -434,7 +498,7 @@ export class CollabServer {
         '==============================================================\n' +
         `  HTTP API:    http://localhost:${this.config.port}\n` +
         `  WebSocket:   ws://localhost:${this.config.port}/ws\n` +
-        `  Database:    ${this.config.dbPath}\n` +
+        `  Storage:     ${storageInfo}\n` +
         `  Max Workers: ${this.config.maxWorkers}\n` +
         '==============================================================\n' +
         '  Usage:\n' +
@@ -447,6 +511,7 @@ export class CollabServer {
 
   async stop(): Promise<void> {
     console.log('[SERVER] Stopping...');
+    this.workflowEngine.stop();
     await this.workerManager.dismissAll();
     this.wss.close();
     this.server.close();

@@ -1,11 +1,11 @@
-# Contributing to Claude Code Collab
+# Contributing to Claude Fleet
 
-Thanks for your interest in contributing! This project enables hidden team mode features in Claude Code for multi-agent collaboration.
+Thanks for your interest in contributing! Claude Fleet enables multi-agent orchestration for Claude Code.
 
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/claude-code-collab.git`
+2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/claude-fleet.git`
 3. Install dependencies: `npm install`
 4. Create a branch: `git checkout -b feature/your-feature-name`
 
@@ -15,31 +15,55 @@ Thanks for your interest in contributing! This project enables hidden team mode 
 # Install dependencies
 npm install
 
-# Start the server in dev mode (auto-reload)
+# Start the server in dev mode (hot reload)
 npm run dev
-
-# Run the patch script
-npm run patch
 
 # Run tests
 npm test
 
-# Run preflight checks
-npm run preflight
+# Run E2E tests
+npm run e2e
+
+# Type checking
+npm run typecheck
+
+# Linting
+npm run lint
+npm run lint:fix  # Auto-fix issues
 ```
 
 ## Project Structure
 
 ```
-claude-code-collab/
-├── server.js          # Express + WebSocket server with SQLite
-├── patch-cli.js       # CLI patcher to enable hidden features
-├── run-lead.sh        # Script to run Claude Code as team lead
-├── run-worker.sh      # Script to run Claude Code as worker
-├── scripts/
-│   ├── preflight.sh   # Pre-commit checks
-│   └── test-suite.sh  # Test runner
-└── package.json
+claude-fleet/
+├── src/
+│   ├── index.ts           # Entry point
+│   ├── server.ts          # Main server class
+│   ├── cli.ts             # CLI tool
+│   ├── types.ts           # TypeScript types
+│   ├── routes/            # Route handlers (modular)
+│   │   ├── core.ts        # Health, auth, metrics
+│   │   ├── chats.ts       # Chat/message routes
+│   │   ├── tasks.ts       # Task routes
+│   │   ├── orchestrate.ts # Worker routes
+│   │   ├── fleet.ts       # Swarm/blackboard routes
+│   │   └── ...
+│   ├── storage/           # Database layer
+│   │   ├── sqlite.ts      # Main SQLite storage
+│   │   ├── blackboard.ts  # Blackboard messages
+│   │   ├── checkpoint.ts  # Agent checkpoints
+│   │   └── ...
+│   ├── workers/           # Worker management
+│   │   ├── manager.ts     # Worker lifecycle
+│   │   ├── worktree.ts    # Git worktree
+│   │   └── spawn-controller.ts
+│   ├── middleware/        # Express middleware
+│   ├── mcp/               # MCP server
+│   └── validation/        # Zod schemas
+├── tests/                 # Unit tests
+├── scripts/               # E2E test scripts
+├── docs/                  # Documentation
+└── public/                # Dashboard
 ```
 
 ## How to Contribute
@@ -48,64 +72,103 @@ claude-code-collab/
 
 - Check existing issues first
 - Include steps to reproduce
-- Include Claude Code version and Node.js version
-- Include relevant logs or error messages
+- Include Node.js version and OS
+- Include relevant logs
 
 ### Suggesting Features
 
 - Open an issue describing the feature
-- Explain the use case and benefits
-- Be open to discussion about implementation
+- Explain the use case
+- Be open to discussion
 
 ### Submitting Pull Requests
 
 1. **Keep PRs focused** - One feature or fix per PR
-2. **Update documentation** - If you change behavior, update the README
+2. **Update documentation** - If you change behavior
 3. **Add tests** - For new features or bug fixes
-4. **Follow code style** - Match existing patterns in the codebase
-5. **Write clear commit messages** - Describe what and why
+4. **Follow code style** - Match existing patterns
+5. **Write clear commit messages**
 
-### Code Style
+## Code Style
 
-- Use 2-space indentation
-- Use single quotes for strings
-- Add JSDoc comments for functions
-- Keep functions small and focused
+- TypeScript with strict mode
+- 2-space indentation
+- Single quotes for strings
+- Zod for runtime validation
+- JSDoc comments for public functions
 
-## Areas for Contribution
+### Example
 
-### High Priority
-- [ ] Better error handling and recovery
-- [ ] Connection retry logic improvements
-- [ ] Task queue management
-- [ ] Agent discovery/heartbeat system
-
-### Nice to Have
-- [ ] Web UI for monitoring agents
-- [ ] Message encryption
-- [ ] Rate limiting
-- [ ] Metrics/observability
-
-### Documentation
-- [ ] More usage examples
-- [ ] Video tutorials
-- [ ] Architecture deep-dive
+```typescript
+/**
+ * Creates a new task and broadcasts to the team
+ */
+export function createTaskHandler(deps: RouteDependencies) {
+  return async (req: Request, res: Response): Promise<void> => {
+    const validation = validateBody(createTaskSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    // ...
+  };
+}
+```
 
 ## Testing
 
 ```bash
-# Run the test suite
+# Unit tests
 npm test
 
-# Test specific functionality
-./scripts/test-suite.sh server    # Test server endpoints
-./scripts/test-suite.sh patch     # Test CLI patching
-./scripts/test-suite.sh collab    # Test collaboration flow
+# Unit tests with coverage
+npm run test:coverage
+
+# E2E tests
+npm run e2e
+
+# All E2E tests
+npm run e2e:all
+```
+
+### Writing Tests
+
+- Use Vitest for unit tests
+- Place tests in `tests/` or alongside source (`*.test.ts`)
+- E2E tests go in `scripts/`
+
+## Areas for Contribution
+
+### High Priority
+- Performance optimization for large swarms
+- Better error messages and recovery
+- Dashboard improvements
+
+### Nice to Have
+- Additional MCP tools
+- Metrics visualization
+- Plugin system
+
+### Documentation
+- More usage examples
+- Tutorial videos
+- Architecture diagrams
+
+## Commit Messages
+
+Follow conventional commits:
+
+```
+feat: add swarm priority support
+fix: resolve worktree cleanup race condition
+docs: update API reference
+test: add checkpoint storage tests
+refactor: extract route handlers
 ```
 
 ## Questions?
 
-Open an issue with the `question` label and we'll do our best to help!
+Open an issue with the `question` label.
 
 ## License
 

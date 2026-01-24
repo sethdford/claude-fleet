@@ -291,6 +291,105 @@ export class SQLiteStorage implements TeamStorage {
       CREATE INDEX IF NOT EXISTS idx_spawn_queue_ready ON spawn_queue(status, blocked_by_count);
       CREATE INDEX IF NOT EXISTS idx_spawn_queue_requester ON spawn_queue(requester_handle);
       CREATE INDEX IF NOT EXISTS idx_spawn_queue_swarm ON spawn_queue(swarm_id);
+
+      -- Workflow Tables (Phase 5)
+
+      -- Workflow definitions (templates/recipes)
+      CREATE TABLE IF NOT EXISTS workflows (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        version INTEGER DEFAULT 1,
+        definition TEXT NOT NULL,
+        is_template INTEGER DEFAULT 0,
+        created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+        updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workflows_name ON workflows(name);
+      CREATE INDEX IF NOT EXISTS idx_workflows_template ON workflows(is_template);
+
+      -- Workflow executions (instances of a workflow)
+      CREATE TABLE IF NOT EXISTS workflow_executions (
+        id TEXT PRIMARY KEY,
+        workflow_id TEXT NOT NULL,
+        swarm_id TEXT,
+        status TEXT NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending', 'running', 'paused', 'completed', 'failed', 'cancelled')),
+        context TEXT DEFAULT '{}',
+        started_at INTEGER,
+        completed_at INTEGER,
+        error TEXT,
+        created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+        created_by TEXT NOT NULL,
+        FOREIGN KEY (workflow_id) REFERENCES workflows(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workflow_executions_workflow ON workflow_executions(workflow_id);
+      CREATE INDEX IF NOT EXISTS idx_workflow_executions_status ON workflow_executions(status);
+      CREATE INDEX IF NOT EXISTS idx_workflow_executions_swarm ON workflow_executions(swarm_id);
+
+      -- Workflow steps (nodes in the DAG)
+      CREATE TABLE IF NOT EXISTS workflow_steps (
+        id TEXT PRIMARY KEY,
+        execution_id TEXT NOT NULL,
+        step_key TEXT NOT NULL,
+        name TEXT,
+        step_type TEXT NOT NULL
+          CHECK (step_type IN ('task', 'spawn', 'checkpoint', 'gate', 'parallel', 'script')),
+        status TEXT NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending', 'ready', 'running', 'completed', 'failed', 'skipped', 'blocked')),
+        config TEXT NOT NULL,
+        depends_on TEXT DEFAULT '[]',
+        blocked_by_count INTEGER DEFAULT 0,
+        output TEXT,
+        assigned_to TEXT,
+        started_at INTEGER,
+        completed_at INTEGER,
+        error TEXT,
+        retry_count INTEGER DEFAULT 0,
+        max_retries INTEGER DEFAULT 0,
+        created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+        FOREIGN KEY (execution_id) REFERENCES workflow_executions(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workflow_steps_execution ON workflow_steps(execution_id);
+      CREATE INDEX IF NOT EXISTS idx_workflow_steps_status ON workflow_steps(status, blocked_by_count);
+      CREATE INDEX IF NOT EXISTS idx_workflow_steps_assigned ON workflow_steps(assigned_to);
+
+      -- Workflow triggers (event-driven execution)
+      CREATE TABLE IF NOT EXISTS workflow_triggers (
+        id TEXT PRIMARY KEY,
+        workflow_id TEXT NOT NULL,
+        trigger_type TEXT NOT NULL
+          CHECK (trigger_type IN ('event', 'schedule', 'webhook', 'blackboard')),
+        config TEXT NOT NULL,
+        is_enabled INTEGER DEFAULT 1,
+        last_fired_at INTEGER,
+        fire_count INTEGER DEFAULT 0,
+        created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+        FOREIGN KEY (workflow_id) REFERENCES workflows(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workflow_triggers_workflow ON workflow_triggers(workflow_id);
+      CREATE INDEX IF NOT EXISTS idx_workflow_triggers_type ON workflow_triggers(trigger_type);
+      CREATE INDEX IF NOT EXISTS idx_workflow_triggers_enabled ON workflow_triggers(is_enabled);
+
+      -- Workflow events (audit log)
+      CREATE TABLE IF NOT EXISTS workflow_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        execution_id TEXT NOT NULL,
+        step_id TEXT,
+        event_type TEXT NOT NULL,
+        actor TEXT,
+        details TEXT,
+        created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+        FOREIGN KEY (execution_id) REFERENCES workflow_executions(id),
+        FOREIGN KEY (step_id) REFERENCES workflow_steps(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workflow_events_execution ON workflow_events(execution_id);
+      CREATE INDEX IF NOT EXISTS idx_workflow_events_step ON workflow_events(step_id);
     `);
   }
 
@@ -341,8 +440,8 @@ export class SQLiteStorage implements TeamStorage {
       // Workers (Phase 1)
       insertWorker: this.db.prepare(`
         INSERT INTO workers (id, handle, status, worktree_path, worktree_branch, pid, session_id,
-                             initial_prompt, last_heartbeat, restart_count, role, created_at, dismissed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             initial_prompt, last_heartbeat, restart_count, role, swarm_id, depth_level, created_at, dismissed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `),
       getWorker: this.db.prepare('SELECT * FROM workers WHERE id = ?'),
       getWorkerByHandle: this.db.prepare('SELECT * FROM workers WHERE handle = ?'),
@@ -725,6 +824,8 @@ export class SQLiteStorage implements TeamStorage {
       worker.lastHeartbeat,
       worker.restartCount,
       worker.role,
+      worker.swarmId,
+      worker.depthLevel,
       worker.createdAt,
       worker.dismissedAt
     );
@@ -742,6 +843,8 @@ export class SQLiteStorage implements TeamStorage {
     last_heartbeat: number | null;
     restart_count: number;
     role: string;
+    swarm_id: string | null;
+    depth_level: number;
     created_at: number;
     dismissed_at: number | null;
   }): PersistentWorker {
@@ -757,6 +860,8 @@ export class SQLiteStorage implements TeamStorage {
       lastHeartbeat: row.last_heartbeat,
       restartCount: row.restart_count,
       role: row.role as AgentRole,
+      swarmId: row.swarm_id,
+      depthLevel: row.depth_level,
       createdAt: row.created_at,
       dismissedAt: row.dismissed_at,
     };
@@ -775,6 +880,8 @@ export class SQLiteStorage implements TeamStorage {
       last_heartbeat: number | null;
       restart_count: number;
       role: string;
+      swarm_id: string | null;
+      depth_level: number;
       created_at: number;
       dismissed_at: number | null;
     } | undefined;
@@ -796,6 +903,8 @@ export class SQLiteStorage implements TeamStorage {
       last_heartbeat: number | null;
       restart_count: number;
       role: string;
+      swarm_id: string | null;
+      depth_level: number;
       created_at: number;
       dismissed_at: number | null;
     } | undefined;
@@ -817,6 +926,8 @@ export class SQLiteStorage implements TeamStorage {
       last_heartbeat: number | null;
       restart_count: number;
       role: string;
+      swarm_id: string | null;
+      depth_level: number;
       created_at: number;
       dismissed_at: number | null;
     }>;
@@ -837,6 +948,8 @@ export class SQLiteStorage implements TeamStorage {
       last_heartbeat: number | null;
       restart_count: number;
       role: string;
+      swarm_id: string | null;
+      depth_level: number;
       created_at: number;
       dismissed_at: number | null;
     }>;

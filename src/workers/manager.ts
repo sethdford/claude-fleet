@@ -169,11 +169,23 @@ export class WorkerManager extends EventEmitter {
    * Restore a worker from persisted state
    */
   private async restoreWorker(pw: PersistentWorker): Promise<void> {
+    // Verify worktree exists if one was configured
+    if (pw.worktreePath) {
+      const fs = await import('fs');
+      if (!fs.existsSync(pw.worktreePath)) {
+        throw new Error(`Worktree no longer exists: ${pw.worktreePath}`);
+      }
+    }
+
+    // For restoration, we use --continue which loads the full conversation history.
+    // We send a simple "continue" prompt instead of the original initialPrompt
+    // since the context is already in the session history.
     const request: SpawnWorkerRequest = {
       handle: pw.handle,
       workingDir: pw.worktreePath ?? undefined,
       sessionId: pw.sessionId ?? undefined,
-      initialPrompt: pw.initialPrompt ?? undefined,
+      // Don't re-send the initial prompt - use a continuation message instead
+      initialPrompt: 'Continue from where you left off. The server was restarted.',
     };
 
     // Spawn with the existing worker ID (isRestore=true to skip insert)
@@ -376,7 +388,7 @@ export class WorkerManager extends EventEmitter {
         worktreeBranch = worktree.branch;
         console.log(`[WORKER] Created worktree: ${worktreePath} (branch: ${worktreeBranch})`);
       } catch (error) {
-        console.error(`[WORKER] Failed to create worktree:`, (error as Error).message);
+        console.error('[WORKER] Failed to create worktree:', (error as Error).message);
         // Continue without worktree
       }
     }
@@ -391,9 +403,12 @@ export class WorkerManager extends EventEmitter {
       '--dangerously-skip-permissions',
     ];
 
-    // Resume session if provided
-    if (request.sessionId) {
+    // For crash recovery, use --resume with the session ID to restore conversation context.
+    // --resume <session_id> preserves both the session ID and full conversation history.
+    // This was verified to work correctly with --print mode.
+    if (isRestore && request.sessionId) {
       claudeArgs.push('--resume', request.sessionId);
+      console.log(`[WORKER] Using --resume ${request.sessionId.slice(0, 8)}... to restore session context`);
     }
 
     // Build the full prompt
@@ -428,6 +443,8 @@ export class WorkerManager extends EventEmitter {
     const argsStr = claudeArgs.join(' ');
     const shellCmd = `echo '${escapedPrompt}' | claude ${argsStr}`;
 
+    // Debug: log the shell command (truncated for readability)
+    console.log(`[WORKER] Shell cmd for ${request.handle}: claude ${argsStr}`);
 
     // Spawn using shell - required because Claude's binary has special stdio handling
     const proc = spawn('sh', ['-c', shellCmd], {
@@ -439,7 +456,7 @@ export class WorkerManager extends EventEmitter {
         CLAUDE_CODE_TEAM_NAME: teamName,
         CLAUDE_CODE_AGENT_TYPE: role,
         CLAUDE_CODE_AGENT_NAME: request.handle,
-        CLAUDE_CODE_COLLAB_URL: this.serverUrl,
+        CLAUDE_FLEET_URL: this.serverUrl,
       },
     });
 
@@ -479,6 +496,8 @@ export class WorkerManager extends EventEmitter {
         lastHeartbeat: now,
         restartCount,
         role,
+        swarmId: swarmId ?? null,
+        depthLevel,
         createdAt: Math.floor(now / 1000),
         dismissedAt: null,
       };
@@ -529,6 +548,7 @@ export class WorkerManager extends EventEmitter {
     worker.process.stderr?.on('data', (data: Buffer) => {
       const text = data.toString().trim();
       if (text && !text.includes('deprecated')) {
+        console.log(`[WORKER] ${worker.handle} stderr: ${text.slice(0, 200)}`);
         this.addOutput(worker, `[stderr] ${text}`);
         this.emit('worker:error', {
           workerId: worker.id,
@@ -548,6 +568,13 @@ export class WorkerManager extends EventEmitter {
       if (this.storage) {
         const status = wasIntentionallyDismissed || code === 0 ? 'dismissed' : 'error';
         this.storage.updateWorkerStatus(worker.id, status);
+      }
+
+      // Clean up worktree if the worker exited successfully (not during recovery scenario)
+      if (this.worktreeManager && (wasIntentionallyDismissed || code === 0)) {
+        this.worktreeManager.remove(worker.id).catch(err => {
+          console.error(`[WORKER] Failed to cleanup worktree for ${worker.handle}:`, err.message);
+        });
       }
 
       this.emit('worker:exit', {
@@ -581,9 +608,16 @@ export class WorkerManager extends EventEmitter {
   private parseNdjsonLine(worker: WorkerProcess, line: string): void {
     try {
       const event = JSON.parse(line) as ClaudeEvent;
+      // Debug: log event type
+      if (event.type === 'system' && event.subtype) {
+        console.log(`[WORKER] ${worker.handle} event: ${event.type}:${event.subtype}`);
+      }
       this.handleClaudeEvent(worker, event);
     } catch {
       // Not JSON, treat as plain text output
+      if (line.length > 0) {
+        console.log(`[WORKER] ${worker.handle} non-JSON output: ${line.slice(0, 100)}`);
+      }
       this.addOutput(worker, line);
     }
   }
@@ -687,8 +721,10 @@ export class WorkerManager extends EventEmitter {
 
   /**
    * Dismiss (terminate) a worker
+   * @param workerId - The worker ID to dismiss
+   * @param cleanupWorktree - Whether to clean up the worktree (default: true)
    */
-  async dismissWorker(workerId: string, cleanupWorktree = false): Promise<void> {
+  async dismissWorker(workerId: string, cleanupWorktree = true): Promise<void> {
     const worker = this.workers.get(workerId);
     if (!worker) return;
 
@@ -735,7 +771,7 @@ export class WorkerManager extends EventEmitter {
       try {
         await this.worktreeManager.remove(workerId);
       } catch (error) {
-        console.error(`[WORKER] Failed to cleanup worktree:`, (error as Error).message);
+        console.error('[WORKER] Failed to cleanup worktree:', (error as Error).message);
       }
     }
   }

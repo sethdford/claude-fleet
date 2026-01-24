@@ -1,5 +1,5 @@
 #!/bin/bash
-# Claude Code Collab Server - Startup Script
+# Claude Fleet Server - Startup Script
 #
 # Usage:
 #   ./start.sh              # Start server in foreground
@@ -10,9 +10,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PORT="${TEAM_SERVER_PORT:-3847}"
-PID_FILE="$HOME/.claude-toolkit/collab-server.pid"
-LOG_FILE="$HOME/.claude-toolkit/collab-server.log"
+PORT="${PORT:-3847}"
+PID_FILE="$HOME/.claude-toolkit/fleet-server.pid"
+LOG_FILE="$HOME/.claude-toolkit/fleet-server.log"
 
 mkdir -p "$HOME/.claude-toolkit"
 
@@ -28,7 +28,7 @@ check_running() {
 }
 
 start_foreground() {
-    echo "Starting Claude Code Collab Server..."
+    echo "Starting Claude Fleet Server..."
     cd "$SCRIPT_DIR"
     exec npx tsx src/index.ts
 }
@@ -39,7 +39,7 @@ start_background() {
         exit 0
     fi
 
-    echo "Starting Claude Code Collab Server in background..."
+    echo "Starting Claude Fleet Server in background..."
     cd "$SCRIPT_DIR"
     nohup npx tsx src/index.ts >> "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"

@@ -203,7 +203,7 @@ function formatResponse(data: unknown, isError = false): ToolResponse {
 function createServer(): Server {
   const server = new Server(
     {
-      name: 'claude-code-collab',
+      name: 'claude-fleet',
       version: '2.0.0',
     },
     {

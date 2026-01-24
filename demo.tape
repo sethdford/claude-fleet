@@ -1,38 +1,49 @@
-# VHS Demo for Claude Code Collab v2.0
+# VHS Demo for Claude Fleet v2.0
 Output demo.gif
-Set FontSize 14
+Set FontSize 16
 Set Width 1200
 Set Height 700
 Set Theme "Catppuccin Mocha"
 Set Padding 20
 Set Shell bash
+Set TypingSpeed 40ms
 
-# Header
-Type "echo '=== Claude Code Collab v2.0 ==='"
+# Title
+Type "# Claude Fleet - Multi-Agent Orchestration for Claude Code"
 Enter
 Sleep 1s
 
-# Server status
-Type "echo '1. Server Status' && ./start.sh --status"
+# Start server
+Type "echo '>>> Starting Fleet Server...'"
+Enter
+Type "./start.sh --background"
 Enter
 Sleep 3s
 
-# E2E tests
-Type "echo '2. E2E Tests' && ./test-e2e.sh 2>&1 | tail -15"
+# Health check
+Type "echo '>>> Health Check'"
 Enter
-Sleep 8s
-
-# Health
-Type "echo '3. Health Check' && curl -s localhost:3847/health | python3 -m json.tool"
+Type "curl -s localhost:3847/health | jq ."
 Enter
 Sleep 2s
 
-# Workers
-Type "echo '4. Workers Ready' && curl -s localhost:3847/orchestrate/workers"
+# CLI help
+Type "echo '>>> Fleet CLI Commands'"
 Enter
-Sleep 2s
+Type "npx tsx src/cli.ts --help | head -25"
+Enter
+Sleep 3s
+
+# Run E2E test (shows the full flow)
+Type "echo '>>> Running E2E Integration Test'"
+Enter
+Type "npm run e2e 2>&1 | tail -25"
+Enter
+Sleep 10s
 
 # Done
-Type "echo '=== Multi-Agent Orchestration Ready! ==='"
+Type "echo ''"
+Enter
+Type "echo '>>> Claude Fleet Ready!'"
 Enter
 Sleep 2s

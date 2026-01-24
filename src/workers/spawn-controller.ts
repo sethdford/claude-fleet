@@ -8,7 +8,7 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { SpawnQueueStorage } from '../storage/spawn-queue.js';
+import type { ISpawnQueueStorage } from '../storage/interfaces.js';
 import type { WorkerManager } from './manager.js';
 import type { FleetAgentRole } from './agent-roles.js';
 import { getMaxDepthForRole, isSpawnAllowed } from './agent-roles.js';
@@ -103,7 +103,7 @@ class AgentCounter {
 
 export class SpawnController extends EventEmitter {
   private counter: AgentCounter;
-  private spawnQueue: SpawnQueueStorage | null = null;
+  private spawnQueue: ISpawnQueueStorage | null = null;
   private workerManager: WorkerManager | null = null;
   private softLimit: number;
   private hardLimit: number;
@@ -125,7 +125,7 @@ export class SpawnController extends EventEmitter {
   /**
    * Initialize with dependencies
    */
-  initialize(spawnQueue: SpawnQueueStorage, workerManager: WorkerManager): void {
+  initialize(spawnQueue: ISpawnQueueStorage, workerManager: WorkerManager): void {
     this.spawnQueue = spawnQueue;
     this.workerManager = workerManager;
 
@@ -261,7 +261,7 @@ export class SpawnController extends EventEmitter {
     }
 
     // Get ready items (limited by remaining capacity)
-    const ready = this.spawnQueue.getReady(limits.remaining);
+    const ready = await this.spawnQueue.getReadyItems(limits.remaining);
     let spawned = 0;
 
     for (const item of ready) {
@@ -281,7 +281,7 @@ export class SpawnController extends EventEmitter {
       );
 
       if (!check.allowed) {
-        this.spawnQueue.reject(item.id);
+        await this.spawnQueue.updateStatus(item.id, 'rejected');
         this.emit('spawn:rejected', { requestId: item.id, reason: check.reason ?? 'Unknown' });
         continue;
       }
@@ -299,12 +299,12 @@ export class SpawnController extends EventEmitter {
         });
 
         // Mark as spawned
-        this.spawnQueue.markSpawned(item.id, worker.id);
+        await this.spawnQueue.updateStatus(item.id, 'spawned', worker.id);
         this.emit('spawn:completed', { requestId: item.id, workerId: worker.id });
         spawned++;
       } catch (error) {
         console.error(`[SPAWN] Failed to spawn ${item.targetAgentType}:`, (error as Error).message);
-        this.spawnQueue.reject(item.id);
+        await this.spawnQueue.updateStatus(item.id, 'rejected');
         this.emit('spawn:rejected', {
           requestId: item.id,
           reason: (error as Error).message,
@@ -318,7 +318,7 @@ export class SpawnController extends EventEmitter {
   /**
    * Queue a spawn request
    */
-  queueSpawn(
+  async queueSpawn(
     requesterHandle: string,
     targetAgentType: FleetAgentRole,
     depthLevel: number,
@@ -329,7 +329,7 @@ export class SpawnController extends EventEmitter {
       swarmId?: string;
       context?: Record<string, unknown>;
     } = {}
-  ): string | null {
+  ): Promise<string | null> {
     if (!this.spawnQueue) {
       console.error('[SPAWN] Spawn queue not initialized');
       return null;
@@ -342,32 +342,42 @@ export class SpawnController extends EventEmitter {
       return null;
     }
 
-    const item = this.spawnQueue.enqueue(
+    const item = await this.spawnQueue.enqueue({
       requesterHandle,
       targetAgentType,
       depthLevel,
-      task,
-      {
-        priority: options.priority,
-        dependsOn: options.dependsOn,
-        swarmId: options.swarmId,
-        context: options.context,
-      }
-    );
+      priority: options.priority ?? 'normal',
+      dependsOn: options.dependsOn ?? [],
+      swarmId: options.swarmId ?? null,
+      payload: { task, context: options.context },
+    });
 
     this.emit('spawn:queued', { requestId: item.id, targetType: targetAgentType });
     return item.id;
   }
 
   /**
-   * Get spawn queue statistics
+   * Get spawn queue statistics (sync version returns null for queue)
    */
   getQueueStats(): {
-    queue: ReturnType<SpawnQueueStorage['getStats']> | null;
+    queue: null;
     limits: ReturnType<SpawnController['getLimits']>;
   } {
     return {
-      queue: this.spawnQueue?.getStats() ?? null,
+      queue: null, // Use getQueueStatsAsync for queue stats
+      limits: this.getLimits(),
+    };
+  }
+
+  /**
+   * Get spawn queue statistics (async version)
+   */
+  async getQueueStatsAsync(): Promise<{
+    queue: Awaited<ReturnType<ISpawnQueueStorage['getQueueStats']>> | null;
+    limits: ReturnType<SpawnController['getLimits']>;
+  }> {
+    return {
+      queue: this.spawnQueue ? await this.spawnQueue.getQueueStats() : null,
       limits: this.getLimits(),
     };
   }

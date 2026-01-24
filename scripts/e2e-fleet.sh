@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-SERVER_URL="${CLAUDE_CODE_COLLAB_URL:-http://localhost:3847}"
+SERVER_URL="${CLAUDE_FLEET_URL:-http://localhost:3847}"
 SERVER_PID=""
 DB_PATH="/tmp/e2e-fleet-test.db"
 
