@@ -15,7 +15,6 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, type WebSocket } from 'ws';
 
 import { SQLiteStorage } from './storage/sqlite.js';
-import { SpawnQueueStorage } from './storage/spawn-queue.js';
 import { WorkerManager } from './workers/manager.js';
 import { SpawnController } from './workers/spawn-controller.js';
 import { WorkflowStorage } from './storage/workflow.js';
@@ -23,7 +22,7 @@ import { WorkflowEngine } from './workers/workflow-engine.js';
 import { createStorage, getStorageConfigFromEnv } from './storage/factory.js';
 import type { IStorage } from './storage/interfaces.js';
 import { createAuthMiddleware, requireRole } from './middleware/auth.js';
-import { metricsMiddleware, metricsHandler, updateGauges } from './metrics/prometheus.js';
+import { metricsMiddleware, metricsHandler } from './metrics/prometheus.js';
 import type {
   ServerConfig,
   ExtendedWebSocket,
@@ -172,6 +171,12 @@ export class CollabServer {
   }
 
   private rateLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
+    // Skip rate limiting for static files
+    const staticExtensions = ['.js', '.css', '.html', '.png', '.jpg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.map', '.json'];
+    if (staticExtensions.some(ext => req.path.endsWith(ext)) || req.path.startsWith('/dashboard')) {
+      return next();
+    }
+
     const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
     const now = Date.now();
 
@@ -341,7 +346,7 @@ export class CollabServer {
   // ============================================================================
 
   private setupWebSocket(): void {
-    this.wss.on('connection', (ws: WebSocket, req) => {
+    this.wss.on('connection', (ws: WebSocket, _req) => {
       console.log('[WS] New connection');
       const extWs = ws as ExtendedWebSocket;
       extWs.isAlive = true;
