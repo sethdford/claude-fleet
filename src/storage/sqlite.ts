@@ -12,29 +12,83 @@ import type {
   Message,
   TeamTask,
   TaskStatus,
+  PersistentWorker,
+  WorkerStatus,
+  WorkItem,
+  WorkItemStatus,
+  Batch,
+  BatchStatus,
+  WorkItemEvent,
+  WorkItemEventType,
+  MailMessage,
+  Handoff,
+  AgentRole,
 } from '../types.js';
 
 export class SQLiteStorage implements TeamStorage {
   private db: Database.Database;
   private stmts: {
+    // Users
     insertUser: Database.Statement;
     getUser: Database.Statement;
     getUsersByTeam: Database.Statement;
+    // Chats
     insertChat: Database.Statement;
     getChat: Database.Statement;
     getChatsByUser: Database.Statement;
     updateChatTime: Database.Statement;
+    // Messages
     insertMessage: Database.Statement;
     getMessages: Database.Statement;
     getMessagesAfter: Database.Statement;
+    // Unread
     getUnread: Database.Statement;
     setUnread: Database.Statement;
     incrementUnread: Database.Statement;
     clearUnread: Database.Statement;
+    // Tasks
     insertTask: Database.Statement;
     getTask: Database.Statement;
     getTasksByTeam: Database.Statement;
     updateTaskStatus: Database.Statement;
+    // Workers (Phase 1)
+    insertWorker: Database.Statement;
+    getWorker: Database.Statement;
+    getWorkerByHandle: Database.Statement;
+    getAllWorkers: Database.Statement;
+    getActiveWorkers: Database.Statement;
+    updateWorkerStatus: Database.Statement;
+    updateWorkerHeartbeat: Database.Statement;
+    updateWorkerPid: Database.Statement;
+    dismissWorker: Database.Statement;
+    deleteWorkerByHandle: Database.Statement;
+    // Work Items (Phase 2)
+    insertWorkItem: Database.Statement;
+    getWorkItem: Database.Statement;
+    getAllWorkItems: Database.Statement;
+    getWorkItemsByBatch: Database.Statement;
+    getWorkItemsByAssignee: Database.Statement;
+    updateWorkItemStatus: Database.Statement;
+    assignWorkItem: Database.Statement;
+    // Batches (Phase 2)
+    insertBatch: Database.Statement;
+    getBatch: Database.Statement;
+    getAllBatches: Database.Statement;
+    updateBatchStatus: Database.Statement;
+    // Work Item Events (Phase 2)
+    insertWorkItemEvent: Database.Statement;
+    getWorkItemEvents: Database.Statement;
+    // Mail (Phase 3)
+    insertMail: Database.Statement;
+    getMail: Database.Statement;
+    getUnreadMail: Database.Statement;
+    getAllMailTo: Database.Statement;
+    markMailRead: Database.Statement;
+    // Handoffs (Phase 3)
+    insertHandoff: Database.Statement;
+    getHandoff: Database.Statement;
+    getPendingHandoffs: Database.Statement;
+    acceptHandoff: Database.Statement;
   };
 
   constructor(dbPath: string) {
@@ -102,6 +156,139 @@ export class SQLiteStorage implements TeamStorage {
       CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
       CREATE INDEX IF NOT EXISTS idx_users_team ON users(team_name);
       CREATE INDEX IF NOT EXISTS idx_tasks_team ON tasks(team_name);
+
+      -- Workers table (Phase 1: Crash Recovery)
+      CREATE TABLE IF NOT EXISTS workers (
+        id TEXT PRIMARY KEY,
+        handle TEXT UNIQUE NOT NULL,
+        status TEXT DEFAULT 'pending',
+        worktree_path TEXT,
+        worktree_branch TEXT,
+        pid INTEGER,
+        session_id TEXT,
+        initial_prompt TEXT,
+        last_heartbeat INTEGER,
+        restart_count INTEGER DEFAULT 0,
+        role TEXT DEFAULT 'worker',
+        swarm_id TEXT,
+        depth_level INTEGER DEFAULT 1,
+        created_at INTEGER DEFAULT (strftime('%s', 'now')),
+        dismissed_at INTEGER
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workers_handle ON workers(handle);
+      CREATE INDEX IF NOT EXISTS idx_workers_status ON workers(status);
+
+      -- Work Items table (Phase 2: Structured Work Tracking)
+      CREATE TABLE IF NOT EXISTS work_items (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT DEFAULT 'pending',
+        assigned_to TEXT,
+        batch_id TEXT,
+        created_at INTEGER DEFAULT (strftime('%s', 'now')),
+        FOREIGN KEY (batch_id) REFERENCES batches(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(status);
+      CREATE INDEX IF NOT EXISTS idx_work_items_assigned ON work_items(assigned_to);
+      CREATE INDEX IF NOT EXISTS idx_work_items_batch ON work_items(batch_id);
+
+      -- Batches table (Phase 2: Bundled Work)
+      CREATE TABLE IF NOT EXISTS batches (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        status TEXT DEFAULT 'open',
+        created_at INTEGER DEFAULT (strftime('%s', 'now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_batches_status ON batches(status);
+
+      -- Work Item Events table (Phase 2: Event History)
+      CREATE TABLE IF NOT EXISTS work_item_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        work_item_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        actor TEXT,
+        details TEXT,
+        created_at INTEGER DEFAULT (strftime('%s', 'now')),
+        FOREIGN KEY (work_item_id) REFERENCES work_items(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_work_item_events_item ON work_item_events(work_item_id);
+
+      -- Mailbox table (Phase 3: Persistent Communication)
+      CREATE TABLE IF NOT EXISTS mailbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_handle TEXT NOT NULL,
+        to_handle TEXT NOT NULL,
+        subject TEXT,
+        body TEXT NOT NULL,
+        read_at INTEGER,
+        created_at INTEGER DEFAULT (strftime('%s', 'now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_mailbox_to ON mailbox(to_handle);
+      CREATE INDEX IF NOT EXISTS idx_mailbox_unread ON mailbox(to_handle, read_at);
+
+      -- Handoffs table (Phase 3: Context Transfer)
+      CREATE TABLE IF NOT EXISTS handoffs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_handle TEXT NOT NULL,
+        to_handle TEXT NOT NULL,
+        context TEXT NOT NULL,
+        checkpoint TEXT,
+        status TEXT DEFAULT 'pending',
+        outcome TEXT,
+        accepted_at INTEGER,
+        created_at INTEGER DEFAULT (strftime('%s', 'now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_handoffs_to ON handoffs(to_handle);
+      CREATE INDEX IF NOT EXISTS idx_handoffs_pending ON handoffs(to_handle, accepted_at);
+      CREATE INDEX IF NOT EXISTS idx_handoffs_status ON handoffs(status);
+
+      -- Fleet Coordination Tables (Phase 4)
+
+      -- Blackboard table for inter-agent messaging
+      CREATE TABLE IF NOT EXISTS blackboard (
+        id TEXT PRIMARY KEY,
+        swarm_id TEXT NOT NULL,
+        sender_handle TEXT NOT NULL,
+        message_type TEXT NOT NULL CHECK (message_type IN ('request', 'response', 'status', 'directive', 'checkpoint')),
+        target_handle TEXT,
+        priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'critical')),
+        payload TEXT NOT NULL,
+        read_by TEXT DEFAULT '[]',
+        created_at INTEGER NOT NULL,
+        archived_at INTEGER
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_blackboard_swarm ON blackboard(swarm_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_blackboard_target ON blackboard(target_handle);
+      CREATE INDEX IF NOT EXISTS idx_blackboard_priority ON blackboard(priority);
+      CREATE INDEX IF NOT EXISTS idx_blackboard_unarchived ON blackboard(swarm_id, archived_at);
+
+      -- Spawn queue for managed agent spawning with DAG dependencies
+      CREATE TABLE IF NOT EXISTS spawn_queue (
+        id TEXT PRIMARY KEY,
+        requester_handle TEXT NOT NULL,
+        target_agent_type TEXT NOT NULL,
+        depth_level INTEGER NOT NULL DEFAULT 1,
+        priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'critical')),
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'spawned')),
+        payload TEXT NOT NULL,
+        depends_on TEXT DEFAULT '[]',
+        blocked_by_count INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        processed_at INTEGER,
+        spawned_worker_id TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_spawn_queue_status ON spawn_queue(status, priority, created_at);
+      CREATE INDEX IF NOT EXISTS idx_spawn_queue_ready ON spawn_queue(status, blocked_by_count);
+      CREATE INDEX IF NOT EXISTS idx_spawn_queue_requester ON spawn_queue(requester_handle);
     `);
   }
 
@@ -148,6 +335,79 @@ export class SQLiteStorage implements TeamStorage {
         'SELECT * FROM tasks WHERE team_name = ? ORDER BY created_at DESC'
       ),
       updateTaskStatus: this.db.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?'),
+
+      // Workers (Phase 1)
+      insertWorker: this.db.prepare(`
+        INSERT INTO workers (id, handle, status, worktree_path, worktree_branch, pid, session_id,
+                             initial_prompt, last_heartbeat, restart_count, role, created_at, dismissed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `),
+      getWorker: this.db.prepare('SELECT * FROM workers WHERE id = ?'),
+      getWorkerByHandle: this.db.prepare('SELECT * FROM workers WHERE handle = ?'),
+      getAllWorkers: this.db.prepare('SELECT * FROM workers ORDER BY created_at DESC'),
+      getActiveWorkers: this.db.prepare(
+        "SELECT * FROM workers WHERE status NOT IN ('dismissed', 'error') ORDER BY created_at DESC"
+      ),
+      updateWorkerStatus: this.db.prepare('UPDATE workers SET status = ? WHERE id = ?'),
+      updateWorkerHeartbeat: this.db.prepare('UPDATE workers SET last_heartbeat = ? WHERE id = ?'),
+      updateWorkerPid: this.db.prepare('UPDATE workers SET pid = ?, session_id = ? WHERE id = ?'),
+      dismissWorker: this.db.prepare(
+        'UPDATE workers SET status = ?, dismissed_at = ? WHERE id = ?'
+      ),
+      deleteWorkerByHandle: this.db.prepare('DELETE FROM workers WHERE handle = ?'),
+
+      // Work Items (Phase 2)
+      insertWorkItem: this.db.prepare(`
+        INSERT INTO work_items (id, title, description, status, assigned_to, batch_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `),
+      getWorkItem: this.db.prepare('SELECT * FROM work_items WHERE id = ?'),
+      getAllWorkItems: this.db.prepare('SELECT * FROM work_items ORDER BY created_at DESC'),
+      getWorkItemsByBatch: this.db.prepare('SELECT * FROM work_items WHERE batch_id = ? ORDER BY created_at ASC'),
+      getWorkItemsByAssignee: this.db.prepare('SELECT * FROM work_items WHERE assigned_to = ? ORDER BY created_at DESC'),
+      updateWorkItemStatus: this.db.prepare('UPDATE work_items SET status = ? WHERE id = ?'),
+      assignWorkItem: this.db.prepare('UPDATE work_items SET assigned_to = ?, status = ? WHERE id = ?'),
+
+      // Batches (Phase 2)
+      insertBatch: this.db.prepare(`
+        INSERT INTO batches (id, name, status, created_at)
+        VALUES (?, ?, ?, ?)
+      `),
+      getBatch: this.db.prepare('SELECT * FROM batches WHERE id = ?'),
+      getAllBatches: this.db.prepare('SELECT * FROM batches ORDER BY created_at DESC'),
+      updateBatchStatus: this.db.prepare('UPDATE batches SET status = ? WHERE id = ?'),
+
+      // Work Item Events (Phase 2)
+      insertWorkItemEvent: this.db.prepare(`
+        INSERT INTO work_item_events (work_item_id, event_type, actor, details, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `),
+      getWorkItemEvents: this.db.prepare('SELECT * FROM work_item_events WHERE work_item_id = ? ORDER BY created_at ASC'),
+
+      // Mail (Phase 3)
+      insertMail: this.db.prepare(`
+        INSERT INTO mailbox (from_handle, to_handle, subject, body, read_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `),
+      getMail: this.db.prepare('SELECT * FROM mailbox WHERE id = ?'),
+      getUnreadMail: this.db.prepare(
+        'SELECT * FROM mailbox WHERE to_handle = ? AND read_at IS NULL ORDER BY created_at ASC'
+      ),
+      getAllMailTo: this.db.prepare(
+        'SELECT * FROM mailbox WHERE to_handle = ? ORDER BY created_at DESC LIMIT ?'
+      ),
+      markMailRead: this.db.prepare('UPDATE mailbox SET read_at = ? WHERE id = ?'),
+
+      // Handoffs (Phase 3)
+      insertHandoff: this.db.prepare(`
+        INSERT INTO handoffs (from_handle, to_handle, context, accepted_at, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `),
+      getHandoff: this.db.prepare('SELECT * FROM handoffs WHERE id = ?'),
+      getPendingHandoffs: this.db.prepare(
+        'SELECT * FROM handoffs WHERE to_handle = ? AND accepted_at IS NULL ORDER BY created_at ASC'
+      ),
+      acceptHandoff: this.db.prepare('UPDATE handoffs SET accepted_at = ? WHERE id = ?'),
     };
   }
 
@@ -447,6 +707,502 @@ export class SQLiteStorage implements TeamStorage {
   }
 
   // ============================================================================
+  // Workers (Phase 1)
+  // ============================================================================
+
+  insertWorker(worker: PersistentWorker): void {
+    this.stmts.insertWorker.run(
+      worker.id,
+      worker.handle,
+      worker.status,
+      worker.worktreePath,
+      worker.worktreeBranch,
+      worker.pid,
+      worker.sessionId,
+      worker.initialPrompt,
+      worker.lastHeartbeat,
+      worker.restartCount,
+      worker.role,
+      worker.createdAt,
+      worker.dismissedAt
+    );
+  }
+
+  private mapWorkerRow(row: {
+    id: string;
+    handle: string;
+    status: string;
+    worktree_path: string | null;
+    worktree_branch: string | null;
+    pid: number | null;
+    session_id: string | null;
+    initial_prompt: string | null;
+    last_heartbeat: number | null;
+    restart_count: number;
+    role: string;
+    created_at: number;
+    dismissed_at: number | null;
+  }): PersistentWorker {
+    return {
+      id: row.id,
+      handle: row.handle,
+      status: row.status as WorkerStatus,
+      worktreePath: row.worktree_path,
+      worktreeBranch: row.worktree_branch,
+      pid: row.pid,
+      sessionId: row.session_id,
+      initialPrompt: row.initial_prompt,
+      lastHeartbeat: row.last_heartbeat,
+      restartCount: row.restart_count,
+      role: row.role as AgentRole,
+      createdAt: row.created_at,
+      dismissedAt: row.dismissed_at,
+    };
+  }
+
+  getWorker(workerId: string): PersistentWorker | null {
+    const row = this.stmts.getWorker.get(workerId) as {
+      id: string;
+      handle: string;
+      status: string;
+      worktree_path: string | null;
+      worktree_branch: string | null;
+      pid: number | null;
+      session_id: string | null;
+      initial_prompt: string | null;
+      last_heartbeat: number | null;
+      restart_count: number;
+      role: string;
+      created_at: number;
+      dismissed_at: number | null;
+    } | undefined;
+
+    if (!row) return null;
+    return this.mapWorkerRow(row);
+  }
+
+  getWorkerByHandle(handle: string): PersistentWorker | null {
+    const row = this.stmts.getWorkerByHandle.get(handle) as {
+      id: string;
+      handle: string;
+      status: string;
+      worktree_path: string | null;
+      worktree_branch: string | null;
+      pid: number | null;
+      session_id: string | null;
+      initial_prompt: string | null;
+      last_heartbeat: number | null;
+      restart_count: number;
+      role: string;
+      created_at: number;
+      dismissed_at: number | null;
+    } | undefined;
+
+    if (!row) return null;
+    return this.mapWorkerRow(row);
+  }
+
+  getAllWorkers(): PersistentWorker[] {
+    const rows = this.stmts.getAllWorkers.all() as Array<{
+      id: string;
+      handle: string;
+      status: string;
+      worktree_path: string | null;
+      worktree_branch: string | null;
+      pid: number | null;
+      session_id: string | null;
+      initial_prompt: string | null;
+      last_heartbeat: number | null;
+      restart_count: number;
+      role: string;
+      created_at: number;
+      dismissed_at: number | null;
+    }>;
+
+    return rows.map((row) => this.mapWorkerRow(row));
+  }
+
+  getActiveWorkers(): PersistentWorker[] {
+    const rows = this.stmts.getActiveWorkers.all() as Array<{
+      id: string;
+      handle: string;
+      status: string;
+      worktree_path: string | null;
+      worktree_branch: string | null;
+      pid: number | null;
+      session_id: string | null;
+      initial_prompt: string | null;
+      last_heartbeat: number | null;
+      restart_count: number;
+      role: string;
+      created_at: number;
+      dismissed_at: number | null;
+    }>;
+
+    return rows.map((row) => this.mapWorkerRow(row));
+  }
+
+  updateWorkerStatus(workerId: string, status: WorkerStatus): void {
+    this.stmts.updateWorkerStatus.run(status, workerId);
+  }
+
+  updateWorkerHeartbeat(workerId: string, timestamp: number): void {
+    this.stmts.updateWorkerHeartbeat.run(timestamp, workerId);
+  }
+
+  updateWorkerPid(workerId: string, pid: number, sessionId: string | null): void {
+    this.stmts.updateWorkerPid.run(pid, sessionId, workerId);
+  }
+
+  dismissWorker(workerId: string): void {
+    const now = Math.floor(Date.now() / 1000);
+    this.stmts.dismissWorker.run('dismissed', now, workerId);
+  }
+
+  deleteWorkerByHandle(handle: string): void {
+    this.stmts.deleteWorkerByHandle.run(handle);
+  }
+
+  // ============================================================================
+  // Work Items (Phase 2)
+  // ============================================================================
+
+  insertWorkItem(workItem: WorkItem): void {
+    this.stmts.insertWorkItem.run(
+      workItem.id,
+      workItem.title,
+      workItem.description,
+      workItem.status,
+      workItem.assignedTo,
+      workItem.batchId,
+      workItem.createdAt
+    );
+  }
+
+  private mapWorkItemRow(row: {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    assigned_to: string | null;
+    batch_id: string | null;
+    created_at: number;
+  }): WorkItem {
+    return {
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      status: row.status as WorkItemStatus,
+      assignedTo: row.assigned_to,
+      batchId: row.batch_id,
+      createdAt: row.created_at,
+    };
+  }
+
+  getWorkItem(workItemId: string): WorkItem | null {
+    const row = this.stmts.getWorkItem.get(workItemId) as {
+      id: string;
+      title: string;
+      description: string | null;
+      status: string;
+      assigned_to: string | null;
+      batch_id: string | null;
+      created_at: number;
+    } | undefined;
+
+    if (!row) return null;
+    return this.mapWorkItemRow(row);
+  }
+
+  getAllWorkItems(): WorkItem[] {
+    const rows = this.stmts.getAllWorkItems.all() as Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      status: string;
+      assigned_to: string | null;
+      batch_id: string | null;
+      created_at: number;
+    }>;
+
+    return rows.map((row) => this.mapWorkItemRow(row));
+  }
+
+  getWorkItemsByBatch(batchId: string): WorkItem[] {
+    const rows = this.stmts.getWorkItemsByBatch.all(batchId) as Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      status: string;
+      assigned_to: string | null;
+      batch_id: string | null;
+      created_at: number;
+    }>;
+
+    return rows.map((row) => this.mapWorkItemRow(row));
+  }
+
+  getWorkItemsByAssignee(handle: string): WorkItem[] {
+    const rows = this.stmts.getWorkItemsByAssignee.all(handle) as Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      status: string;
+      assigned_to: string | null;
+      batch_id: string | null;
+      created_at: number;
+    }>;
+
+    return rows.map((row) => this.mapWorkItemRow(row));
+  }
+
+  updateWorkItemStatus(workItemId: string, status: WorkItemStatus): void {
+    this.stmts.updateWorkItemStatus.run(status, workItemId);
+  }
+
+  assignWorkItem(workItemId: string, handle: string): void {
+    this.stmts.assignWorkItem.run(handle, 'in_progress', workItemId);
+  }
+
+  // ============================================================================
+  // Batches (Phase 2)
+  // ============================================================================
+
+  insertBatch(batch: Batch): void {
+    this.stmts.insertBatch.run(
+      batch.id,
+      batch.name,
+      batch.status,
+      batch.createdAt
+    );
+  }
+
+  private mapBatchRow(row: {
+    id: string;
+    name: string;
+    status: string;
+    created_at: number;
+  }): Batch {
+    return {
+      id: row.id,
+      name: row.name,
+      status: row.status as BatchStatus,
+      createdAt: row.created_at,
+    };
+  }
+
+  getBatch(batchId: string): Batch | null {
+    const row = this.stmts.getBatch.get(batchId) as {
+      id: string;
+      name: string;
+      status: string;
+      created_at: number;
+    } | undefined;
+
+    if (!row) return null;
+    return this.mapBatchRow(row);
+  }
+
+  getAllBatches(): Batch[] {
+    const rows = this.stmts.getAllBatches.all() as Array<{
+      id: string;
+      name: string;
+      status: string;
+      created_at: number;
+    }>;
+
+    return rows.map((row) => this.mapBatchRow(row));
+  }
+
+  updateBatchStatus(batchId: string, status: BatchStatus): void {
+    this.stmts.updateBatchStatus.run(status, batchId);
+  }
+
+  // ============================================================================
+  // Work Item Events (Phase 2)
+  // ============================================================================
+
+  insertWorkItemEvent(event: Omit<WorkItemEvent, 'id'>): number {
+    const result = this.stmts.insertWorkItemEvent.run(
+      event.workItemId,
+      event.eventType,
+      event.actor,
+      event.details,
+      event.createdAt
+    );
+    return result.lastInsertRowid as number;
+  }
+
+  getWorkItemEvents(workItemId: string): WorkItemEvent[] {
+    const rows = this.stmts.getWorkItemEvents.all(workItemId) as Array<{
+      id: number;
+      work_item_id: string;
+      event_type: string;
+      actor: string | null;
+      details: string | null;
+      created_at: number;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      workItemId: row.work_item_id,
+      eventType: row.event_type as WorkItemEventType,
+      actor: row.actor,
+      details: row.details,
+      createdAt: row.created_at,
+    }));
+  }
+
+  // ============================================================================
+  // Mail (Phase 3)
+  // ============================================================================
+
+  insertMail(mail: Omit<MailMessage, 'id'>): number {
+    const result = this.stmts.insertMail.run(
+      mail.fromHandle,
+      mail.toHandle,
+      mail.subject,
+      mail.body,
+      mail.readAt,
+      mail.createdAt
+    );
+    return result.lastInsertRowid as number;
+  }
+
+  private mapMailRow(row: {
+    id: number;
+    from_handle: string;
+    to_handle: string;
+    subject: string | null;
+    body: string;
+    read_at: number | null;
+    created_at: number;
+  }): MailMessage {
+    return {
+      id: row.id,
+      fromHandle: row.from_handle,
+      toHandle: row.to_handle,
+      subject: row.subject,
+      body: row.body,
+      readAt: row.read_at,
+      createdAt: row.created_at,
+    };
+  }
+
+  getMail(mailId: number): MailMessage | null {
+    const row = this.stmts.getMail.get(mailId) as {
+      id: number;
+      from_handle: string;
+      to_handle: string;
+      subject: string | null;
+      body: string;
+      read_at: number | null;
+      created_at: number;
+    } | undefined;
+
+    if (!row) return null;
+    return this.mapMailRow(row);
+  }
+
+  getUnreadMail(handle: string): MailMessage[] {
+    const rows = this.stmts.getUnreadMail.all(handle) as Array<{
+      id: number;
+      from_handle: string;
+      to_handle: string;
+      subject: string | null;
+      body: string;
+      read_at: number | null;
+      created_at: number;
+    }>;
+
+    return rows.map((row) => this.mapMailRow(row));
+  }
+
+  getAllMailTo(handle: string, limit: number = 50): MailMessage[] {
+    const rows = this.stmts.getAllMailTo.all(handle, limit) as Array<{
+      id: number;
+      from_handle: string;
+      to_handle: string;
+      subject: string | null;
+      body: string;
+      read_at: number | null;
+      created_at: number;
+    }>;
+
+    return rows.map((row) => this.mapMailRow(row));
+  }
+
+  markMailRead(mailId: number): void {
+    const now = Math.floor(Date.now() / 1000);
+    this.stmts.markMailRead.run(now, mailId);
+  }
+
+  // ============================================================================
+  // Handoffs (Phase 3)
+  // ============================================================================
+
+  insertHandoff(handoff: Omit<Handoff, 'id'>): number {
+    const result = this.stmts.insertHandoff.run(
+      handoff.fromHandle,
+      handoff.toHandle,
+      JSON.stringify(handoff.context),
+      handoff.acceptedAt,
+      handoff.createdAt
+    );
+    return result.lastInsertRowid as number;
+  }
+
+  private mapHandoffRow(row: {
+    id: number;
+    from_handle: string;
+    to_handle: string;
+    context: string;
+    accepted_at: number | null;
+    created_at: number;
+  }): Handoff {
+    return {
+      id: row.id,
+      fromHandle: row.from_handle,
+      toHandle: row.to_handle,
+      context: JSON.parse(row.context) as Record<string, unknown>,
+      acceptedAt: row.accepted_at,
+      createdAt: row.created_at,
+    };
+  }
+
+  getHandoff(handoffId: number): Handoff | null {
+    const row = this.stmts.getHandoff.get(handoffId) as {
+      id: number;
+      from_handle: string;
+      to_handle: string;
+      context: string;
+      accepted_at: number | null;
+      created_at: number;
+    } | undefined;
+
+    if (!row) return null;
+    return this.mapHandoffRow(row);
+  }
+
+  getPendingHandoffs(handle: string): Handoff[] {
+    const rows = this.stmts.getPendingHandoffs.all(handle) as Array<{
+      id: number;
+      from_handle: string;
+      to_handle: string;
+      context: string;
+      accepted_at: number | null;
+      created_at: number;
+    }>;
+
+    return rows.map((row) => this.mapHandoffRow(row));
+  }
+
+  acceptHandoff(handoffId: number): void {
+    const now = Math.floor(Date.now() / 1000);
+    this.stmts.acceptHandoff.run(now, handoffId);
+  }
+
+  // ============================================================================
   // Debug
   // ============================================================================
 
@@ -521,6 +1277,17 @@ export class SQLiteStorage implements TeamStorage {
         updatedAt: t.updated_at,
       })),
     };
+  }
+
+  // ============================================================================
+  // Database Access
+  // ============================================================================
+
+  /**
+   * Get the underlying database instance for advanced operations
+   */
+  getDatabase(): Database.Database {
+    return this.db;
   }
 
   // ============================================================================

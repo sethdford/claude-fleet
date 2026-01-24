@@ -17,6 +17,54 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { SQLiteStorage } from './storage/sqlite.js';
 import { WorkerManager } from './workers/manager.js';
+import { WorkItemStorage } from './storage/workitems.js';
+import { MailStorage } from './storage/mail.js';
+import { BlackboardStorage } from './storage/blackboard.js';
+import { SpawnQueueStorage } from './storage/spawn-queue.js';
+import { CheckpointStorage } from './storage/checkpoint.js';
+import { SpawnController } from './workers/spawn-controller.js';
+import { createAuthMiddleware, requireRole, type AuthenticatedRequest } from './middleware/auth.js';
+import {
+  validateBody,
+  agentRegistrationSchema,
+  createTaskSchema,
+  updateTaskSchema,
+  createChatSchema,
+  sendMessageSchema,
+  broadcastSchema,
+  markReadSchema,
+  spawnWorkerSchema,
+  sendToWorkerSchema,
+  worktreeCommitSchema,
+  worktreePRSchema,
+  createWorkItemSchema,
+  updateWorkItemSchema,
+  createBatchSchema,
+  dispatchBatchSchema,
+  sendMailSchema,
+  createHandoffSchema,
+  // Fleet coordination schemas
+  blackboardPostSchema,
+  blackboardMarkReadSchema,
+  blackboardArchiveSchema,
+  blackboardArchiveOldSchema,
+  spawnEnqueueSchema,
+  checkpointCreateSchema,
+  swarmCreateSchema,
+  swarmKillSchema,
+} from './validation/schemas.js';
+import {
+  metricsMiddleware,
+  metricsHandler,
+  updateGauges,
+  agentAuthentications,
+  tasksCreated,
+  tasksCompleted,
+  messagesSent,
+  broadcastsSent,
+  workerSpawns,
+  workerDismissals,
+} from './metrics/prometheus.js';
 import type {
   ServerConfig,
   ServerMetrics,
@@ -29,15 +77,16 @@ import type {
   HealthResponse,
   ErrorResponse,
   AuthResponse,
-  AgentRegistration,
-  CreateTaskRequest,
-  UpdateTaskRequest,
-  SendMessageRequest,
-  BroadcastRequest,
-  SpawnWorkerRequest,
   TaskStatus,
   WorkerState,
+  WorkItemStatus,
+  CreateWorkItemOptions,
+  CreateBatchOptions,
+  SendMailOptions,
+  BlackboardMessageType,
+  MessagePriority,
 } from './types.js';
+import type { FleetAgentRole } from './workers/agent-roles.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,37 +107,7 @@ export function getConfig(): ServerConfig {
   };
 }
 
-// ============================================================================
-// VALIDATION HELPERS
-// ============================================================================
-
-function validateRequired(obj: Record<string, unknown>, fields: string[]): { valid: boolean; error?: string } {
-  const missing = fields.filter(f => !obj[f] || (typeof obj[f] === 'string' && (obj[f] as string).trim() === ''));
-  if (missing.length > 0) {
-    return { valid: false, error: `Missing required fields: ${missing.join(', ')}` };
-  }
-  return { valid: true };
-}
-
-function validateString(value: unknown, name: string, minLen = 1, maxLen = 1000): { valid: boolean; error?: string } {
-  if (typeof value !== 'string') {
-    return { valid: false, error: `${name} must be a string` };
-  }
-  if (value.length < minLen) {
-    return { valid: false, error: `${name} must be at least ${minLen} characters` };
-  }
-  if (value.length > maxLen) {
-    return { valid: false, error: `${name} must be at most ${maxLen} characters` };
-  }
-  return { valid: true };
-}
-
-function validateEnum(value: unknown, name: string, allowed: string[]): { valid: boolean; error?: string } {
-  if (!allowed.includes(value as string)) {
-    return { valid: false, error: `${name} must be one of: ${allowed.join(', ')}` };
-  }
-  return { valid: true };
-}
+// Validation helpers moved to src/validation/schemas.ts (using Zod)
 
 // ============================================================================
 // HASH HELPERS
@@ -116,11 +135,18 @@ export class CollabServer {
   private server: http.Server;
   private wss: WebSocketServer;
   private storage: SQLiteStorage;
+  private workItemStorage: WorkItemStorage;
+  private mailStorage: MailStorage;
+  private blackboardStorage: BlackboardStorage;
+  private spawnQueueStorage: SpawnQueueStorage;
+  private checkpointStorage: CheckpointStorage;
+  private spawnController: SpawnController;
   private workerManager: WorkerManager;
   private config: ServerConfig;
   private subscriptions = new Map<string, Set<ExtendedWebSocket>>();
   private rateLimits = new Map<string, { count: number; windowStart: number }>();
   private startTime = Date.now();
+  private swarms = new Map<string, { id: string; name: string; description?: string; maxAgents: number; createdAt: number }>();
 
   constructor(config?: Partial<ServerConfig>) {
     this.config = { ...getConfig(), ...config };
@@ -128,10 +154,28 @@ export class CollabServer {
     this.server = http.createServer(this.app);
     this.wss = new WebSocketServer({ server: this.server, path: '/ws' });
     this.storage = new SQLiteStorage(this.config.dbPath);
+    this.workItemStorage = new WorkItemStorage(this.storage);
+    this.mailStorage = new MailStorage(this.storage);
+    this.blackboardStorage = new BlackboardStorage(this.storage);
+    this.spawnQueueStorage = new SpawnQueueStorage(this.storage);
+    this.checkpointStorage = new CheckpointStorage(this.storage);
+    this.spawnController = new SpawnController({
+      softLimit: 50,
+      hardLimit: 100,
+      maxDepth: 3,
+      autoProcess: true,
+    });
     this.workerManager = new WorkerManager({
       maxWorkers: this.config.maxWorkers,
       serverUrl: `http://localhost:${this.config.port}`,
+      storage: this.storage,
+      injectMail: true,
+      useWorktrees: true,
     });
+
+    // Connect SpawnController to WorkerManager
+    this.spawnController.initialize(this.spawnQueueStorage, this.workerManager);
+    this.workerManager.setSpawnController(this.spawnController);
 
     this.setupMiddleware();
     this.setupRoutes();
@@ -146,8 +190,12 @@ export class CollabServer {
 
   private setupMiddleware(): void {
     this.app.use(cors());
-    this.app.use(express.json());
+    this.app.use(express.json({ limit: '1mb' })); // Limit body size
+    this.app.use(metricsMiddleware); // Prometheus metrics
     this.app.use(this.rateLimitMiddleware.bind(this));
+
+    // JWT authentication for protected routes
+    this.app.use(createAuthMiddleware(this.config.jwtSecret));
 
     // Serve static files (dashboard)
     this.app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -178,24 +226,6 @@ export class CollabServer {
     next();
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private _authenticateToken(req: Request, res: Response, next: NextFunction): void {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader?.split(' ')[1];
-
-    if (!token) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
-
-    try {
-      const decoded = jwt.verify(token, this.config.jwtSecret);
-      (req as Request & { user: unknown }).user = decoded;
-      next();
-    } catch {
-      res.status(403).json({ error: 'Invalid or expired token' });
-    }
-  }
 
   // ============================================================================
   // ROUTES
@@ -205,8 +235,9 @@ export class CollabServer {
     // Health check
     this.app.get('/health', this.handleHealth.bind(this));
 
-    // Metrics endpoint
-    this.app.get('/metrics', this.handleMetrics.bind(this));
+    // Metrics endpoints
+    this.app.get('/metrics', metricsHandler); // Prometheus format
+    this.app.get('/metrics/json', this.handleMetrics.bind(this)); // JSON format
 
     // Authentication
     this.app.post('/auth', this.handleAuth.bind(this));
@@ -215,9 +246,9 @@ export class CollabServer {
     this.app.get('/users/:uid', this.handleGetUser.bind(this));
     this.app.get('/users/:uid/chats', this.handleGetUserChats.bind(this));
 
-    // Teams
+    // Teams - broadcast requires team-lead role
     this.app.get('/teams/:teamName/agents', this.handleGetTeamAgents.bind(this));
-    this.app.post('/teams/:teamName/broadcast', this.handleBroadcast.bind(this));
+    this.app.post('/teams/:teamName/broadcast', requireRole('team-lead'), this.handleBroadcast.bind(this));
     this.app.get('/teams/:teamName/tasks', this.handleGetTeamTasks.bind(this));
 
     // Chats
@@ -231,12 +262,71 @@ export class CollabServer {
     this.app.get('/tasks/:taskId', this.handleGetTask.bind(this));
     this.app.patch('/tasks/:taskId', this.handleUpdateTask.bind(this));
 
-    // Orchestration (NEW)
-    this.app.post('/orchestrate/spawn', this.handleSpawnWorker.bind(this));
-    this.app.post('/orchestrate/dismiss/:handle', this.handleDismissWorker.bind(this));
+    // Orchestration (NEW) - spawn/dismiss require team-lead role
+    this.app.post('/orchestrate/spawn', requireRole('team-lead'), this.handleSpawnWorker.bind(this));
+    this.app.post('/orchestrate/dismiss/:handle', requireRole('team-lead'), this.handleDismissWorker.bind(this));
     this.app.post('/orchestrate/send/:handle', this.handleSendToWorker.bind(this));
     this.app.get('/orchestrate/workers', this.handleGetWorkers.bind(this));
     this.app.get('/orchestrate/output/:handle', this.handleGetWorkerOutput.bind(this));
+
+    // Worktree operations (Phase 1) - push/pr require team-lead role
+    this.app.post('/orchestrate/worktree/:handle/commit', this.handleWorktreeCommit.bind(this));
+    this.app.post('/orchestrate/worktree/:handle/push', requireRole('team-lead'), this.handleWorktreePush.bind(this));
+    this.app.post('/orchestrate/worktree/:handle/pr', requireRole('team-lead'), this.handleWorktreePR.bind(this));
+    this.app.get('/orchestrate/worktree/:handle/status', this.handleWorktreeStatus.bind(this));
+
+    // Work Items (Phase 2)
+    this.app.post('/workitems', this.handleCreateWorkItem.bind(this));
+    this.app.get('/workitems', this.handleListWorkItems.bind(this));
+    this.app.get('/workitems/:id', this.handleGetWorkItem.bind(this));
+    this.app.patch('/workitems/:id', this.handleUpdateWorkItem.bind(this));
+
+    // Batches (Phase 2) - dispatch requires team-lead role (assign permission)
+    this.app.post('/batches', this.handleCreateBatch.bind(this));
+    this.app.get('/batches', this.handleListBatches.bind(this));
+    this.app.get('/batches/:id', this.handleGetBatch.bind(this));
+    this.app.post('/batches/:id/dispatch', requireRole('team-lead'), this.handleDispatchBatch.bind(this));
+
+    // Mail (Phase 3)
+    this.app.post('/mail', this.handleSendMail.bind(this));
+    this.app.get('/mail/:handle', this.handleGetMail.bind(this));
+    this.app.get('/mail/:handle/unread', this.handleGetUnreadMail.bind(this));
+    this.app.post('/mail/:id/read', this.handleMarkMailRead.bind(this));
+
+    // Handoffs (Phase 3)
+    this.app.post('/handoffs', this.handleCreateHandoff.bind(this));
+    this.app.get('/handoffs/:handle', this.handleGetHandoffs.bind(this));
+
+    // ============================================================================
+    // Fleet Coordination Routes (Phase 4)
+    // ============================================================================
+
+    // Blackboard messaging - all ops require authentication (both roles allowed for read ops)
+    this.app.post('/blackboard', requireRole('team-lead'), this.handleBlackboardPost.bind(this));
+    this.app.get('/blackboard/:swarmId', requireRole('team-lead', 'worker'), this.handleBlackboardRead.bind(this));
+    this.app.post('/blackboard/mark-read', requireRole('team-lead', 'worker'), this.handleBlackboardMarkRead.bind(this));
+    this.app.post('/blackboard/archive', requireRole('team-lead'), this.handleBlackboardArchive.bind(this));
+    this.app.post('/blackboard/:swarmId/archive-old', requireRole('team-lead'), this.handleBlackboardArchiveOld.bind(this));
+
+    // Spawn queue - spawning requires team-lead, status requires auth (both roles)
+    this.app.post('/spawn-queue', requireRole('team-lead'), this.handleSpawnEnqueue.bind(this));
+    this.app.get('/spawn-queue/status', requireRole('team-lead', 'worker'), this.handleSpawnStatus.bind(this));
+    this.app.get('/spawn-queue/:id', requireRole('team-lead', 'worker'), this.handleSpawnGet.bind(this));
+    this.app.delete('/spawn-queue/:id', requireRole('team-lead'), this.handleSpawnCancel.bind(this));
+
+    // Checkpoints
+    this.app.post('/checkpoints', this.handleCheckpointCreate.bind(this));
+    this.app.get('/checkpoints/:id', this.handleCheckpointLoad.bind(this));
+    this.app.get('/checkpoints/latest/:handle', this.handleCheckpointLatest.bind(this));
+    this.app.get('/checkpoints/list/:handle', this.handleCheckpointList.bind(this));
+    this.app.post('/checkpoints/:id/accept', this.handleCheckpointAccept.bind(this));
+    this.app.post('/checkpoints/:id/reject', this.handleCheckpointReject.bind(this));
+
+    // Swarm management
+    this.app.post('/swarms', requireRole('team-lead'), this.handleSwarmCreate.bind(this));
+    this.app.get('/swarms', this.handleSwarmList.bind(this));
+    this.app.get('/swarms/:id', this.handleSwarmGet.bind(this));
+    this.app.post('/swarms/:id/kill', requireRole('team-lead'), this.handleSwarmKill.bind(this));
 
     // Debug
     this.app.get('/debug', this.handleDebug.bind(this));
@@ -313,34 +403,14 @@ export class CollabServer {
   }
 
   private handleAuth(req: Request, res: Response): void {
-    const { handle, teamName, agentType } = req.body as AgentRegistration;
-
-    const reqCheck = validateRequired(req.body, ['handle', 'teamName']);
-    if (!reqCheck.valid) {
-      res.status(400).json({ error: reqCheck.error } as ErrorResponse);
+    // Validate request body with Zod schema
+    const validation = validateBody(agentRegistrationSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
       return;
     }
 
-    const handleCheck = validateString(handle, 'handle', 1, 50);
-    if (!handleCheck.valid) {
-      res.status(400).json({ error: handleCheck.error } as ErrorResponse);
-      return;
-    }
-
-    const teamCheck = validateString(teamName, 'teamName', 1, 50);
-    if (!teamCheck.valid) {
-      res.status(400).json({ error: teamCheck.error } as ErrorResponse);
-      return;
-    }
-
-    if (agentType) {
-      const typeCheck = validateEnum(agentType, 'agentType', ['team-lead', 'worker']);
-      if (!typeCheck.valid) {
-        res.status(400).json({ error: typeCheck.error } as ErrorResponse);
-        return;
-      }
-    }
-
+    const { handle, teamName, agentType } = validation.data;
     const uid = generateUid(teamName, handle);
     const now = new Date().toISOString();
     const agent: TeamAgent = {
@@ -361,6 +431,8 @@ export class CollabServer {
     );
 
     console.log(`[AUTH] ${handle} (${agent.agentType}) joined team "${teamName}"`);
+
+    agentAuthentications.inc(); // Prometheus metric
 
     const response: AuthResponse = {
       uid,
@@ -405,8 +477,15 @@ export class CollabServer {
 
   private handleBroadcast(req: Request, res: Response): void {
     const { teamName } = req.params;
-    const { from, text, metadata } = req.body as BroadcastRequest;
 
+    // Validate request body with Zod schema
+    const validation = validateBody(broadcastSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { from, text, metadata } = validation.data;
     const fromUser = this.storage.getUser(from);
     if (!fromUser) {
       res.status(404).json({ error: 'Sender not found' } as ErrorResponse);
@@ -451,6 +530,7 @@ export class CollabServer {
       if (uid !== from) this.storage.incrementUnread(teamChatId, uid);
     });
 
+    broadcastsSent.inc(); // Prometheus metric
     console.log(`[BROADCAST] ${fromUser.handle} -> ${teamName}: ${text.slice(0, 50)}...`);
     this.broadcastToChat(teamChatId, { type: 'broadcast', message, handle: fromUser.handle });
     res.json(message);
@@ -462,13 +542,14 @@ export class CollabServer {
   }
 
   private handleCreateChat(req: Request, res: Response): void {
-    const { uid1, uid2 } = req.body;
-
-    const reqCheck = validateRequired(req.body, ['uid1', 'uid2']);
-    if (!reqCheck.valid) {
-      res.status(400).json({ error: reqCheck.error } as ErrorResponse);
+    // Validate request body with Zod schema (includes uid1 !== uid2 check)
+    const validation = validateBody(createChatSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
       return;
     }
+
+    const { uid1, uid2 } = validation.data;
 
     const user1 = this.storage.getUser(uid1);
     const user2 = this.storage.getUser(uid2);
@@ -478,10 +559,6 @@ export class CollabServer {
     }
     if (!user2) {
       res.status(404).json({ error: 'User uid2 not found' } as ErrorResponse);
-      return;
-    }
-    if (uid1 === uid2) {
-      res.status(400).json({ error: 'Cannot create chat with yourself' } as ErrorResponse);
       return;
     }
 
@@ -531,19 +608,15 @@ export class CollabServer {
 
   private handleSendMessage(req: Request, res: Response): void {
     const { chatId } = req.params;
-    const { from, text, metadata } = req.body as SendMessageRequest;
 
-    const reqCheck = validateRequired(req.body, ['from', 'text']);
-    if (!reqCheck.valid) {
-      res.status(400).json({ error: reqCheck.error } as ErrorResponse);
+    // Validate request body with Zod schema
+    const validation = validateBody(sendMessageSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
       return;
     }
 
-    const textCheck = validateString(text, 'text', 1, 50000);
-    if (!textCheck.valid) {
-      res.status(400).json({ error: textCheck.error } as ErrorResponse);
-      return;
-    }
+    const { from, text, metadata } = validation.data;
 
     const chat = this.storage.getChat(chatId);
     if (!chat) {
@@ -576,6 +649,7 @@ export class CollabServer {
       if (uid !== from) this.storage.incrementUnread(chatId, uid);
     });
 
+    messagesSent.inc(); // Prometheus metric
     console.log(`[MSG] ${fromUser.handle}: ${text.slice(0, 50)}...`);
     this.broadcastToChat(chatId, { type: 'new_message', message, handle: fromUser.handle });
     res.json(message);
@@ -583,13 +657,15 @@ export class CollabServer {
 
   private handleMarkRead(req: Request, res: Response): void {
     const { chatId } = req.params;
-    const { uid } = req.body;
 
-    if (!uid) {
-      res.status(400).json({ error: 'uid is required' } as ErrorResponse);
+    // Validate request body with Zod schema
+    const validation = validateBody(markReadSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
       return;
     }
 
+    const { uid } = validation.data;
     const chat = this.storage.getChat(chatId);
     if (!chat) {
       res.status(404).json({ error: 'Chat not found' } as ErrorResponse);
@@ -601,32 +677,14 @@ export class CollabServer {
   }
 
   private handleCreateTask(req: Request, res: Response): void {
-    const { fromUid, toHandle, teamName, subject, description, blockedBy } = req.body as CreateTaskRequest;
-
-    const reqCheck = validateRequired(req.body, ['fromUid', 'toHandle', 'teamName', 'subject']);
-    if (!reqCheck.valid) {
-      res.status(400).json({ error: reqCheck.error } as ErrorResponse);
+    // Validate request body with Zod schema
+    const validation = validateBody(createTaskSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
       return;
     }
 
-    const subjectCheck = validateString(subject, 'subject', 3, 200);
-    if (!subjectCheck.valid) {
-      res.status(400).json({ error: subjectCheck.error } as ErrorResponse);
-      return;
-    }
-
-    if (description) {
-      const descCheck = validateString(description, 'description', 0, 10000);
-      if (!descCheck.valid) {
-        res.status(400).json({ error: descCheck.error } as ErrorResponse);
-        return;
-      }
-    }
-
-    if (blockedBy && !Array.isArray(blockedBy)) {
-      res.status(400).json({ error: 'blockedBy must be an array of task IDs' } as ErrorResponse);
-      return;
-    }
+    const { fromUid, toHandle, teamName, subject, description, blockedBy } = validation.data;
 
     const fromUser = this.storage.getUser(fromUid);
     if (!fromUser) {
@@ -691,6 +749,7 @@ export class CollabServer {
     this.storage.insertMessage(message);
     this.storage.incrementUnread(chatId, toUser.uid);
 
+    tasksCreated.inc(); // Prometheus metric
     console.log(`[TASK] ${fromUser.handle} -> ${toHandle}: ${subject}`);
     this.broadcastToChat(chatId, { type: 'task_assigned', task, handle: fromUser.handle });
     res.json(task);
@@ -707,19 +766,15 @@ export class CollabServer {
 
   private handleUpdateTask(req: Request, res: Response): void {
     const { taskId } = req.params;
-    const { status } = req.body as UpdateTaskRequest;
 
-    if (!status) {
-      res.status(400).json({ error: 'status is required' } as ErrorResponse);
+    // Validate request body with Zod schema
+    const validation = validateBody(updateTaskSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
       return;
     }
 
-    const statusCheck = validateEnum(status, 'status', ['open', 'in_progress', 'resolved', 'blocked']);
-    if (!statusCheck.valid) {
-      res.status(400).json({ error: statusCheck.error } as ErrorResponse);
-      return;
-    }
-
+    const { status } = validation.data;
     const task = this.storage.getTask(taskId);
     if (!task) {
       res.status(404).json({ error: 'Task not found' } as ErrorResponse);
@@ -743,6 +798,9 @@ export class CollabServer {
 
     const now = new Date().toISOString();
     this.storage.updateTaskStatus(taskId, status as TaskStatus, now);
+    if (status === 'resolved') {
+      tasksCompleted.inc(); // Prometheus metric
+    }
     console.log(`[TASK] ${taskId.slice(0, 8)}... status -> ${status}`);
     res.json({ ...task, status, updatedAt: now });
   }
@@ -752,15 +810,16 @@ export class CollabServer {
   // ============================================================================
 
   private async handleSpawnWorker(req: Request, res: Response): Promise<void> {
-    const request = req.body as SpawnWorkerRequest;
-
-    if (!request.handle) {
-      res.status(400).json({ error: 'handle is required' } as ErrorResponse);
+    // Validate request body with Zod schema
+    const validation = validateBody(spawnWorkerSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
       return;
     }
 
     try {
-      const worker = await this.workerManager.spawnWorker(request);
+      const worker = await this.workerManager.spawnWorker(validation.data);
+      workerSpawns.inc(); // Prometheus metric
       this.broadcastToAll({ type: 'worker_spawned', worker });
       res.json(worker);
     } catch (error) {
@@ -778,20 +837,22 @@ export class CollabServer {
     }
 
     await this.workerManager.dismissWorkerByHandle(handle);
+    workerDismissals.inc(); // Prometheus metric
     this.broadcastToAll({ type: 'worker_dismissed', handle });
     res.json({ success: true, handle });
   }
 
   private handleSendToWorker(req: Request, res: Response): void {
     const { handle } = req.params;
-    const { message } = req.body;
 
-    if (!message) {
-      res.status(400).json({ error: 'message is required' } as ErrorResponse);
+    // Validate request body with Zod schema
+    const validation = validateBody(sendToWorkerSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
       return;
     }
 
-    const success = this.workerManager.sendToWorkerByHandle(handle, message);
+    const success = this.workerManager.sendToWorkerByHandle(handle, validation.data.message);
     if (!success) {
       res.status(404).json({ error: `Worker '${handle}' not found or stopped` } as ErrorResponse);
       return;
@@ -828,6 +889,917 @@ export class CollabServer {
       state: worker.state,
       output: worker.recentOutput,
     });
+  }
+
+  // ============================================================================
+  // WORKTREE HANDLERS
+  // ============================================================================
+
+  private async handleWorktreeCommit(req: Request, res: Response): Promise<void> {
+    const { handle } = req.params;
+
+    // Validate request body with Zod schema
+    const validation = validateBody(worktreeCommitSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { message } = validation.data;
+    const worker = this.workerManager.getWorkerByHandle(handle);
+    if (!worker) {
+      res.status(404).json({ error: `Worker '${handle}' not found` } as ErrorResponse);
+      return;
+    }
+
+    const worktreeManager = this.workerManager.getWorktreeManager();
+    if (!worktreeManager) {
+      res.status(400).json({ error: 'Worktrees are not enabled' } as ErrorResponse);
+      return;
+    }
+
+    try {
+      const commitHash = await worktreeManager.commit(worker.id, message);
+      res.json({ success: true, commitHash, handle });
+    } catch (error) {
+      const err = error as Error;
+      res.status(500).json({ error: err.message } as ErrorResponse);
+    }
+  }
+
+  private async handleWorktreePush(req: Request, res: Response): Promise<void> {
+    const { handle } = req.params;
+
+    const worker = this.workerManager.getWorkerByHandle(handle);
+    if (!worker) {
+      res.status(404).json({ error: `Worker '${handle}' not found` } as ErrorResponse);
+      return;
+    }
+
+    const worktreeManager = this.workerManager.getWorktreeManager();
+    if (!worktreeManager) {
+      res.status(400).json({ error: 'Worktrees are not enabled' } as ErrorResponse);
+      return;
+    }
+
+    try {
+      await worktreeManager.push(worker.id);
+      res.json({ success: true, handle });
+    } catch (error) {
+      const err = error as Error;
+      res.status(500).json({ error: err.message } as ErrorResponse);
+    }
+  }
+
+  private async handleWorktreePR(req: Request, res: Response): Promise<void> {
+    const { handle } = req.params;
+
+    // Validate request body with Zod schema
+    const validation = validateBody(worktreePRSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { title, body, base } = validation.data;
+    const worker = this.workerManager.getWorkerByHandle(handle);
+    if (!worker) {
+      res.status(404).json({ error: `Worker '${handle}' not found` } as ErrorResponse);
+      return;
+    }
+
+    const worktreeManager = this.workerManager.getWorktreeManager();
+    if (!worktreeManager) {
+      res.status(400).json({ error: 'Worktrees are not enabled' } as ErrorResponse);
+      return;
+    }
+
+    try {
+      const prUrl = await worktreeManager.createPR(worker.id, title, body, base);
+      res.json({ success: true, prUrl, handle });
+    } catch (error) {
+      const err = error as Error;
+      res.status(500).json({ error: err.message } as ErrorResponse);
+    }
+  }
+
+  private async handleWorktreeStatus(req: Request, res: Response): Promise<void> {
+    const { handle } = req.params;
+
+    const worker = this.workerManager.getWorkerByHandle(handle);
+    if (!worker) {
+      res.status(404).json({ error: `Worker '${handle}' not found` } as ErrorResponse);
+      return;
+    }
+
+    const worktreeManager = this.workerManager.getWorktreeManager();
+    if (!worktreeManager) {
+      res.status(400).json({ error: 'Worktrees are not enabled' } as ErrorResponse);
+      return;
+    }
+
+    try {
+      const status = await worktreeManager.getStatus(worker.id);
+      res.json({ ...status, handle });
+    } catch (error) {
+      const err = error as Error;
+      res.status(500).json({ error: err.message } as ErrorResponse);
+    }
+  }
+
+  // ============================================================================
+  // WORK ITEM HANDLERS (Phase 2)
+  // ============================================================================
+
+  private handleCreateWorkItem(req: Request, res: Response): void {
+    // Validate request body with Zod schema
+    const validation = validateBody(createWorkItemSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { title, description, assignedTo, batchId } = validation.data;
+    const options: CreateWorkItemOptions = {};
+    if (description) options.description = description;
+    if (assignedTo) options.assignedTo = assignedTo;
+    if (batchId) options.batchId = batchId;
+
+    const workItem = this.workItemStorage.create(title, options);
+    console.log(`[WORKITEM] Created ${workItem.id}: ${title}`);
+    res.json(workItem);
+  }
+
+  private handleListWorkItems(req: Request, res: Response): void {
+    const { status, assignee, batch } = req.query as {
+      status?: string;
+      assignee?: string;
+      batch?: string;
+    };
+
+    let workItems = this.workItemStorage.getAll();
+
+    if (status) {
+      workItems = workItems.filter(w => w.status === status);
+    }
+    if (assignee) {
+      workItems = workItems.filter(w => w.assignedTo === assignee);
+    }
+    if (batch) {
+      workItems = workItems.filter(w => w.batchId === batch);
+    }
+
+    res.json(workItems);
+  }
+
+  private handleGetWorkItem(req: Request, res: Response): void {
+    const { id } = req.params;
+    const workItem = this.workItemStorage.get(id);
+
+    if (!workItem) {
+      res.status(404).json({ error: 'Work item not found' } as ErrorResponse);
+      return;
+    }
+
+    res.json(workItem);
+  }
+
+  private handleUpdateWorkItem(req: Request, res: Response): void {
+    const { id } = req.params;
+
+    // Validate request body with Zod schema
+    const validation = validateBody(updateWorkItemSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { status, reason, actor } = validation.data;
+    let result;
+    switch (status as WorkItemStatus) {
+      case 'blocked':
+        result = this.workItemStorage.block(id, reason ?? 'No reason provided', actor);
+        break;
+      case 'cancelled':
+        result = this.workItemStorage.cancel(id, reason ?? 'No reason provided', actor);
+        break;
+      case 'completed':
+        result = this.workItemStorage.complete(id, actor);
+        break;
+      default:
+        result = this.workItemStorage.updateStatus(id, status as WorkItemStatus, actor);
+    }
+
+    if (!result) {
+      res.status(404).json({ error: 'Work item not found' } as ErrorResponse);
+      return;
+    }
+
+    console.log(`[WORKITEM] ${id} -> ${status}`);
+    res.json(result);
+  }
+
+  // ============================================================================
+  // BATCH HANDLERS (Phase 2)
+  // ============================================================================
+
+  private handleCreateBatch(req: Request, res: Response): void {
+    // Validate request body with Zod schema
+    const validation = validateBody(createBatchSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { name, workItemIds } = validation.data;
+    const options: CreateBatchOptions = {};
+    if (workItemIds) options.workItemIds = workItemIds;
+
+    const batch = this.workItemStorage.createBatch(name, options);
+    console.log(`[BATCH] Created ${batch.id}: ${name}`);
+    res.json(batch);
+  }
+
+  private handleListBatches(_req: Request, res: Response): void {
+    const batches = this.workItemStorage.getAllBatches();
+    res.json(batches);
+  }
+
+  private handleGetBatch(req: Request, res: Response): void {
+    const { id } = req.params;
+    const batch = this.workItemStorage.getBatch(id);
+
+    if (!batch) {
+      res.status(404).json({ error: 'Batch not found' } as ErrorResponse);
+      return;
+    }
+
+    const workItems = this.workItemStorage.getByBatch(id);
+    res.json({ ...batch, workItems });
+  }
+
+  private handleDispatchBatch(req: Request, res: Response): void {
+    const { id } = req.params;
+
+    // Validate request body with Zod schema
+    const validation = validateBody(dispatchBatchSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const result = this.workItemStorage.dispatch(id, validation.data.workerHandle);
+    if (!result) {
+      res.status(404).json({ error: 'Batch not found' } as ErrorResponse);
+      return;
+    }
+
+    console.log(`[BATCH] Dispatched ${id} to ${validation.data.workerHandle} (${result.workItems.length} items)`);
+    res.json(result);
+  }
+
+  // ============================================================================
+  // MAIL HANDLERS (Phase 3)
+  // ============================================================================
+
+  private handleSendMail(req: Request, res: Response): void {
+    // Validate request body with Zod schema
+    const validation = validateBody(sendMailSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { from, to, body, subject } = validation.data;
+    const options: SendMailOptions = {};
+    if (subject) options.subject = subject;
+
+    const mailId = this.mailStorage.send(from, to, body, options);
+    console.log(`[MAIL] ${from} -> ${to}: ${(subject ?? body).slice(0, 50)}...`);
+    res.json({ id: mailId, from, to, subject, body, createdAt: Math.floor(Date.now() / 1000) });
+  }
+
+  private handleGetMail(req: Request, res: Response): void {
+    const { handle } = req.params;
+    const messages = this.mailStorage.getAll(handle);
+    res.json(messages);
+  }
+
+  private handleGetUnreadMail(req: Request, res: Response): void {
+    const { handle } = req.params;
+    const messages = this.mailStorage.getUnread(handle);
+    res.json(messages);
+  }
+
+  private handleMarkMailRead(req: Request, res: Response): void {
+    const { id } = req.params;
+    const mailId = parseInt(id, 10);
+
+    if (isNaN(mailId)) {
+      res.status(400).json({ error: 'Invalid mail ID' } as ErrorResponse);
+      return;
+    }
+
+    this.mailStorage.markRead(mailId);
+    res.json({ success: true, id: mailId });
+  }
+
+  // ============================================================================
+  // HANDOFF HANDLERS (Phase 3)
+  // ============================================================================
+
+  private handleCreateHandoff(req: Request, res: Response): void {
+    // Validate request body with Zod schema
+    const validation = validateBody(createHandoffSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { from, to, context } = validation.data;
+    const handoffId = this.mailStorage.createHandoff(from, to, context);
+    console.log(`[HANDOFF] ${from} -> ${to}`);
+    res.json({ id: handoffId, from, to, context, createdAt: Math.floor(Date.now() / 1000) });
+  }
+
+  private handleGetHandoffs(req: Request, res: Response): void {
+    const { handle } = req.params;
+    const handoffs = this.mailStorage.getPendingHandoffs(handle);
+    res.json(handoffs);
+  }
+
+  // ============================================================================
+  // BLACKBOARD HANDLERS (Fleet Coordination)
+  // ============================================================================
+
+  /**
+   * Verify the authenticated user has access to the specified swarm.
+   * - Team leads can access all swarms
+   * - Workers can only access their assigned swarm
+   */
+  private verifySwarmAccess(req: Request, swarmId: string): { allowed: boolean; reason?: string } {
+    const authReq = req as AuthenticatedRequest;
+    const user = authReq.user;
+
+    if (!user) {
+      return { allowed: false, reason: 'Authentication required' };
+    }
+
+    // Team leads can access all swarms
+    if (user.agentType === 'team-lead') {
+      return { allowed: true };
+    }
+
+    // Workers can only access their assigned swarm
+    const worker = this.workerManager.getWorkerByHandle(user.handle);
+    if (!worker) {
+      // User is authenticated but not an active worker - allow read-only access to any swarm
+      // This handles the case where a worker authenticates but hasn't been spawned yet
+      return { allowed: true };
+    }
+
+    if (!worker.swarmId) {
+      // Worker not assigned to any swarm - deny access
+      return { allowed: false, reason: 'Worker not assigned to any swarm' };
+    }
+
+    if (worker.swarmId !== swarmId) {
+      return {
+        allowed: false,
+        reason: `Access denied: worker belongs to swarm '${worker.swarmId}', not '${swarmId}'`,
+      };
+    }
+
+    return { allowed: true };
+  }
+
+  private handleBlackboardPost(req: Request, res: Response): void {
+    const validation = validateBody(blackboardPostSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { swarmId, senderHandle, messageType, payload, targetHandle, priority } = validation.data;
+
+    // Verify swarm access
+    const access = this.verifySwarmAccess(req, swarmId);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.reason } as ErrorResponse);
+      return;
+    }
+
+    const message = this.blackboardStorage.postMessage(
+      swarmId,
+      senderHandle,
+      messageType,
+      payload as Record<string, unknown>,
+      { targetHandle, priority }
+    );
+
+    console.log(`[BLACKBOARD] ${senderHandle} -> ${targetHandle ?? 'all'} (${messageType})`);
+    res.json(message);
+  }
+
+  private handleBlackboardRead(req: Request, res: Response): void {
+    const { swarmId } = req.params;
+
+    // Verify swarm access
+    const access = this.verifySwarmAccess(req, swarmId);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.reason } as ErrorResponse);
+      return;
+    }
+
+    const { messageType, unreadOnly, readerHandle, priority, limit } = req.query as {
+      messageType?: string;
+      unreadOnly?: string;
+      readerHandle?: string;
+      priority?: string;
+      limit?: string;
+    };
+
+    const options: {
+      messageType?: BlackboardMessageType;
+      unreadOnly?: boolean;
+      readerHandle?: string;
+      priority?: MessagePriority;
+      limit?: number;
+    } = {};
+
+    if (messageType) options.messageType = messageType as BlackboardMessageType;
+    if (unreadOnly === 'true' && readerHandle) {
+      options.unreadOnly = true;
+      options.readerHandle = readerHandle;
+    }
+    if (priority) options.priority = priority as MessagePriority;
+    if (limit) options.limit = parseInt(limit, 10);
+
+    const messages = this.blackboardStorage.readMessages(swarmId, options);
+    res.json(messages);
+  }
+
+  private handleBlackboardMarkRead(req: Request, res: Response): void {
+    const validation = validateBody(blackboardMarkReadSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { messageIds, readerHandle } = validation.data;
+    const count = this.blackboardStorage.markRead(messageIds, readerHandle);
+    res.json({ success: true, marked: count });
+  }
+
+  private handleBlackboardArchive(req: Request, res: Response): void {
+    const validation = validateBody(blackboardArchiveSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { messageIds } = validation.data;
+    const count = this.blackboardStorage.archiveMessages(messageIds);
+    res.json({ success: true, archived: count });
+  }
+
+  private handleBlackboardArchiveOld(req: Request, res: Response): void {
+    const { swarmId } = req.params;
+
+    // Verify swarm access (already requires team-lead via route middleware)
+    const access = this.verifySwarmAccess(req, swarmId);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.reason } as ErrorResponse);
+      return;
+    }
+
+    const validation = validateBody(blackboardArchiveOldSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { maxAgeMs } = validation.data;
+    const ageThreshold = maxAgeMs ?? 24 * 60 * 60 * 1000; // Default 24 hours
+    const cutoff = Date.now() - ageThreshold;
+
+    // Get old messages and archive them
+    const messages = this.blackboardStorage.readMessages(swarmId, { limit: 1000 });
+    const oldMessageIds = messages
+      .filter(m => m.createdAt < cutoff)
+      .map(m => m.id);
+
+    const count = this.blackboardStorage.archiveMessages(oldMessageIds);
+    res.json({ success: true, archived: count, swarmId });
+  }
+
+  // ============================================================================
+  // SPAWN QUEUE HANDLERS (Fleet Coordination)
+  // ============================================================================
+
+  private handleSpawnEnqueue(req: Request, res: Response): void {
+    const validation = validateBody(spawnEnqueueSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { requesterHandle, targetAgentType, task, swarmId, priority, dependsOn } = validation.data;
+
+    // Get requester info from worker manager or auth context
+    const requester = this.workerManager.getWorkerByHandle(requesterHandle);
+    const depthLevel = requester?.depthLevel ?? 1;
+
+    // Determine requester's role for permission checking
+    // If requester is an active worker, they're a 'worker' fleet role
+    // If they're the team-lead making the request, treat as 'lead'
+    const authReq = req as AuthenticatedRequest;
+    const requesterRole = authReq.user?.agentType === 'team-lead' ? 'lead' : 'worker';
+
+    const requestId = this.spawnController.queueSpawn(
+      requesterHandle,
+      targetAgentType,
+      depthLevel,
+      task,
+      { priority, dependsOn, context: { swarmId, requesterRole } }
+    );
+
+    if (!requestId) {
+      res.status(400).json({ error: 'Failed to queue spawn request' } as ErrorResponse);
+      return;
+    }
+
+    console.log(`[SPAWN] Queued ${targetAgentType} by ${requesterHandle} (depth: ${depthLevel})`);
+    res.json({ requestId, status: 'pending', targetAgentType, task });
+  }
+
+  private handleSpawnStatus(_req: Request, res: Response): void {
+    const stats = this.spawnController.getQueueStats();
+    res.json(stats);
+  }
+
+  private handleSpawnGet(req: Request, res: Response): void {
+    const { id } = req.params;
+    const item = this.spawnQueueStorage.get(id);
+
+    if (!item) {
+      res.status(404).json({ error: 'Spawn request not found' } as ErrorResponse);
+      return;
+    }
+
+    res.json(item);
+  }
+
+  private handleSpawnCancel(req: Request, res: Response): void {
+    const { id } = req.params;
+    const success = this.spawnQueueStorage.reject(id);
+
+    if (!success) {
+      res.status(404).json({ error: 'Spawn request not found or already processed' } as ErrorResponse);
+      return;
+    }
+
+    console.log(`[SPAWN] Cancelled ${id}`);
+    res.json({ success: true, id });
+  }
+
+  // ============================================================================
+  // CHECKPOINT HANDLERS (Fleet Coordination)
+  // ============================================================================
+
+  /**
+   * Verify the authenticated user has access to a checkpoint.
+   * - Team leads can access all checkpoints
+   * - Users can access checkpoints where they are fromHandle or toHandle
+   */
+  private verifyCheckpointAccess(
+    req: Request,
+    checkpoint: { fromHandle: string; toHandle: string }
+  ): { allowed: boolean; reason?: string } {
+    const authReq = req as AuthenticatedRequest;
+    const user = authReq.user;
+
+    if (!user) {
+      return { allowed: false, reason: 'Authentication required' };
+    }
+
+    // Team leads can access all checkpoints
+    if (user.agentType === 'team-lead') {
+      return { allowed: true };
+    }
+
+    // Users can access checkpoints they're involved in
+    if (user.handle === checkpoint.fromHandle || user.handle === checkpoint.toHandle) {
+      return { allowed: true };
+    }
+
+    return {
+      allowed: false,
+      reason: `Access denied: checkpoint belongs to ${checkpoint.fromHandle} -> ${checkpoint.toHandle}`,
+    };
+  }
+
+  /**
+   * Verify the authenticated user can access checkpoints for a given handle.
+   * - Team leads can access any handle's checkpoints
+   * - Users can only access their own checkpoints
+   */
+  private verifyCheckpointHandleAccess(req: Request, handle: string): { allowed: boolean; reason?: string } {
+    const authReq = req as AuthenticatedRequest;
+    const user = authReq.user;
+
+    if (!user) {
+      return { allowed: false, reason: 'Authentication required' };
+    }
+
+    // Team leads can access all checkpoints
+    if (user.agentType === 'team-lead') {
+      return { allowed: true };
+    }
+
+    // Users can only access their own checkpoints
+    if (user.handle === handle) {
+      return { allowed: true };
+    }
+
+    return {
+      allowed: false,
+      reason: `Access denied: cannot access checkpoints for handle '${handle}'`,
+    };
+  }
+
+  private handleCheckpointCreate(req: Request, res: Response): void {
+    const validation = validateBody(checkpointCreateSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { fromHandle, toHandle, goal, now, test, doneThisSession, blockers, questions, next } = validation.data;
+
+    const checkpoint = this.checkpointStorage.createCheckpoint(fromHandle, toHandle, {
+      goal,
+      now,
+      test,
+      doneThisSession,
+      blockers,
+      questions,
+      next,
+    });
+
+    console.log(`[CHECKPOINT] ${fromHandle} -> ${toHandle}: ${goal.slice(0, 50)}...`);
+    res.json(checkpoint);
+  }
+
+  private handleCheckpointLoad(req: Request, res: Response): void {
+    const id = parseInt(req.params.id, 10);
+
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Invalid checkpoint ID' } as ErrorResponse);
+      return;
+    }
+
+    const checkpoint = this.checkpointStorage.loadCheckpoint(id);
+
+    if (!checkpoint) {
+      res.status(404).json({ error: 'Checkpoint not found' } as ErrorResponse);
+      return;
+    }
+
+    // Verify access to this checkpoint
+    const access = this.verifyCheckpointAccess(req, checkpoint);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.reason } as ErrorResponse);
+      return;
+    }
+
+    res.json(checkpoint);
+  }
+
+  private handleCheckpointLatest(req: Request, res: Response): void {
+    const { handle } = req.params;
+
+    // Verify access to this handle's checkpoints
+    const access = this.verifyCheckpointHandleAccess(req, handle);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.reason } as ErrorResponse);
+      return;
+    }
+
+    const checkpoint = this.checkpointStorage.loadLatestCheckpoint(handle);
+
+    if (!checkpoint) {
+      res.status(404).json({ error: 'No checkpoint found for this handle' } as ErrorResponse);
+      return;
+    }
+
+    res.json(checkpoint);
+  }
+
+  private handleCheckpointList(req: Request, res: Response): void {
+    const { handle } = req.params;
+
+    // Verify access to this handle's checkpoints
+    const access = this.verifyCheckpointHandleAccess(req, handle);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.reason } as ErrorResponse);
+      return;
+    }
+
+    const { status, limit } = req.query as { status?: string; limit?: string };
+
+    const options: { status?: 'pending' | 'accepted' | 'rejected'; limit?: number } = {};
+    if (status) options.status = status as 'pending' | 'accepted' | 'rejected';
+    if (limit) options.limit = parseInt(limit, 10);
+
+    const checkpoints = this.checkpointStorage.listCheckpoints(handle, options);
+    res.json(checkpoints);
+  }
+
+  private handleCheckpointAccept(req: Request, res: Response): void {
+    const id = parseInt(req.params.id, 10);
+
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Invalid checkpoint ID' } as ErrorResponse);
+      return;
+    }
+
+    // Load checkpoint to verify ownership
+    const checkpoint = this.checkpointStorage.loadCheckpoint(id);
+    if (!checkpoint) {
+      res.status(404).json({ error: 'Checkpoint not found' } as ErrorResponse);
+      return;
+    }
+
+    // Only the recipient (toHandle) or team-lead can accept
+    const authReq = req as AuthenticatedRequest;
+    const user = authReq.user;
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required' } as ErrorResponse);
+      return;
+    }
+
+    if (user.agentType !== 'team-lead' && user.handle !== checkpoint.toHandle) {
+      res.status(403).json({
+        error: `Only the recipient '${checkpoint.toHandle}' can accept this checkpoint`,
+      } as ErrorResponse);
+      return;
+    }
+
+    const success = this.checkpointStorage.acceptCheckpoint(id);
+
+    if (!success) {
+      res.status(400).json({ error: 'Checkpoint already processed' } as ErrorResponse);
+      return;
+    }
+
+    console.log(`[CHECKPOINT] Accepted ${id}`);
+    res.json({ success: true, id });
+  }
+
+  private handleCheckpointReject(req: Request, res: Response): void {
+    const id = parseInt(req.params.id, 10);
+
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Invalid checkpoint ID' } as ErrorResponse);
+      return;
+    }
+
+    // Load checkpoint to verify ownership
+    const checkpoint = this.checkpointStorage.loadCheckpoint(id);
+    if (!checkpoint) {
+      res.status(404).json({ error: 'Checkpoint not found' } as ErrorResponse);
+      return;
+    }
+
+    // Only the recipient (toHandle) or team-lead can reject
+    const authReq = req as AuthenticatedRequest;
+    const user = authReq.user;
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required' } as ErrorResponse);
+      return;
+    }
+
+    if (user.agentType !== 'team-lead' && user.handle !== checkpoint.toHandle) {
+      res.status(403).json({
+        error: `Only the recipient '${checkpoint.toHandle}' can reject this checkpoint`,
+      } as ErrorResponse);
+      return;
+    }
+
+    const success = this.checkpointStorage.rejectCheckpoint(id);
+
+    if (!success) {
+      res.status(400).json({ error: 'Checkpoint already processed' } as ErrorResponse);
+      return;
+    }
+
+    console.log(`[CHECKPOINT] Rejected ${id}`);
+    res.json({ success: true, id });
+  }
+
+  // ============================================================================
+  // SWARM MANAGEMENT HANDLERS (Fleet Coordination)
+  // ============================================================================
+
+  private handleSwarmCreate(req: Request, res: Response): void {
+    const validation = validateBody(swarmCreateSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { name, description, maxAgents } = validation.data;
+
+    const id = `swarm-${crypto.randomBytes(4).toString('hex')}`;
+    const swarm = {
+      id,
+      name,
+      description,
+      maxAgents,
+      createdAt: Date.now(),
+    };
+
+    this.swarms.set(id, swarm);
+    console.log(`[SWARM] Created ${id}: ${name}`);
+    res.json(swarm);
+  }
+
+  private handleSwarmList(req: Request, res: Response): void {
+    const { includeAgents } = req.query as { includeAgents?: string };
+    const swarms = Array.from(this.swarms.values());
+
+    if (includeAgents === 'true') {
+      const workers = this.workerManager.getWorkers();
+      const result = swarms.map(swarm => ({
+        ...swarm,
+        agents: workers.filter(w => w.swarmId === swarm.id).map(w => ({
+          id: w.id,
+          handle: w.handle,
+          state: w.state,
+        })),
+      }));
+      res.json(result);
+    } else {
+      res.json(swarms);
+    }
+  }
+
+  private handleSwarmGet(req: Request, res: Response): void {
+    const { id } = req.params;
+    const swarm = this.swarms.get(id);
+
+    if (!swarm) {
+      res.status(404).json({ error: 'Swarm not found' } as ErrorResponse);
+      return;
+    }
+
+    const workers = this.workerManager.getWorkers().filter(w => w.swarmId === id);
+    res.json({
+      ...swarm,
+      agents: workers.map(w => ({
+        id: w.id,
+        handle: w.handle,
+        state: w.state,
+        depthLevel: w.depthLevel,
+      })),
+    });
+  }
+
+  private async handleSwarmKill(req: Request, res: Response): Promise<void> {
+    const { id } = req.params;
+    const validation = validateBody(swarmKillSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
+      return;
+    }
+
+    const { graceful } = validation.data;
+    const swarm = this.swarms.get(id);
+    if (!swarm) {
+      res.status(404).json({ error: 'Swarm not found' } as ErrorResponse);
+      return;
+    }
+
+    const workers = this.workerManager.getWorkers().filter(w => w.swarmId === id);
+    const dismissed: string[] = [];
+
+    for (const worker of workers) {
+      try {
+        await this.workerManager.dismissWorker(worker.id, true);
+        dismissed.push(worker.handle);
+      } catch (error) {
+        console.error(`[SWARM] Failed to dismiss ${worker.handle}:`, (error as Error).message);
+      }
+    }
+
+    // Optionally remove the swarm
+    if (!graceful) {
+      this.swarms.delete(id);
+    }
+
+    console.log(`[SWARM] Killed ${id}: dismissed ${dismissed.length} agents`);
+    res.json({ success: true, swarmId: id, dismissed });
   }
 
   private handleDebug(_req: Request, res: Response): void {
@@ -961,7 +1933,10 @@ export class CollabServer {
   // START
   // ============================================================================
 
-  start(): void {
+  async start(): Promise<void> {
+    // Initialize worker manager (crash recovery)
+    await this.workerManager.initialize();
+
     this.server.listen(this.config.port, () => {
       console.log('\n' +
         '==============================================================\n' +

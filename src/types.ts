@@ -174,6 +174,10 @@ export interface WorkerProcess {
   restartCount: number;
   /** Health status */
   health: 'healthy' | 'degraded' | 'unhealthy';
+  /** Swarm ID for fleet coordination */
+  swarmId?: string;
+  /** Depth level in agent hierarchy (1 = spawned by lead) */
+  depthLevel?: number;
 }
 
 // ============================================================================
@@ -370,4 +374,244 @@ export interface MCPToolResult {
     text: string;
   }>;
   isError?: boolean;
+}
+
+// ============================================================================
+// AGENT ROLES (Phase 3)
+// ============================================================================
+
+export type AgentRole = 'coordinator' | 'worker' | 'monitor' | 'notifier' | 'merger';
+
+export interface RolePermissions {
+  spawn: boolean;
+  dismiss: boolean;
+  assign: boolean;
+  broadcast: boolean;
+  merge: boolean;
+  claim: boolean;
+  complete: boolean;
+  send: boolean;
+  readAll: boolean;
+  alert: boolean;
+  notify: boolean;
+  readStatus: boolean;
+  resolve: boolean;
+  push: boolean;
+}
+
+export const ROLE_PERMISSIONS: Record<AgentRole, RolePermissions> = {
+  coordinator: {
+    spawn: true, dismiss: true, assign: true, broadcast: true, merge: true,
+    claim: true, complete: true, send: true, readAll: true, alert: false,
+    notify: false, readStatus: true, resolve: true, push: true,
+  },
+  worker: {
+    spawn: false, dismiss: false, assign: false, broadcast: false, merge: false,
+    claim: true, complete: true, send: true, readAll: false, alert: false,
+    notify: false, readStatus: false, resolve: false, push: false,
+  },
+  monitor: {
+    spawn: false, dismiss: false, assign: false, broadcast: false, merge: false,
+    claim: false, complete: false, send: false, readAll: true, alert: true,
+    notify: false, readStatus: true, resolve: false, push: false,
+  },
+  notifier: {
+    spawn: false, dismiss: false, assign: false, broadcast: false, merge: false,
+    claim: false, complete: false, send: false, readAll: false, alert: false,
+    notify: true, readStatus: true, resolve: false, push: false,
+  },
+  merger: {
+    spawn: false, dismiss: false, assign: false, broadcast: false, merge: true,
+    claim: false, complete: false, send: false, readAll: false, alert: false,
+    notify: false, readStatus: false, resolve: true, push: true,
+  },
+};
+
+// ============================================================================
+// PERSISTENT WORKER TYPES (Phase 1)
+// ============================================================================
+
+export type WorkerStatus = 'pending' | 'ready' | 'busy' | 'error' | 'dismissed';
+
+export interface PersistentWorker {
+  id: string;
+  handle: string;
+  status: WorkerStatus;
+  worktreePath: string | null;
+  worktreeBranch: string | null;
+  pid: number | null;
+  sessionId: string | null;
+  initialPrompt: string | null;
+  lastHeartbeat: number | null;
+  restartCount: number;
+  role: AgentRole;
+  createdAt: number;
+  dismissedAt: number | null;
+}
+
+// ============================================================================
+// WORK ITEM TYPES (Phase 2)
+// ============================================================================
+
+export type WorkItemStatus = 'pending' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
+export type BatchStatus = 'open' | 'dispatched' | 'completed' | 'cancelled';
+export type WorkItemEventType = 'created' | 'assigned' | 'started' | 'completed' | 'blocked' | 'unblocked' | 'cancelled' | 'comment';
+
+export interface WorkItem {
+  id: string;           // e.g., 'wi-x7k2m'
+  title: string;
+  description: string | null;
+  status: WorkItemStatus;
+  assignedTo: string | null;  // worker handle
+  batchId: string | null;
+  createdAt: number;
+}
+
+export interface Batch {
+  id: string;
+  name: string;
+  status: BatchStatus;
+  createdAt: number;
+}
+
+export interface WorkItemEvent {
+  id: number;
+  workItemId: string;
+  eventType: WorkItemEventType;
+  actor: string | null;
+  details: string | null;
+  createdAt: number;
+}
+
+export interface CreateWorkItemOptions {
+  description?: string;
+  batchId?: string;
+  assignedTo?: string;
+}
+
+export interface CreateBatchOptions {
+  workItemIds?: string[];
+}
+
+// ============================================================================
+// MAIL TYPES (Phase 3)
+// ============================================================================
+
+export interface MailMessage {
+  id: number;
+  fromHandle: string;
+  toHandle: string;
+  subject: string | null;
+  body: string;
+  readAt: number | null;
+  createdAt: number;
+}
+
+export interface Handoff {
+  id: number;
+  fromHandle: string;
+  toHandle: string;
+  context: Record<string, unknown>;
+  acceptedAt: number | null;
+  createdAt: number;
+}
+
+export interface SendMailOptions {
+  subject?: string;
+}
+
+// ============================================================================
+// WORKTREE TYPES (Phase 1)
+// ============================================================================
+
+export interface WorktreeInfo {
+  workerId: string;
+  path: string;
+  branch: string;
+  createdAt: number;
+}
+
+// ============================================================================
+// FLEET COORDINATION TYPES (Phase 4)
+// ============================================================================
+
+export type BlackboardMessageType = 'request' | 'response' | 'status' | 'directive' | 'checkpoint';
+export type MessagePriority = 'low' | 'normal' | 'high' | 'critical';
+export type SpawnQueueStatus = 'pending' | 'approved' | 'rejected' | 'spawned';
+export type CheckpointOutcome = 'SUCCEEDED' | 'PARTIAL_PLUS' | 'PARTIAL_MINUS' | 'FAILED';
+
+export interface BlackboardMessage {
+  id: string;
+  swarmId: string;
+  senderHandle: string;
+  messageType: BlackboardMessageType;
+  targetHandle: string | null;  // null = broadcast to swarm
+  priority: MessagePriority;
+  payload: Record<string, unknown>;
+  readBy: string[];  // Array of handles that have read this
+  createdAt: number;
+  archivedAt: number | null;
+}
+
+export interface SpawnQueueItem {
+  id: string;
+  requesterHandle: string;
+  targetAgentType: string;  // FleetAgentRole
+  depthLevel: number;
+  priority: MessagePriority;
+  status: SpawnQueueStatus;
+  payload: {
+    task: string;
+    context?: Record<string, unknown>;
+    checkpoint?: Record<string, unknown>;
+  };
+  dependsOn: string[];  // IDs of other spawn queue items
+  blockedByCount: number;
+  createdAt: number;
+  processedAt: number | null;
+  spawnedWorkerId: string | null;
+}
+
+export interface Checkpoint {
+  goal: string;
+  now: string;
+  test?: string;
+  doneThisSession: Array<{
+    task: string;
+    files: string[];
+  }>;
+  blockers: string[];
+  questions: string[];
+  worked: string[];
+  failed: string[];
+  next: string[];
+  files: {
+    created: string[];
+    modified: string[];
+  };
+}
+
+export interface SwarmInfo {
+  id: string;
+  name?: string;
+  workers: Array<{
+    handle: string;
+    role: string;
+    status: string;
+    depthLevel: number;
+  }>;
+  createdAt: number;
+}
+
+// Extend PersistentWorker with fleet fields
+export interface FleetWorker extends PersistentWorker {
+  swarmId: string | null;
+  depthLevel: number;
+}
+
+// Extend Handoff with checkpoint fields
+export interface FleetHandoff extends Handoff {
+  checkpoint: Checkpoint | null;
+  status: 'pending' | 'accepted' | 'rejected';
+  outcome: CheckpointOutcome | null;
 }
