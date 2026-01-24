@@ -71,6 +71,7 @@
   <script>
     const SERVER = 'http://localhost:3847';
     let ws;
+    let authToken = null;
 
     function fmt(ms) {
       const s = Math.floor(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60);
@@ -86,21 +87,36 @@
       if (el.children.length > 100) el.removeChild(el.lastChild);
     }
 
+    async function authenticate() {
+      try {
+        const resp = await fetch(SERVER + '/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ handle: 'dashboard', teamName: 'monitoring', agentType: 'team-lead' })
+        });
+        const data = await resp.json();
+        authToken = data.token;
+        log('output', 'Dashboard authenticated');
+      } catch(e) { console.error('Auth failed:', e); }
+    }
+
     async function refresh() {
       try {
-        const m = await fetch(SERVER + '/metrics').then(r => r.json());
+        const headers = authToken ? { 'Authorization': 'Bearer ' + authToken } : {};
+        const m = await fetch(SERVER + '/metrics/json', { headers }).then(r => r.json());
+        if (m.error) { await authenticate(); return refresh(); }
         document.getElementById('uptime').textContent = fmt(m.uptime);
         document.getElementById('workers').textContent = m.workers.total;
         document.getElementById('healthy').textContent = m.workers.healthy;
         document.getElementById('tasks').textContent = m.tasks.total;
         document.getElementById('restarts').textContent = m.restarts.lastHour;
         document.getElementById('agents').textContent = m.agents;
-        
-        const w = await fetch(SERVER + '/orchestrate/workers').then(r => r.json());
+
+        const w = await fetch(SERVER + '/orchestrate/workers', { headers }).then(r => r.json());
         const list = document.getElementById('workers-list');
         list.innerHTML = w.length === 0 ? '<div style="color:#8b949e">No active workers</div>' :
           w.map(x => '<div class="worker"><div class="worker-status '+(x.health||'healthy')+'"></div><div><div class="worker-handle">'+x.handle+'</div><div class="worker-state">'+x.state+' • '+x.teamName+'</div></div></div>').join('');
-      } catch(e) {}
+      } catch(e) { console.error('Refresh error:', e); }
     }
 
     function connect() {
@@ -115,7 +131,7 @@
       };
     }
 
-    refresh(); connect(); setInterval(refresh, 5000);
+    authenticate().then(() => { refresh(); connect(); setInterval(refresh, 5000); });
   </script>
 </body>
 </html>
