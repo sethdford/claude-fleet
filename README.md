@@ -17,214 +17,462 @@
 </p>
 
 <p align="center">
-  <a href="https://sethdford.github.io/claude-fleet/">Documentation</a> •
+  <a href="https://sethdford.github.io/claude-fleet/">Website</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#features">Features</a> •
+  <a href="#cli-reference">CLI Reference</a> •
+  <a href="#mcp-tools">MCP Tools</a> •
   <a href="https://github.com/sethdford/claude-fleet/issues">Issues</a>
 </p>
 
 ---
 
-Orchestrate multiple Claude Code instances with intelligent coordination, swarm intelligence, and real-time collaboration. Build production-grade multi-agent systems.
+Orchestrate multiple Claude Code instances with intelligent coordination, swarm intelligence, and real-time collaboration. Build production-grade multi-agent systems with role-based agents aligned to the Software Development Lifecycle.
 
 <p align="center">
-  <img src="demo.gif" alt="Claude Fleet Dashboard" width="800">
+  <img src="docs/images/cli-demo.gif" alt="Claude Fleet CLI Demo" width="800">
 </p>
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [CLI Reference](#cli-reference)
+- [Dashboard](#dashboard)
+- [MCP Tools](#mcp-tools)
+- [Agent Roles](#agent-roles)
+- [Workflows](#workflows)
+- [API Reference](#api-reference)
+- [Architecture](#architecture)
+- [Configuration](#configuration)
+- [Contributing](#contributing)
 
 ---
 
 ## Features
 
-- **Fleet Orchestration** - Spawn and manage multiple Claude Code worker agents
-- **Swarm Coordination** - Blackboard messaging pattern for agent communication
-- **Task Management** - Create, assign, and track tasks across agents
-- **Git Worktrees** - Isolated workspaces for each agent to prevent conflicts
-- **MCP Integration** - 25+ tools accessible via Model Context Protocol
-- **Real-time Updates** - WebSocket notifications for live collaboration
-- **JWT Authentication** - Secure role-based access control
-- **Prometheus Metrics** - Production-ready observability
+### Core Capabilities
+
+| Feature | Description |
+|---------|-------------|
+| **Fleet Orchestration** | Spawn, manage, and coordinate multiple Claude Code worker agents |
+| **Swarm Intelligence** | Blackboard messaging pattern for agent communication and coordination |
+| **Git Worktrees** | Isolated workspaces for each agent to prevent conflicts |
+| **Real-time Dashboard** | WebSocket-powered monitoring with live updates |
+| **MCP Integration** | 25+ tools accessible via Model Context Protocol |
+| **JWT Authentication** | Secure role-based access control (team-lead/worker) |
+| **Prometheus Metrics** | Production-ready observability and monitoring |
+| **Workflow Engine** | Define and execute multi-step workflows with dependencies |
+
+### SDLC-Aligned Agent Roles
+
+Claude Fleet provides 12 specialized agent roles organized by Software Development Lifecycle phase:
+
+| Phase | Roles |
+|-------|-------|
+| **Discovery** | Product Analyst, Architect |
+| **Development** | Frontend Dev, Backend Dev, Full-Stack Dev, Data Engineer |
+| **Quality** | QA Engineer, Security Engineer, Performance Engineer |
+| **Delivery** | DevOps Engineer, Tech Writer, Release Manager |
 
 ---
 
 ## Quick Start
 
-### Option 1: NPM (Recommended)
+### Installation
 
 ```bash
-# Install globally
+# Install globally via NPM
 npm install -g claude-fleet
 
-# Start the server
+# Start the fleet server
 claude-fleet
 
-# Use the CLI in another terminal
+# In another terminal, use the CLI
 fleet health
-fleet workers
 ```
 
-### Option 2: From Source
+### Your First Fleet
+
+```bash
+# 1. Start the server
+claude-fleet
+
+# 2. Authenticate as team lead
+fleet auth my-lead my-team team-lead
+export FLEET_TOKEN="<token from above>"
+
+# 3. Spawn a worker
+fleet spawn worker-1 "Fix the authentication bug in src/auth.ts"
+
+# 4. Check worker status
+fleet workers --table
+
+# 5. View the dashboard
+open http://localhost:3847/dashboard/
+```
+
+### From Source
 
 ```bash
 git clone https://github.com/sethdford/claude-fleet.git
 cd claude-fleet
 npm install
 npm run build
-./start.sh
+npm start
 ```
 
 ---
 
-## Usage
+## CLI Reference
 
-### Starting the Server
+The `fleet` CLI provides complete control over your agent fleet.
 
-```bash
-# Foreground (see logs)
-./start.sh
-
-# Background daemon
-./start.sh --background
-
-# Check status
-./start.sh --status
-
-# Stop daemon
-./start.sh --stop
-```
-
-### CLI Commands
+### Core Commands
 
 ```bash
-# Core Commands
-fleet health                      # Server health check
-fleet metrics                     # Prometheus metrics (JSON)
-fleet audit                       # Run codebase audit (typecheck, lint, tests, build)
-
-# Worker Management
-fleet workers                     # List active workers
-fleet spawn <handle> <prompt>     # Spawn a worker agent
-fleet dismiss <handle>            # Stop a worker
-fleet send <handle> <message>     # Send message to worker
-
-# Team & Task Management
-fleet swarms                      # List all swarms
-fleet swarm-create <name> <max>   # Create a swarm
-fleet teams <team>                # List team agents
-fleet tasks <team>                # List team tasks
-
-# Workflow Management
-fleet workflows                   # List workflows
-fleet workflow-start <id>         # Start workflow execution
-fleet executions                  # List executions
+fleet health                    # Check server health
+fleet metrics                   # Get server metrics (JSON)
+fleet debug                     # Get debug information
+fleet auth <handle> <team> [type]  # Authenticate (team-lead|worker)
 ```
 
-### MCP Integration
+### Worker Management
 
-Add to `~/.claude/settings.json`:
+```bash
+fleet workers                   # List all workers
+fleet workers --table           # List with formatted table output
+fleet spawn <handle> <prompt>   # Spawn a new worker [team-lead]
+fleet dismiss <handle>          # Dismiss a worker [team-lead]
+fleet send <handle> <message>   # Send message to worker
+fleet output <handle>           # Get worker output
+```
+
+### Git Worktree Operations
+
+Each worker operates in an isolated git worktree for conflict-free parallel development:
+
+```bash
+fleet worktree-status <handle>            # Get worktree git status
+fleet worktree-commit <handle> <message>  # Commit changes
+fleet worktree-push <handle>              # Push branch to remote
+fleet worktree-pr <handle> <title> <body> # Create pull request
+```
+
+### Task Management
+
+```bash
+fleet tasks <teamName>                    # List team tasks
+fleet task <id>                           # Get task details
+fleet task-create <to> <subject> [desc]   # Create a new task
+fleet task-update <id> <status>           # Update task status
+```
+
+### Work Items & Batches
+
+Work items provide human-readable IDs (e.g., `wi-x7k2m`) for tracking work:
+
+```bash
+fleet workitems [status]                  # List work items
+fleet workitem-create <title> [desc]      # Create work item
+fleet workitem-update <id> <status>       # Update status
+
+fleet batches                             # List batches
+fleet batch-create <name> [ids...]        # Bundle work items
+fleet batch-dispatch <batchId> <worker>   # Assign batch to worker
+```
+
+### Communication
+
+```bash
+# Mail (async messaging)
+fleet mail <handle>                       # Get unread mail
+fleet mail-send <from> <to> <body> [subj] # Send mail
+
+# Handoffs (context transfer)
+fleet handoffs <handle>                   # List handoffs
+fleet handoff-create <from> <to> <json>   # Transfer context
+```
+
+### Checkpoints
+
+Workers can create checkpoints for review by team leads:
+
+```bash
+fleet checkpoints <handle>                # List checkpoints
+fleet checkpoint <id>                     # Get checkpoint details
+fleet checkpoint-create <h> <goal> <now>  # Create checkpoint
+fleet checkpoint-accept <id>              # Accept [team-lead]
+fleet checkpoint-reject <id>              # Reject [team-lead]
+```
+
+### Swarm Operations
+
+```bash
+fleet swarms                              # List all swarms
+fleet swarm-create <name> <maxAgents>     # Create a swarm
+fleet swarm-kill <id>                     # Kill swarm gracefully
+fleet spawn-queue                         # Get spawn queue status
+fleet blackboard <swarmId>                # Read blackboard messages
+fleet blackboard-post <swarm> <sender> <type> <payload>
+```
+
+### Workflow Execution
+
+```bash
+fleet workflows                           # List workflows
+fleet workflow <id>                       # Get workflow details
+fleet workflow-start <id> [inputs]        # Start execution [team-lead]
+fleet executions [status]                 # List executions
+fleet execution <id>                      # Get execution details
+fleet execution-pause <id>                # Pause execution
+fleet execution-resume <id>               # Resume execution
+fleet execution-cancel <id>               # Cancel execution
+```
+
+### Template & Role Management
+
+```bash
+fleet templates                           # List swarm templates
+fleet template <id>                       # Get template details
+fleet template-save <name> <json>         # Save template
+fleet template-run <id>                   # Run template
+
+fleet roles                               # List all agent roles
+fleet role <name>                         # Get role details
+```
+
+---
+
+## Dashboard
+
+Access the real-time dashboard at `http://localhost:3847/dashboard/`
+
+<p align="center">
+  <img src="docs/images/dashboard-animation.svg" alt="Claude Fleet Dashboard" width="800">
+</p>
+
+### Dashboard Features
+
+- **Overview** - Fleet health, active workers, task counts
+- **Workers** - Real-time worker status, output, and controls
+- **Tasks** - Task management and assignment
+- **Swarms** - Swarm visualization and blackboard messages
+- **Metrics** - Prometheus metrics and performance graphs
+- **Graph View** - Visual dependency graph of agents and tasks
+
+### Interactive Swarm Planner
+
+Try the [Interactive Swarm Planner](https://sethdford.github.io/claude-fleet/swarm-planner-demo.html) to design your agent fleet visually.
+
+---
+
+## MCP Tools
+
+Claude Fleet exposes 25+ tools via the Model Context Protocol, allowing Claude Code to orchestrate the fleet:
+
+### Team Management
+| Tool | Description |
+|------|-------------|
+| `team_status` | Get team status and list of online members |
+| `team_broadcast` | Send a message to all team members |
+| `team_tasks` | List tasks for the team |
+| `team_assign` | Assign a task to a team member |
+| `team_complete` | Mark a task as complete |
+| `team_claim` | Claim a file to prevent conflicts |
+
+### Worker Control
+| Tool | Description |
+|------|-------------|
+| `team_spawn` | Spawn a new Claude Code worker instance |
+| `team_dismiss` | Dismiss a worker |
+| `team_workers` | List all active workers |
+| `team_send` | Send a message to a specific worker |
+
+### Work Items & Batches
+| Tool | Description |
+|------|-------------|
+| `workitem_create` | Create a work item with human-readable ID |
+| `workitem_update` | Update work item status |
+| `workitem_list` | List work items with filtering |
+| `batch_create` | Create a batch of work items |
+| `batch_dispatch` | Dispatch batch to a worker |
+
+### Communication
+| Tool | Description |
+|------|-------------|
+| `mail_send` | Send mail to a worker |
+| `mail_read` | Read mail messages |
+| `team_handoff` | Transfer context to another worker |
+
+### Git Operations
+| Tool | Description |
+|------|-------------|
+| `worktree_commit` | Commit changes in worker's branch |
+| `worktree_push` | Push worker's branch to remote |
+| `worktree_pr` | Create pull request from worker's branch |
+
+### MCP Configuration
+
+Add to your Claude Code MCP settings:
 
 ```json
 {
   "mcpServers": {
-    "fleet": {
+    "claude-fleet": {
       "command": "npx",
-      "args": ["claude-fleet-mcp"],
+      "args": ["claude-fleet", "--mcp"],
       "env": {
         "CLAUDE_FLEET_URL": "http://localhost:3847",
-        "CLAUDE_FLEET_TEAM": "my-team",
-        "CLAUDE_CODE_AGENT_NAME": "my-agent",
-        "CLAUDE_CODE_AGENT_TYPE": "team-lead"
+        "FLEET_TOKEN": "your-jwt-token"
       }
     }
   }
 }
 ```
 
-Then use MCP tools in Claude Code:
-- `team_status` - See team members
-- `team_spawn` - Spawn worker agents
-- `team_assign` - Assign tasks
-- `team_broadcast` - Send team-wide messages
-- `blackboard_post` - Post to swarm blackboard
-- `checkpoint_create` - Save agent state
+---
+
+## Agent Roles
+
+### Discovery Phase
+
+| Role | Description | Can Spawn |
+|------|-------------|-----------|
+| **Product Analyst** | Requirements gathering, user stories, acceptance criteria | No |
+| **Architect** | System design, API contracts, architecture decisions | Yes |
+
+### Development Phase
+
+| Role | Description | Can Spawn |
+|------|-------------|-----------|
+| **Frontend Dev** | UI components, styling, client-side logic | No |
+| **Backend Dev** | APIs, services, business logic | No |
+| **Full-Stack Dev** | End-to-end feature implementation | Yes |
+| **Data Engineer** | Database schemas, migrations, data pipelines | No |
+
+### Quality Phase
+
+| Role | Description | Can Spawn |
+|------|-------------|-----------|
+| **QA Engineer** | Test planning, test automation, bug verification | No |
+| **Security Engineer** | Security review, vulnerability assessment | No |
+| **Performance Engineer** | Load testing, optimization, profiling | No |
+
+### Delivery Phase
+
+| Role | Description | Can Spawn |
+|------|-------------|-----------|
+| **DevOps Engineer** | CI/CD, deployment, infrastructure | Yes |
+| **Tech Writer** | Documentation, API docs, guides | No |
+| **Release Manager** | Release coordination, changelog, versioning | Yes |
+
+---
+
+## Workflows
+
+Define multi-step workflows with dependencies:
+
+```yaml
+name: feature-development
+description: Complete feature development workflow
+steps:
+  - id: analyze
+    name: Analyze Requirements
+    role: product-analyst
+    prompt: "Analyze the requirements for {{feature}}"
+
+  - id: design
+    name: Design Architecture
+    role: architect
+    dependsOn: [analyze]
+    prompt: "Design the architecture based on {{analyze.output}}"
+
+  - id: implement
+    name: Implement Feature
+    role: fullstack-dev
+    dependsOn: [design]
+    parallel: true
+    prompt: "Implement the feature according to the design"
+
+  - id: test
+    name: Test Implementation
+    role: qa-engineer
+    dependsOn: [implement]
+    prompt: "Test the implementation thoroughly"
+
+  - id: deploy
+    name: Deploy
+    role: devops-engineer
+    dependsOn: [test]
+    prompt: "Deploy the feature to staging"
+```
+
+---
+
+## API Reference
+
+### REST Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/health` | Health check |
+| GET | `/api/metrics` | Prometheus metrics |
+| POST | `/api/auth/login` | Authenticate |
+| GET | `/api/workers` | List workers |
+| POST | `/api/workers/spawn` | Spawn worker |
+| DELETE | `/api/workers/:handle` | Dismiss worker |
+| GET | `/api/tasks` | List tasks |
+| POST | `/api/tasks` | Create task |
+| GET | `/api/workitems` | List work items |
+| POST | `/api/workitems` | Create work item |
+| GET | `/api/swarms` | List swarms |
+| POST | `/api/swarms` | Create swarm |
+| GET | `/api/workflows` | List workflows |
+| POST | `/api/workflows/:id/execute` | Execute workflow |
+
+### WebSocket Events
+
+Connect to `ws://localhost:3847/ws` for real-time updates:
+
+```javascript
+// Events received
+{ type: 'worker:spawned', data: { handle, status } }
+{ type: 'worker:dismissed', data: { handle } }
+{ type: 'task:created', data: { id, subject } }
+{ type: 'task:updated', data: { id, status } }
+{ type: 'blackboard:message', data: { swarmId, message } }
+```
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Claude Fleet Server                       │
-│                    (localhost:3847)                          │
-├─────────────────────────────────────────────────────────────┤
-│  HTTP API          WebSocket         Worker Manager          │
-│  ─────────         ─────────         ──────────────          │
-│  • Auth            • Real-time       • Spawn/dismiss         │
-│  • Tasks           • Subscriptions   • Health monitoring     │
-│  • Teams           • Broadcasts      • Auto-restart          │
-│  • Swarms                            • Git worktrees         │
-├─────────────────────────────────────────────────────────────┤
-│  Storage (SQLite)                                            │
-│  ─────────────────                                           │
-│  • Agents, Tasks, Messages, Checkpoints, Blackboard          │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-   ┌────▼────┐         ┌────▼────┐         ┌────▼────┐
-   │ Claude  │         │ Claude  │         │ Claude  │
-   │ Code    │         │ Code    │         │ Code    │
-   │ (lead)  │         │ (worker)│         │ (worker)│
-   └─────────┘         └─────────┘         └─────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Team Lead                                 │
+│                     (Orchestrator)                               │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+    ┌──────────┐    ┌──────────┐    ┌──────────┐
+    │ Worker α │    │ Worker β │    │ Worker γ │
+    │ (branch) │    │ (branch) │    │ (branch) │
+    └────┬─────┘    └────┬─────┘    └────┬─────┘
+         │               │               │
+         └───────────────┼───────────────┘
+                         │
+    ┌────────────────────┼────────────────────┐
+    │                    │                    │
+    ▼                    ▼                    ▼
+┌────────┐         ┌──────────┐         ┌──────────┐
+│ SQLite │         │Blackboard│         │   Mail   │
+│Storage │         │  Queue   │         │  System  │
+└────────┘         └──────────┘         └──────────┘
 ```
-
----
-
-## Agent Roles
-
-| Role | Permissions |
-|------|-------------|
-| **team-lead** | Spawn workers, assign tasks, broadcast, merge code |
-| **worker** | Claim tasks, complete work, send messages |
-| **coordinator** | Full orchestration control |
-| **monitor** | Read-only access, alerts |
-| **merger** | Merge branches, push code |
-
----
-
-## API Endpoints
-
-### Core
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Server health |
-| GET | `/metrics` | Prometheus metrics |
-| POST | `/auth` | Authenticate agent |
-
-### Teams & Tasks
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/teams/:team/agents` | List team agents |
-| GET | `/teams/:team/tasks` | List team tasks |
-| POST | `/tasks` | Create task |
-| PATCH | `/tasks/:id` | Update task |
-
-### Orchestration
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/orchestrate/spawn` | Spawn worker |
-| POST | `/orchestrate/dismiss/:handle` | Dismiss worker |
-| GET | `/orchestrate/workers` | List workers |
-
-### Fleet Coordination
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/swarms` | Create swarm |
-| GET | `/swarms` | List swarms |
-| POST | `/blackboard` | Post message |
-| GET | `/blackboard/:swarmId` | Read messages |
-| POST | `/checkpoints` | Create checkpoint |
-
-See [API Documentation](docs/api.md) for complete reference.
 
 ---
 
@@ -235,145 +483,50 @@ See [API Documentation](docs/api.md) for complete reference.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3847` | Server port |
-| `STORAGE_BACKEND` | `sqlite` | Storage backend (see below) |
-| `DB_PATH` | `./fleet.db` | SQLite database path |
-| `JWT_SECRET` | (random) | JWT signing secret |
-| `JWT_EXPIRES_IN` | `24h` | Token expiration |
+| `HOST` | `0.0.0.0` | Server host |
 | `MAX_WORKERS` | `5` | Maximum concurrent workers |
+| `JWT_SECRET` | (generated) | JWT signing secret |
+| `STORAGE_BACKEND` | `sqlite` | Storage backend |
+| `SQLITE_PATH` | `./fleet.db` | SQLite database path |
+| `LOG_LEVEL` | `info` | Logging level |
+| `CLAUDE_FLEET_URL` | `http://localhost:3847` | Fleet server URL |
+| `FLEET_TOKEN` | - | JWT token for authentication |
 
 ### Storage Backends
 
-Claude Fleet supports multiple storage backends for different deployment scenarios:
+Claude Fleet supports multiple storage backends:
 
-| Backend | Best For | Required Package |
-|---------|----------|------------------|
-| `sqlite` | Local development | Built-in |
-| `dynamodb` | AWS serverless | `@aws-sdk/client-dynamodb` |
-| `s3` | Archival/infrequent access | `@aws-sdk/client-s3` |
-| `firestore` | Google Cloud | `@google-cloud/firestore` |
-| `postgresql` | Production deployments | `pg` |
-
-**SQLite (Default)**
-```bash
-STORAGE_BACKEND=sqlite
-DB_PATH=./fleet.db
-```
-
-**DynamoDB**
-```bash
-STORAGE_BACKEND=dynamodb
-AWS_REGION=us-east-1
-DYNAMODB_TABLE_PREFIX=fleet_
-# Optional: DYNAMODB_ENDPOINT for local development
-```
-
-**S3**
-```bash
-STORAGE_BACKEND=s3
-S3_BUCKET=my-fleet-bucket
-AWS_REGION=us-east-1
-S3_PREFIX=data/
-```
-
-**Firestore**
-```bash
-STORAGE_BACKEND=firestore
-GOOGLE_CLOUD_PROJECT=my-project
-# Optional: GOOGLE_APPLICATION_CREDENTIALS for service account
-```
-
-**PostgreSQL**
-```bash
-STORAGE_BACKEND=postgresql
-DATABASE_URL=postgres://user:pass@host:5432/fleet
-POSTGRESQL_SCHEMA=public
-POSTGRESQL_POOL_SIZE=10
-```
-
-### Agent Environment
-
-| Variable | Description |
-|----------|-------------|
-| `CLAUDE_FLEET_URL` | Server URL |
-| `CLAUDE_FLEET_TEAM` | Team name |
-| `CLAUDE_CODE_AGENT_NAME` | Agent handle |
-| `CLAUDE_CODE_AGENT_TYPE` | `team-lead` or `worker` |
+- **SQLite** (default) - Local file-based storage
+- **PostgreSQL** - Production-ready relational database
+- **DynamoDB** - AWS managed NoSQL
+- **Firestore** - Google Cloud managed NoSQL
+- **S3** - Object storage for artifacts
 
 ---
 
-## Development
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ```bash
-# Install dependencies
-npm install
-
-# Development mode (hot reload)
-npm run dev
-
-# Run tests
-npm test
-
-# Run E2E tests
-npm run e2e            # Core E2E tests
-npm run e2e:cli        # CLI E2E tests (64 commands)
-npm run e2e:all        # All E2E tests
-
-# Type checking
-npm run typecheck
-
-# Linting
-npm run lint
-
-# Full verification
-npm run verify         # typecheck + lint + test + e2e
+# Development
+npm run dev          # Start with hot reload
+npm test             # Run unit tests
+npm run e2e          # Run E2E tests
+npm run lint         # Lint code
+npm run typecheck    # TypeScript check
 ```
-
-### Audit Objective
-
-Claude Fleet includes a goal-oriented audit system with wave-based task tracking:
-
-```bash
-# Quick codebase health check
-fleet audit
-
-# Full audit objective (loops through waves until complete)
-fleet audit-loop [--dry-run] [--max N]
-```
-
-Each **Loop** deploys **Waves** of work:
-- **Wave 1: Reconnaissance** - Run checks, discover issues, create tasks
-- **Wave 2: Fleet Deployment** - Work through fix tasks
-- **Wave 3: Verification** - Re-run checks, confirm fixes
-
-**Exit Criteria** (all must pass to complete):
-1. `fleet audit` passes (typecheck, lint, tests, build)
-2. `npm run e2e:all` passes
-3. No critical TODOs remain
-4. All tasks complete
-
-When everything passes: **"OBJECTIVE COMPLETE - Escaped the maze!"**
-
-See [CLAUDE.md](CLAUDE.md) for detailed development guidelines.
-
----
-
-## Documentation
-
-- [Architecture Guide](docs/ARCHITECTURE.md) - System design and components
-- [API Reference](docs/api.md) - Complete API documentation
-- [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
-- [Contributing](CONTRIBUTING.md) - How to contribute
 
 ---
 
 ## License
 
-MIT - see [LICENSE](LICENSE)
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## Credits
-
-Created by [Seth Ford](https://github.com/sethdford)
-
-Built for orchestrating [Claude Code](https://claude.ai/code) agents.
+<p align="center">
+  <a href="https://sethdford.github.io/claude-fleet/">Website</a> •
+  <a href="https://www.npmjs.com/package/claude-fleet">NPM</a> •
+  <a href="https://github.com/sethdford/claude-fleet">GitHub</a>
+</p>

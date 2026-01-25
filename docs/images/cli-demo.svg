@@ -1,0 +1,140 @@
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="termBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="promptGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00D4FF"/>
+      <stop offset="100%" stop-color="#00FF94"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Terminal window -->
+  <rect width="800" height="500" rx="12" fill="url(#termBg)"/>
+
+  <!-- Title bar -->
+  <rect width="800" height="36" rx="12" fill="#0d1117"/>
+  <rect y="24" width="800" height="12" fill="#0d1117"/>
+
+  <!-- Window buttons -->
+  <circle cx="20" cy="18" r="6" fill="#FF5F56"/>
+  <circle cx="40" cy="18" r="6" fill="#FFBD2E"/>
+  <circle cx="60" cy="18" r="6" fill="#27C93F"/>
+
+  <!-- Title -->
+  <text x="400" y="22" text-anchor="middle" font-family="SF Mono, monospace" font-size="12" fill="#666">claude-fleet — zsh</text>
+
+  <!-- Terminal content -->
+  <g font-family="JetBrains Mono, SF Mono, monospace" font-size="13">
+
+    <!-- Line 1: Health check -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.5s" fill="freeze"/>
+      <text x="20" y="60" fill="url(#promptGrad)">❯</text>
+      <text x="40" y="60" fill="#c9d1d9">fleet health</text>
+    </g>
+
+    <!-- Line 2: Health response -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1s" fill="freeze"/>
+      <text x="20" y="85" fill="#3fb950">✓</text>
+      <text x="40" y="85" fill="#8b949e">Server healthy</text>
+      <text x="160" y="85" fill="#58a6ff">http://localhost:3847</text>
+    </g>
+
+    <!-- Line 3: Auth command -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.8s" fill="freeze"/>
+      <text x="20" y="120" fill="url(#promptGrad)">❯</text>
+      <text x="40" y="120" fill="#c9d1d9">fleet auth lead-agent my-team team-lead</text>
+    </g>
+
+    <!-- Line 4: Auth response -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2.3s" fill="freeze"/>
+      <text x="20" y="145" fill="#3fb950">✓</text>
+      <text x="40" y="145" fill="#8b949e">Authenticated as</text>
+      <text x="180" y="145" fill="#d29922">lead-agent</text>
+      <text x="270" y="145" fill="#8b949e">(team-lead)</text>
+    </g>
+
+    <!-- Line 5: Spawn command -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.2s" fill="freeze"/>
+      <text x="20" y="180" fill="url(#promptGrad)">❯</text>
+      <text x="40" y="180" fill="#c9d1d9">fleet spawn worker-1 "Fix auth bug in src/auth.ts"</text>
+    </g>
+
+    <!-- Line 6: Spawn response -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.8s" fill="freeze"/>
+      <text x="20" y="205" fill="#3fb950">✓</text>
+      <text x="40" y="205" fill="#8b949e">Spawned worker</text>
+      <text x="175" y="205" fill="#a371f7">worker-1</text>
+      <text x="260" y="205" fill="#8b949e">in branch</text>
+      <text x="340" y="205" fill="#58a6ff">fleet/worker-1</text>
+    </g>
+
+    <!-- Line 7: Workers command -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="4.8s" fill="freeze"/>
+      <text x="20" y="240" fill="url(#promptGrad)">❯</text>
+      <text x="40" y="240" fill="#c9d1d9">fleet workers --table</text>
+    </g>
+
+    <!-- Line 8-11: Workers table -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="5.3s" fill="freeze"/>
+      <text x="20" y="270" fill="#58a6ff">HANDLE      STATUS    BRANCH              TASK</text>
+      <text x="20" y="290" fill="#8b949e">─────────────────────────────────────────────────────</text>
+      <text x="20" y="310" fill="#c9d1d9">worker-1</text>
+      <text x="120" y="310" fill="#3fb950">active</text>
+      <text x="220" y="310" fill="#a371f7">fleet/worker-1</text>
+      <text x="380" y="310" fill="#8b949e">Fix auth bug</text>
+    </g>
+
+    <!-- Line 12: Task create -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="6.5s" fill="freeze"/>
+      <text x="20" y="350" fill="url(#promptGrad)">❯</text>
+      <text x="40" y="350" fill="#c9d1d9">fleet task-create worker-1 "Review PR #42"</text>
+    </g>
+
+    <!-- Line 13: Task response -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="7s" fill="freeze"/>
+      <text x="20" y="375" fill="#3fb950">✓</text>
+      <text x="40" y="375" fill="#8b949e">Task created</text>
+      <text x="145" y="375" fill="#d29922">task-a3f8c</text>
+      <text x="240" y="375" fill="#8b949e">assigned to</text>
+      <text x="340" y="375" fill="#a371f7">worker-1</text>
+    </g>
+
+    <!-- Line 14: Worktree status -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="8s" fill="freeze"/>
+      <text x="20" y="410" fill="url(#promptGrad)">❯</text>
+      <text x="40" y="410" fill="#c9d1d9">fleet worktree-status worker-1</text>
+    </g>
+
+    <!-- Line 15: Git status response -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="8.5s" fill="freeze"/>
+      <text x="20" y="435" fill="#3fb950">M</text>
+      <text x="40" y="435" fill="#c9d1d9">src/auth.ts</text>
+      <text x="140" y="435" fill="#8b949e">+42 -18</text>
+    </g>
+
+    <!-- Blinking cursor -->
+    <rect x="20" y="455" width="8" height="16" fill="#00D4FF">
+      <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/>
+    </rect>
+
+  </g>
+
+  <!-- Subtle scan line effect -->
+  <rect x="0" y="0" width="800" height="2" fill="rgba(0,212,255,0.03)">
+    <animate attributeName="y" values="0;500;0" dur="8s" repeatCount="indefinite"/>
+  </rect>
+</svg>
