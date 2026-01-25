@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wave Coordination Demo - Claude Fleet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a2e;
+      --bg-terminal: #0d1117;
+      --border: rgba(255,255,255,0.08);
+      --text-primary: #e4e4e7;
+      --text-secondary: rgba(255,255,255,0.7);
+      --text-muted: rgba(255,255,255,0.4);
+      --accent-cyan: #00d4ff;
+      --accent-blue: #0066ff;
+      --accent-purple: #7c3aed;
+      --accent-green: #00ff94;
+      --accent-yellow: #fbbf24;
+      --accent-red: #ff6b6b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 0 24px; }
+
+    /* Header */
+    header {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10,10,15,0.9);
+      backdrop-filter: blur(20px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-primary);
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 20px;
+    }
+
+    .back-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: color 0.2s;
+    }
+
+    .back-link:hover { color: var(--accent-cyan); }
+
+    /* Hero */
+    .hero {
+      padding: 80px 0 60px;
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 800;
+      margin-bottom: 20px;
+      letter-spacing: -0.03em;
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: 18px;
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto 40px;
+    }
+
+    /* Main Content */
+    .demo-grid {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 32px;
+      margin-bottom: 80px;
+    }
+
+    @media (max-width: 1024px) {
+      .demo-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Terminal Window */
+    .terminal-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 18px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .terminal-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .terminal-dot.red { background: #ff5f56; }
+    .terminal-dot.yellow { background: #ffbd2e; }
+    .terminal-dot.green { background: #27c93f; }
+
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .terminal-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      height: 500px;
+      background: var(--bg-terminal);
+    }
+
+    .terminal-pane {
+      border: 1px solid var(--border);
+      padding: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .pane-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pane-title {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    .pane-status {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(0,212,255,0.1);
+      color: var(--accent-cyan);
+    }
+
+    .pane-status.active {
+      background: rgba(0,255,148,0.1);
+      color: var(--accent-green);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .pane-status.waiting {
+      background: rgba(251,191,36,0.1);
+      color: var(--accent-yellow);
+    }
+
+    .pane-status.complete {
+      background: rgba(0,102,255,0.1);
+      color: var(--accent-blue);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .pane-content {
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .pane-content .prompt {
+      color: var(--accent-green);
+    }
+
+    .pane-content .command {
+      color: var(--text-primary);
+    }
+
+    .pane-content .output {
+      color: var(--text-muted);
+    }
+
+    .pane-content .highlight {
+      color: var(--accent-cyan);
+    }
+
+    .typing-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: var(--accent-cyan);
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* Control Panel */
+    .control-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+
+    .panel-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .panel-title svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--accent-cyan);
+    }
+
+    /* Wave Timeline */
+    .wave-timeline {
+      margin-bottom: 24px;
+    }
+
+    .wave-phase {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      border-left: 3px solid var(--border);
+      transition: all 0.3s;
+    }
+
+    .wave-phase.active {
+      border-left-color: var(--accent-cyan);
+      background: rgba(0,212,255,0.05);
+    }
+
+    .wave-phase.complete {
+      border-left-color: var(--accent-green);
+    }
+
+    .wave-number {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-card);
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 12px;
+      margin-right: 12px;
+    }
+
+    .wave-phase.active .wave-number {
+      background: var(--accent-cyan);
+      color: var(--bg-primary);
+    }
+
+    .wave-phase.complete .wave-number {
+      background: var(--accent-green);
+      color: var(--bg-primary);
+    }
+
+    .wave-info {
+      flex: 1;
+    }
+
+    .wave-name {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+
+    .wave-workers {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .wave-duration {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* KPIs */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .kpi-card {
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .kpi-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .kpi-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+
+    /* Action Buttons */
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: var(--bg-primary);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0,212,255,0.3);
+    }
+
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent-cyan);
+    }
+
+    /* Outcome Section */
+    .outcome-section {
+      padding: 80px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .outcome-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .outcome-header h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(32px, 4vw, 48px);
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .outcome-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .outcome-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .outcome-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px 24px;
+      text-align: center;
+      transition: all 0.3s;
+    }
+
+    .outcome-card:hover {
+      border-color: var(--accent-cyan);
+      transform: translateY(-4px);
+    }
+
+    .outcome-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,212,255,0.1);
+      border-radius: 12px;
+    }
+
+    .outcome-icon svg {
+      width: 24px;
+      height: 24px;
+      stroke: var(--accent-cyan);
+    }
+
+    .outcome-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 36px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+
+    .outcome-label {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .outcome-comparison {
+      font-size: 12px;
+      color: var(--accent-green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    /* Before/After Section */
+    .comparison-section {
+      padding: 80px 0;
+      background: var(--bg-secondary);
+    }
+
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    @media (max-width: 768px) {
+      .comparison-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .comparison-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+    }
+
+    .comparison-card h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .comparison-card.before h3 { color: var(--accent-red); }
+    .comparison-card.after h3 { color: var(--accent-green); }
+
+    .comparison-list {
+      list-style: none;
+    }
+
+    .comparison-list li {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .comparison-list li:last-child {
+      border-bottom: none;
+    }
+
+    .comparison-list .icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .comparison-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .comparison-arrow svg {
+      width: 40px;
+      height: 40px;
+      stroke: var(--accent-cyan);
+    }
+
+    .comparison-arrow span {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* CTA */
+    .cta-section {
+      padding: 100px 0;
+      text-align: center;
+    }
+
+    .cta-section h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(32px, 4vw, 48px);
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .cta-section p {
+      font-size: 18px;
+      color: var(--text-secondary);
+      max-width: 500px;
+      margin: 0 auto 32px;
+    }
+
+    .cta-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .cta-buttons .btn {
+      padding: 16px 32px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <a href="index.html" class="logo">
+        <svg width="32" height="32" viewBox="0 0 36 36" fill="none">
+          <rect width="36" height="36" rx="8" fill="url(#g1)"/>
+          <path d="M18 8L26 12V24L18 28L10 24V12L18 8Z" stroke="white" stroke-width="1.5" fill="none"/>
+          <circle cx="18" cy="16" r="3" fill="white"/>
+          <defs><linearGradient id="g1" x1="0" y1="0" x2="36" y2="36"><stop stop-color="#0066FF"/><stop offset="1" stop-color="#00D4FF"/></linearGradient></defs>
+        </svg>
+        Claude Fleet
+      </a>
+      <a href="index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Back to Home
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <h1>Wave <span class="gradient-text">Coordination</span> in Action</h1>
+        <p>Watch how Claude Fleet orchestrates multiple AI agents through coordinated waves, maximizing parallelism while respecting dependencies.</p>
+      </div>
+    </section>
+
+    <section class="container">
+      <div class="demo-grid">
+        <!-- Terminal Demo -->
+        <div class="terminal-container">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <div class="terminal-title">fleet-orchestration — tmux — 120×40</div>
+          </div>
+          <div class="terminal-body" id="terminal-demo">
+            <div class="terminal-pane" id="pane-lead">
+              <div class="pane-header">
+                <span class="pane-title">Team Lead</span>
+                <span class="pane-status active" id="lead-status">Orchestrating</span>
+              </div>
+              <div class="pane-content" id="lead-content">
+                <div><span class="prompt">λ</span> <span class="command">fleet wave-start feature-dev</span></div>
+                <div class="output">Starting wave: feature-development</div>
+                <div class="output">Phase 1: Discovery (3 workers)</div>
+                <div class="highlight">→ Spawning worker-alpha...</div>
+                <div class="highlight">→ Spawning worker-beta...</div>
+                <div class="highlight">→ Spawning worker-gamma...</div>
+                <div class="typing-cursor"></div>
+              </div>
+            </div>
+            <div class="terminal-pane" id="pane-alpha">
+              <div class="pane-header">
+                <span class="pane-title">Worker Alpha</span>
+                <span class="pane-status active" id="alpha-status">Analyzing</span>
+              </div>
+              <div class="pane-content" id="alpha-content">
+                <div><span class="prompt">α</span> <span class="command">Analyzing codebase structure...</span></div>
+                <div class="output">Found 847 TypeScript files</div>
+                <div class="output">Mapping module dependencies...</div>
+                <div class="highlight">✓ Dependency graph complete</div>
+              </div>
+            </div>
+            <div class="terminal-pane" id="pane-beta">
+              <div class="pane-header">
+                <span class="pane-title">Worker Beta</span>
+                <span class="pane-status waiting" id="beta-status">API Analysis</span>
+              </div>
+              <div class="pane-content" id="beta-content">
+                <div><span class="prompt">β</span> <span class="command">Scanning API endpoints...</span></div>
+                <div class="output">Discovered 42 REST endpoints</div>
+                <div class="output">Checking OpenAPI specs...</div>
+                <div class="highlight">✓ API inventory ready</div>
+              </div>
+            </div>
+            <div class="terminal-pane" id="pane-gamma">
+              <div class="pane-header">
+                <span class="pane-title">Worker Gamma</span>
+                <span class="pane-status" id="gamma-status">Test Coverage</span>
+              </div>
+              <div class="pane-content" id="gamma-content">
+                <div><span class="prompt">γ</span> <span class="command">Evaluating test coverage...</span></div>
+                <div class="output">Running coverage analysis...</div>
+                <div class="output">Coverage: 73% → Target: 85%</div>
+                <div class="highlight">✓ Gap analysis complete</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+          <h3 class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            Wave Progress
+          </h3>
+
+          <div class="wave-timeline">
+            <div class="wave-phase active" id="phase-1">
+              <div class="wave-number">1</div>
+              <div class="wave-info">
+                <div class="wave-name">Discovery</div>
+                <div class="wave-workers">3 parallel workers</div>
+              </div>
+              <div class="wave-duration" id="phase-1-time">0:42</div>
+            </div>
+            <div class="wave-phase" id="phase-2">
+              <div class="wave-number">2</div>
+              <div class="wave-info">
+                <div class="wave-name">Implementation</div>
+                <div class="wave-workers">4 parallel workers</div>
+              </div>
+              <div class="wave-duration">—</div>
+            </div>
+            <div class="wave-phase" id="phase-3">
+              <div class="wave-number">3</div>
+              <div class="wave-info">
+                <div class="wave-name">Testing</div>
+                <div class="wave-workers">2 parallel workers</div>
+              </div>
+              <div class="wave-duration">—</div>
+            </div>
+            <div class="wave-phase" id="phase-4">
+              <div class="wave-number">4</div>
+              <div class="wave-info">
+                <div class="wave-name">Integration</div>
+                <div class="wave-workers">1 worker (lead)</div>
+              </div>
+              <div class="wave-duration">—</div>
+            </div>
+          </div>
+
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-value" id="kpi-workers">3</div>
+              <div class="kpi-label">Active Workers</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-value" id="kpi-tasks">12</div>
+              <div class="kpi-label">Tasks Queued</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-value" id="kpi-complete">4</div>
+              <div class="kpi-label">Completed</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-value" id="kpi-time">0:42</div>
+              <div class="kpi-label">Elapsed</div>
+            </div>
+          </div>
+
+          <div class="action-buttons">
+            <button class="btn btn-primary" id="btn-start">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+              Start Demo
+            </button>
+            <button class="btn btn-secondary" id="btn-reset">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 4v6h6M23 20v-6h-6"/>
+                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+              </svg>
+              Reset
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Outcomes Section -->
+    <section class="outcome-section">
+      <div class="container">
+        <div class="outcome-header">
+          <h2>Measurable <span class="gradient-text">Outcomes</span></h2>
+          <p style="color: var(--text-secondary); font-size: 18px;">Real metrics from fleet-coordinated development workflows</p>
+        </div>
+
+        <div class="outcome-grid">
+          <div class="outcome-card">
+            <div class="outcome-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <div class="outcome-value">73%</div>
+            <div class="outcome-label">Faster Development</div>
+            <div class="outcome-comparison">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 15l-6-6-6 6"/>
+              </svg>
+              vs. sequential work
+            </div>
+          </div>
+
+          <div class="outcome-card">
+            <div class="outcome-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+            <div class="outcome-value">4.2x</div>
+            <div class="outcome-label">Task Throughput</div>
+            <div class="outcome-comparison">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 15l-6-6-6 6"/>
+              </svg>
+              parallel execution
+            </div>
+          </div>
+
+          <div class="outcome-card">
+            <div class="outcome-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+              </svg>
+            </div>
+            <div class="outcome-value">96%</div>
+            <div class="outcome-label">Coordination Success</div>
+            <div class="outcome-comparison">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 15l-6-6-6 6"/>
+              </svg>
+              zero conflicts
+            </div>
+          </div>
+
+          <div class="outcome-card">
+            <div class="outcome-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="M3 9h18"/>
+                <path d="M9 21V9"/>
+              </svg>
+            </div>
+            <div class="outcome-value">5</div>
+            <div class="outcome-label">Max Concurrent Workers</div>
+            <div class="outcome-comparison">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 15l-6-6-6 6"/>
+              </svg>
+              configurable limit
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Before/After Comparison -->
+    <section class="comparison-section">
+      <div class="container">
+        <div class="outcome-header">
+          <h2>The <span class="gradient-text">Transformation</span></h2>
+          <p style="color: var(--text-secondary); font-size: 18px;">From sequential bottlenecks to parallel acceleration</p>
+        </div>
+
+        <div class="comparison-grid">
+          <div class="comparison-card before">
+            <h3>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+              Before Fleet
+            </h3>
+            <ul class="comparison-list">
+              <li>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                Single agent handles everything sequentially
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                Context window fills up quickly
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                No specialization by task type
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                Manual coordination required
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                Bottlenecked by API rate limits
+              </li>
+            </ul>
+          </div>
+
+          <div class="comparison-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+            <span>With Fleet</span>
+          </div>
+
+          <div class="comparison-card after">
+            <h3>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00ff94" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              After Fleet
+            </h3>
+            <ul class="comparison-list">
+              <li>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#00ff94" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                Multiple agents work in parallel waves
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#00ff94" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                Isolated worktrees prevent conflicts
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#00ff94" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                Specialized roles for each task type
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#00ff94" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                Automatic coordination via blackboard
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#00ff94" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                Distributed load across workers
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="container">
+        <h2>Ready to <span class="gradient-text">accelerate</span>?</h2>
+        <p>Start orchestrating your AI agent fleet today.</p>
+        <div class="cta-buttons">
+          <a href="index.html#install" class="btn btn-primary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Install Claude Fleet
+          </a>
+          <a href="https://github.com/sethdford/claude-fleet" class="btn btn-secondary">
+            View Documentation
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Demo animation state
+    let demoRunning = false;
+    let demoInterval = null;
+    let elapsedSeconds = 0;
+
+    const phases = [
+      { duration: 45, workers: 3, tasks: 12 },
+      { duration: 90, workers: 4, tasks: 8 },
+      { duration: 60, workers: 2, tasks: 4 },
+      { duration: 30, workers: 1, tasks: 2 }
+    ];
+
+    function startDemo() {
+      if (demoRunning) return;
+      demoRunning = true;
+      elapsedSeconds = 0;
+
+      document.getElementById('btn-start').textContent = 'Running...';
+      document.getElementById('btn-start').disabled = true;
+
+      demoInterval = setInterval(() => {
+        elapsedSeconds++;
+        updateKPIs();
+        updatePhases();
+
+        if (elapsedSeconds >= 225) { // Total demo duration
+          stopDemo();
+        }
+      }, 100); // Speed up for demo (100ms = 1s in demo time)
+    }
+
+    function stopDemo() {
+      demoRunning = false;
+      clearInterval(demoInterval);
+      document.getElementById('btn-start').textContent = 'Start Demo';
+      document.getElementById('btn-start').disabled = false;
+    }
+
+    function resetDemo() {
+      stopDemo();
+      elapsedSeconds = 0;
+      updateKPIs();
+
+      // Reset phases
+      document.querySelectorAll('.wave-phase').forEach((phase, i) => {
+        phase.classList.remove('active', 'complete');
+        if (i === 0) phase.classList.add('active');
+        phase.querySelector('.wave-duration').textContent = i === 0 ? '0:00' : '—';
+      });
+
+      // Reset statuses
+      document.getElementById('lead-status').textContent = 'Orchestrating';
+      document.getElementById('alpha-status').textContent = 'Analyzing';
+      document.getElementById('beta-status').textContent = 'API Analysis';
+      document.getElementById('gamma-status').textContent = 'Test Coverage';
+    }
+
+    function updateKPIs() {
+      const minutes = Math.floor(elapsedSeconds / 60);
+      const seconds = elapsedSeconds % 60;
+      document.getElementById('kpi-time').textContent =
+        `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+      // Update completed tasks based on progress
+      const completed = Math.min(Math.floor(elapsedSeconds / 15), 16);
+      document.getElementById('kpi-complete').textContent = completed;
+      document.getElementById('kpi-tasks').textContent = Math.max(0, 16 - completed);
+    }
+
+    function updatePhases() {
+      let cumulative = 0;
+      phases.forEach((phase, i) => {
+        const phaseEl = document.getElementById(`phase-${i + 1}`);
+        const startTime = cumulative;
+        cumulative += phase.duration;
+
+        if (elapsedSeconds >= startTime && elapsedSeconds < cumulative) {
+          phaseEl.classList.add('active');
+          phaseEl.classList.remove('complete');
+          const phaseElapsed = elapsedSeconds - startTime;
+          const mins = Math.floor(phaseElapsed / 60);
+          const secs = phaseElapsed % 60;
+          phaseEl.querySelector('.wave-duration').textContent =
+            `${mins}:${secs.toString().padStart(2, '0')}`;
+          document.getElementById('kpi-workers').textContent = phase.workers;
+        } else if (elapsedSeconds >= cumulative) {
+          phaseEl.classList.remove('active');
+          phaseEl.classList.add('complete');
+          const mins = Math.floor(phase.duration / 60);
+          const secs = phase.duration % 60;
+          phaseEl.querySelector('.wave-duration').textContent =
+            `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+      });
+    }
+
+    document.getElementById('btn-start').addEventListener('click', startDemo);
+    document.getElementById('btn-reset').addEventListener('click', resetDemo);
+  </script>
+</body>
+</html>
