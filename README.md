@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>The infrastructure for AI agent fleets</strong>
+  <strong>Waves of agents until the job is done</strong>
 </p>
 
 <p align="center">
@@ -19,63 +19,87 @@
 <p align="center">
   <a href="https://sethdford.github.io/claude-fleet/">Website</a> •
   <a href="#quick-start">Quick Start</a> •
-  <a href="#features">Features</a> •
+  <a href="#key-features">Features</a> •
+  <a href="#agent-roles">Agent Roles</a> •
   <a href="#cli-reference">CLI Reference</a> •
-  <a href="#mcp-tools">MCP Tools</a> •
   <a href="https://github.com/sethdford/claude-fleet/issues">Issues</a>
 </p>
 
 ---
 
-Orchestrate multiple Claude Code instances with intelligent coordination, swarm intelligence, and real-time collaboration. Build production-grade multi-agent systems with role-based agents aligned to the Software Development Lifecycle.
+Deploy specialized agent fleets across multiple repositories. Run iterative waves until objectives are achieved. TMUX or headless mode for full CI/CD integration.
 
-<p align="center">
-  <img src="docs/images/cli-demo.gif" alt="Claude Fleet CLI Demo" width="800">
-</p>
+```bash
+# Launch a wave across multiple repos
+$ claude-fleet wave --repos api,frontend,shared --objective "Add rate limiting"
+
+Wave 1: Spawning scouts...
+  ✓ Scout[api]      Mapped 47 endpoints
+  ✓ Scout[frontend] Found 12 API calls
+  ✓ Scout[shared]   Identified rate-limit types
+
+Wave 2: Architect designing...
+  ✓ Architect       Proposed middleware approach
+
+Wave 3: Implementation...
+  ✓ Worker[api]     Added middleware + config
+  ✓ Kraken[api]     22 tests passing
+
+Wave 4: Review...
+  ✓ Critic          Approved. Creating PRs...
+
+✓ Objective achieved in 4 waves. 3 PRs created.
+```
 
 ---
 
-## Table of Contents
-
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [CLI Reference](#cli-reference)
-- [Dashboard](#dashboard)
-- [MCP Tools](#mcp-tools)
-- [Agent Roles](#agent-roles)
-- [Workflows](#workflows)
-- [API Reference](#api-reference)
-- [Architecture](#architecture)
-- [Configuration](#configuration)
-- [Contributing](#contributing)
-
----
-
-## Features
-
-### Core Capabilities
+## Key Features
 
 | Feature | Description |
 |---------|-------------|
-| **Fleet Orchestration** | Spawn, manage, and coordinate multiple Claude Code worker agents |
-| **Swarm Intelligence** | Blackboard messaging pattern for agent communication and coordination |
-| **Git Worktrees** | Isolated workspaces for each agent to prevent conflicts |
-| **Real-time Dashboard** | WebSocket-powered monitoring with live updates |
-| **MCP Integration** | 25+ tools accessible via Model Context Protocol |
-| **JWT Authentication** | Secure role-based access control (team-lead/worker) |
-| **Prometheus Metrics** | Production-ready observability and monitoring |
-| **Workflow Engine** | Define and execute multi-step workflows with dependencies |
+| **Wave Orchestration** | Phased execution with dependencies. Parallel within waves, sequential across phases. Iterate until objectives are met. |
+| **7 Specialized Agents** | Lead, Scout, Kraken (TDD), Oracle, Critic, Architect, Worker - each with distinct capabilities. |
+| **Multi-Repository Ops** | Parallel operations across repos. Auto-branching, auto-commit, auto-PR. Atomic commits with rollback. |
+| **TMUX & Headless Mode** | Visual TMUX sessions or headless for CI/CD. Context monitoring with auto-rollover. |
+| **Swarm Intelligence** | Blackboard-based coordination. Workers post discoveries, others subscribe. |
+| **24/7 Autonomous Ops** | Cron scheduling, webhook triggers, alert-driven tasks. Priority queues with retry logic. |
+| **E2E Audit Loops** | Continuous quality enforcement across your pipeline. Pattern detection and automatic retries. |
 
-### SDLC-Aligned Agent Roles
+---
 
-Claude Fleet provides 12 specialized agent roles organized by Software Development Lifecycle phase:
+## Agent Roles
 
-| Phase | Roles |
-|-------|-------|
-| **Discovery** | Product Analyst, Architect |
-| **Development** | Frontend Dev, Backend Dev, Full-Stack Dev, Data Engineer |
-| **Quality** | QA Engineer, Security Engineer, Performance Engineer |
-| **Delivery** | DevOps Engineer, Tech Writer, Release Manager |
+Claude Fleet provides 7 specialized agent roles:
+
+| Role | Description | Capabilities |
+|------|-------------|--------------|
+| **Lead** | Orchestrates the fleet, delegates tasks, monitors progress | Can spawn other agents |
+| **Worker** | General-purpose implementation, executes assigned tasks | Code changes, commits |
+| **Scout** | Explores codebases, maps dependencies, gathers intel | Read-only exploration |
+| **Kraken** | TDD specialist - red-green-refactor cycle | Test-first development |
+| **Oracle** | Research and analysis, investigates patterns | Deep code analysis |
+| **Critic** | Code review, quality gates, security checks | Review and approve |
+| **Architect** | System design, API contracts, architecture decisions | Can spawn workers |
+
+### Wave Flow Example
+
+```
+Wave 1 (parallel):  Scout ─────── Oracle
+                         ╲       ╱
+                          ╲     ╱
+Wave 2 (sequential):       Architect
+                              │
+                              ▼
+Wave 3 (parallel):    Worker ───── Kraken
+                         ╲       ╱
+                          ╲     ╱
+Wave 4 (quality gate):     Critic
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Loop if needed  │
+                    └─────────────────┘
+```
 
 ---
 
@@ -94,7 +118,7 @@ claude-fleet
 fleet health
 ```
 
-### Your First Fleet
+### Your First Wave
 
 ```bash
 # 1. Start the server
@@ -104,144 +128,208 @@ claude-fleet
 fleet auth my-lead my-team team-lead
 export FLEET_TOKEN="<token from above>"
 
-# 3. Spawn a worker
-fleet spawn worker-1 "Fix the authentication bug in src/auth.ts"
+# 3. Launch a wave
+fleet wave --objective "Add input validation to all API endpoints"
 
-# 4. Check worker status
+# 4. Monitor progress
 fleet workers --table
 
 # 5. View the dashboard
 open http://localhost:3847/dashboard/
 ```
 
-### From Source
+### Multi-Repository Setup
 
 ```bash
-git clone https://github.com/sethdford/claude-fleet.git
-cd claude-fleet
-npm install
-npm run build
-npm start
+# Configure repositories
+fleet repos add api ./repos/api-service
+fleet repos add frontend ./repos/web-client
+fleet repos add shared ./repos/shared-types
+
+# Launch cross-repo wave
+fleet wave --repos api,frontend,shared \
+  --objective "Implement rate limiting across all services"
+```
+
+---
+
+## Wave Orchestration
+
+Execute complex multi-phase workflows with automatic dependency management:
+
+```typescript
+import { WaveOrchestrator } from 'claude-fleet';
+
+const orchestrator = new WaveOrchestrator({
+  fleetName: 'feature-implementation',
+  remote: true, // headless mode for CI/CD
+});
+
+// Wave 1: Discovery (parallel)
+orchestrator.addWave({
+  name: 'discovery',
+  workers: [
+    { handle: 'scout-1', role: 'scout', prompt: 'Map the authentication module' },
+    { handle: 'oracle-1', role: 'oracle', prompt: 'Research OAuth2 patterns' },
+  ],
+});
+
+// Wave 2: Design (depends on discovery)
+orchestrator.addWave({
+  name: 'design',
+  workers: [
+    { handle: 'architect-1', role: 'architect', prompt: 'Design the auth flow' },
+  ],
+  afterWaves: ['discovery'],
+});
+
+// Wave 3: Implementation (parallel, depends on design)
+orchestrator.addWave({
+  name: 'implementation',
+  workers: [
+    { handle: 'worker-1', role: 'worker', prompt: 'Implement auth middleware' },
+    { handle: 'kraken-1', role: 'kraken', prompt: 'Write auth tests (TDD)' },
+  ],
+  afterWaves: ['design'],
+});
+
+// Wave 4: Review (depends on implementation)
+orchestrator.addWave({
+  name: 'review',
+  workers: [
+    { handle: 'critic-1', role: 'critic', prompt: 'Review implementation' },
+  ],
+  afterWaves: ['implementation'],
+  continueOnFailure: false, // Quality gate
+});
+
+// Execute with iteration until success
+const results = await orchestrator.execute({
+  maxIterations: 3,
+  successCriteria: (results) => results.every(r => r.success),
+});
+```
+
+---
+
+## Multi-Repository Operations
+
+Coordinate work across multiple repositories with atomic commits:
+
+```typescript
+import { MultiRepoOrchestrator } from 'claude-fleet';
+
+const multiRepo = new MultiRepoOrchestrator({
+  fleetName: 'cross-repo-update',
+  repositories: [
+    { name: 'api', path: './repos/api', tags: ['backend'] },
+    { name: 'frontend', path: './repos/web', tags: ['frontend'] },
+    { name: 'shared', path: './repos/shared', tags: ['common'] },
+  ],
+  maxParallel: 3,
+  remote: true,
+});
+
+// Run task across all repos
+await multiRepo.runTask({
+  name: 'update-dependencies',
+  prompt: 'Update all npm dependencies to latest versions',
+  createBranch: true,
+  branchPattern: 'chore/update-deps-{{repo}}',
+  autoCommit: true,
+  createPR: true,
+  prTitlePattern: 'chore({{repo}}): Update dependencies',
+});
+```
+
+---
+
+## CI/CD Integration
+
+### Headless Mode
+
+Run fleets in CI/CD pipelines without TMUX:
+
+```yaml
+# .github/workflows/fleet-audit.yml
+name: Fleet Audit
+on: [push]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Claude Fleet
+        run: npm install -g claude-fleet
+
+      - name: Run Audit Wave
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude-fleet --headless wave \
+            --objective "Audit codebase for security vulnerabilities" \
+            --roles scout,oracle,critic \
+            --max-iterations 2
+```
+
+### Webhook Triggers
+
+```bash
+# Configure webhook endpoint
+fleet webhook create --event pull_request --action "Run review wave"
+
+# Fleet responds to GitHub webhooks automatically
 ```
 
 ---
 
 ## CLI Reference
 
-The `fleet` CLI provides complete control over your agent fleet.
-
 ### Core Commands
 
 ```bash
 fleet health                    # Check server health
-fleet metrics                   # Get server metrics (JSON)
-fleet debug                     # Get debug information
+fleet metrics                   # Get server metrics
 fleet auth <handle> <team> [type]  # Authenticate (team-lead|worker)
+```
+
+### Wave Operations
+
+```bash
+fleet wave --objective <text>   # Launch a new wave
+fleet wave --repos a,b,c        # Target specific repos
+fleet wave --roles scout,critic # Use specific roles
+fleet wave-status               # Check wave progress
+fleet wave-cancel <id>          # Cancel running wave
 ```
 
 ### Worker Management
 
 ```bash
 fleet workers                   # List all workers
-fleet workers --table           # List with formatted table output
-fleet spawn <handle> <prompt>   # Spawn a new worker [team-lead]
-fleet dismiss <handle>          # Dismiss a worker [team-lead]
-fleet send <handle> <message>   # Send message to worker
+fleet workers --table           # Formatted table output
+fleet spawn <handle> <prompt>   # Spawn individual worker
+fleet dismiss <handle>          # Dismiss a worker
 fleet output <handle>           # Get worker output
 ```
 
-### Git Worktree Operations
-
-Each worker operates in an isolated git worktree for conflict-free parallel development:
+### Repository Management
 
 ```bash
-fleet worktree-status <handle>            # Get worktree git status
-fleet worktree-commit <handle> <message>  # Commit changes
-fleet worktree-push <handle>              # Push branch to remote
-fleet worktree-pr <handle> <title> <body> # Create pull request
-```
-
-### Task Management
-
-```bash
-fleet tasks <teamName>                    # List team tasks
-fleet task <id>                           # Get task details
-fleet task-create <to> <subject> [desc]   # Create a new task
-fleet task-update <id> <status>           # Update task status
-```
-
-### Work Items & Batches
-
-Work items provide human-readable IDs (e.g., `wi-x7k2m`) for tracking work:
-
-```bash
-fleet workitems [status]                  # List work items
-fleet workitem-create <title> [desc]      # Create work item
-fleet workitem-update <id> <status>       # Update status
-
-fleet batches                             # List batches
-fleet batch-create <name> [ids...]        # Bundle work items
-fleet batch-dispatch <batchId> <worker>   # Assign batch to worker
-```
-
-### Communication
-
-```bash
-# Mail (async messaging)
-fleet mail <handle>                       # Get unread mail
-fleet mail-send <from> <to> <body> [subj] # Send mail
-
-# Handoffs (context transfer)
-fleet handoffs <handle>                   # List handoffs
-fleet handoff-create <from> <to> <json>   # Transfer context
-```
-
-### Checkpoints
-
-Workers can create checkpoints for review by team leads:
-
-```bash
-fleet checkpoints <handle>                # List checkpoints
-fleet checkpoint <id>                     # Get checkpoint details
-fleet checkpoint-create <h> <goal> <now>  # Create checkpoint
-fleet checkpoint-accept <id>              # Accept [team-lead]
-fleet checkpoint-reject <id>              # Reject [team-lead]
+fleet repos                     # List configured repos
+fleet repos add <name> <path>   # Add repository
+fleet repos remove <name>       # Remove repository
+fleet repos sync                # Sync all repos
 ```
 
 ### Swarm Operations
 
 ```bash
-fleet swarms                              # List all swarms
-fleet swarm-create <name> <maxAgents>     # Create a swarm
-fleet swarm-kill <id>                     # Kill swarm gracefully
-fleet spawn-queue                         # Get spawn queue status
-fleet blackboard <swarmId>                # Read blackboard messages
+fleet swarms                    # List all swarms
+fleet blackboard <swarmId>      # Read blackboard messages
 fleet blackboard-post <swarm> <sender> <type> <payload>
-```
-
-### Workflow Execution
-
-```bash
-fleet workflows                           # List workflows
-fleet workflow <id>                       # Get workflow details
-fleet workflow-start <id> [inputs]        # Start execution [team-lead]
-fleet executions [status]                 # List executions
-fleet execution <id>                      # Get execution details
-fleet execution-pause <id>                # Pause execution
-fleet execution-resume <id>               # Resume execution
-fleet execution-cancel <id>               # Cancel execution
-```
-
-### Template & Role Management
-
-```bash
-fleet templates                           # List swarm templates
-fleet template <id>                       # Get template details
-fleet template-save <name> <json>         # Save template
-fleet template-run <id>                   # Run template
-
-fleet roles                               # List all agent roles
-fleet role <name>                         # Get role details
 ```
 
 ---
@@ -250,73 +338,18 @@ fleet role <name>                         # Get role details
 
 Access the real-time dashboard at `http://localhost:3847/dashboard/`
 
-<p align="center">
-  <img src="docs/images/dashboard-animation.svg" alt="Claude Fleet Dashboard" width="800">
-</p>
-
-### Dashboard Features
-
-- **Overview** - Fleet health, active workers, task counts
-- **Workers** - Real-time worker status, output, and controls
-- **Tasks** - Task management and assignment
-- **Swarms** - Swarm visualization and blackboard messages
-- **Metrics** - Prometheus metrics and performance graphs
-- **Graph View** - Visual dependency graph of agents and tasks
-
-### Interactive Swarm Planner
-
-Try the [Interactive Swarm Planner](https://sethdford.github.io/claude-fleet/swarm-planner-demo.html) to design your agent fleet visually.
+Features:
+- **Wave Progress** - Visual wave execution status
+- **Workers** - Real-time worker status and output
+- **Repositories** - Multi-repo status overview
+- **Blackboard** - Swarm communication messages
+- **Metrics** - Performance and health monitoring
 
 ---
 
-## MCP Tools
+## MCP Integration
 
-Claude Fleet exposes 25+ tools via the Model Context Protocol, allowing Claude Code to orchestrate the fleet:
-
-### Team Management
-| Tool | Description |
-|------|-------------|
-| `team_status` | Get team status and list of online members |
-| `team_broadcast` | Send a message to all team members |
-| `team_tasks` | List tasks for the team |
-| `team_assign` | Assign a task to a team member |
-| `team_complete` | Mark a task as complete |
-| `team_claim` | Claim a file to prevent conflicts |
-
-### Worker Control
-| Tool | Description |
-|------|-------------|
-| `team_spawn` | Spawn a new Claude Code worker instance |
-| `team_dismiss` | Dismiss a worker |
-| `team_workers` | List all active workers |
-| `team_send` | Send a message to a specific worker |
-
-### Work Items & Batches
-| Tool | Description |
-|------|-------------|
-| `workitem_create` | Create a work item with human-readable ID |
-| `workitem_update` | Update work item status |
-| `workitem_list` | List work items with filtering |
-| `batch_create` | Create a batch of work items |
-| `batch_dispatch` | Dispatch batch to a worker |
-
-### Communication
-| Tool | Description |
-|------|-------------|
-| `mail_send` | Send mail to a worker |
-| `mail_read` | Read mail messages |
-| `team_handoff` | Transfer context to another worker |
-
-### Git Operations
-| Tool | Description |
-|------|-------------|
-| `worktree_commit` | Commit changes in worker's branch |
-| `worktree_push` | Push worker's branch to remote |
-| `worktree_pr` | Create pull request from worker's branch |
-
-### MCP Configuration
-
-Add to your Claude Code MCP settings:
+Claude Fleet exposes 40+ tools via Model Context Protocol:
 
 ```json
 {
@@ -333,146 +366,12 @@ Add to your Claude Code MCP settings:
 }
 ```
 
----
-
-## Agent Roles
-
-### Discovery Phase
-
-| Role | Description | Can Spawn |
-|------|-------------|-----------|
-| **Product Analyst** | Requirements gathering, user stories, acceptance criteria | No |
-| **Architect** | System design, API contracts, architecture decisions | Yes |
-
-### Development Phase
-
-| Role | Description | Can Spawn |
-|------|-------------|-----------|
-| **Frontend Dev** | UI components, styling, client-side logic | No |
-| **Backend Dev** | APIs, services, business logic | No |
-| **Full-Stack Dev** | End-to-end feature implementation | Yes |
-| **Data Engineer** | Database schemas, migrations, data pipelines | No |
-
-### Quality Phase
-
-| Role | Description | Can Spawn |
-|------|-------------|-----------|
-| **QA Engineer** | Test planning, test automation, bug verification | No |
-| **Security Engineer** | Security review, vulnerability assessment | No |
-| **Performance Engineer** | Load testing, optimization, profiling | No |
-
-### Delivery Phase
-
-| Role | Description | Can Spawn |
-|------|-------------|-----------|
-| **DevOps Engineer** | CI/CD, deployment, infrastructure | Yes |
-| **Tech Writer** | Documentation, API docs, guides | No |
-| **Release Manager** | Release coordination, changelog, versioning | Yes |
-
----
-
-## Workflows
-
-Define multi-step workflows with dependencies:
-
-```yaml
-name: feature-development
-description: Complete feature development workflow
-steps:
-  - id: analyze
-    name: Analyze Requirements
-    role: product-analyst
-    prompt: "Analyze the requirements for {{feature}}"
-
-  - id: design
-    name: Design Architecture
-    role: architect
-    dependsOn: [analyze]
-    prompt: "Design the architecture based on {{analyze.output}}"
-
-  - id: implement
-    name: Implement Feature
-    role: fullstack-dev
-    dependsOn: [design]
-    parallel: true
-    prompt: "Implement the feature according to the design"
-
-  - id: test
-    name: Test Implementation
-    role: qa-engineer
-    dependsOn: [implement]
-    prompt: "Test the implementation thoroughly"
-
-  - id: deploy
-    name: Deploy
-    role: devops-engineer
-    dependsOn: [test]
-    prompt: "Deploy the feature to staging"
-```
-
----
-
-## API Reference
-
-### REST Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/metrics` | Prometheus metrics |
-| POST | `/api/auth/login` | Authenticate |
-| GET | `/api/workers` | List workers |
-| POST | `/api/workers/spawn` | Spawn worker |
-| DELETE | `/api/workers/:handle` | Dismiss worker |
-| GET | `/api/tasks` | List tasks |
-| POST | `/api/tasks` | Create task |
-| GET | `/api/workitems` | List work items |
-| POST | `/api/workitems` | Create work item |
-| GET | `/api/swarms` | List swarms |
-| POST | `/api/swarms` | Create swarm |
-| GET | `/api/workflows` | List workflows |
-| POST | `/api/workflows/:id/execute` | Execute workflow |
-
-### WebSocket Events
-
-Connect to `ws://localhost:3847/ws` for real-time updates:
-
-```javascript
-// Events received
-{ type: 'worker:spawned', data: { handle, status } }
-{ type: 'worker:dismissed', data: { handle } }
-{ type: 'task:created', data: { id, subject } }
-{ type: 'task:updated', data: { id, status } }
-{ type: 'blackboard:message', data: { swarmId, message } }
-```
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Team Lead                                 │
-│                     (Orchestrator)                               │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │
-          ┌───────────────┼───────────────┐
-          ▼               ▼               ▼
-    ┌──────────┐    ┌──────────┐    ┌──────────┐
-    │ Worker α │    │ Worker β │    │ Worker γ │
-    │ (branch) │    │ (branch) │    │ (branch) │
-    └────┬─────┘    └────┬─────┘    └────┬─────┘
-         │               │               │
-         └───────────────┼───────────────┘
-                         │
-    ┌────────────────────┼────────────────────┐
-    │                    │                    │
-    ▼                    ▼                    ▼
-┌────────┐         ┌──────────┐         ┌──────────┐
-│ SQLite │         │Blackboard│         │   Mail   │
-│Storage │         │  Queue   │         │  System  │
-└────────┘         └──────────┘         └──────────┘
-```
+Key MCP tools:
+- `wave_launch` - Start a new wave
+- `wave_status` - Check wave progress
+- `team_spawn` - Spawn individual workers
+- `repo_add` - Add repository to fleet
+- `blackboard_post` - Post to swarm blackboard
 
 ---
 
@@ -485,75 +384,71 @@ Connect to `ws://localhost:3847/ws` for real-time updates:
 | `PORT` | `3847` | Server port |
 | `HOST` | `0.0.0.0` | Server host |
 | `MAX_WORKERS` | `5` | Maximum concurrent workers |
-| `JWT_SECRET` | (generated) | JWT signing secret |
-| `STORAGE_BACKEND` | `sqlite` | Storage backend |
-| `SQLITE_PATH` | `./fleet.db` | SQLite database path |
-| `LOG_LEVEL` | `info` | Logging level |
-| `CLAUDE_FLEET_URL` | `http://localhost:3847` | Fleet server URL |
-| `FLEET_TOKEN` | - | JWT token for authentication |
+| `ANTHROPIC_API_KEY` | - | API key for Claude |
+| `FLEET_MODE` | `tmux` | Mode: `tmux` or `headless` |
+| `STORAGE_BACKEND` | `sqlite` | Storage: `sqlite`, `postgresql` |
 
-### Storage Backends
+### Fleet Configuration File
 
-Claude Fleet supports multiple storage backends:
+```yaml
+# fleet.config.yaml
+fleet:
+  name: my-project
+  maxWorkers: 8
+  mode: headless
 
-- **SQLite** (default) - Local file-based storage
-- **PostgreSQL** - Production-ready relational database
-- **DynamoDB** - AWS managed NoSQL
-- **Firestore** - Google Cloud managed NoSQL
-- **S3** - Object storage for artifacts
+repositories:
+  - name: api
+    path: ./services/api
+    defaultBranch: main
+  - name: frontend
+    path: ./apps/web
+    defaultBranch: main
 
-### Tmux Theme
+waves:
+  defaultRoles: [scout, worker, critic]
+  maxIterations: 3
 
-Claude Fleet includes a premium tmux configuration with a modern gradient theme designed for multi-agent development workflows.
-
-<p align="center">
-  <img src="docs/images/tmux-theme-preview.svg" alt="Claude Fleet Tmux Theme" width="800">
-</p>
-
-**Quick Install:**
-
-```bash
-# One-liner install
-curl -fsSL https://raw.githubusercontent.com/sethdford/claude-fleet/main/config/install-tmux-theme.sh | bash
-
-# Or manually
-cp config/tmux.conf ~/.tmux.conf
-tmux source-file ~/.tmux.conf
+scheduling:
+  enabled: true
+  timezone: America/New_York
+  tasks:
+    - name: nightly-audit
+      cron: "0 2 * * *"
+      objective: "Run security audit"
 ```
 
-**Features:**
-- Cyan → Blue → Purple gradient accent colors
-- Clean tab-style window indicators
-- Vim-style navigation (hjkl)
-- Smart pane switching (works with vim splits)
-- Session persistence with tmux-resurrect
+---
 
-**Fleet Status Integration:**
+## Architecture
 
-For real-time fleet monitoring in your status bar:
-
-```bash
-# Install with fleet integration
-curl -fsSL https://raw.githubusercontent.com/sethdford/claude-fleet/main/config/install-tmux-theme.sh | bash -s -- --fleet
 ```
-
-This adds:
-- Live worker count (active/total)
-- Active task indicator
-- Swarm status display
-- Fleet server health check
-
-**Key Bindings (Prefix = Ctrl-a):**
-
-| Key | Action | Key | Action |
-|-----|--------|-----|--------|
-| `\|` | Split vertical | `-` | Split horizontal |
-| `h/j/k/l` | Navigate panes | `H/J/K/L` | Resize panes |
-| `c` | New window | `x` | Kill pane |
-| `s` | Session picker | `S` | Sync panes |
-| `r` | Reload config | `[` | Copy mode |
-
-See [config/tmux.conf](config/tmux.conf) for the basic theme, or [config/tmux-fleet.conf](config/tmux-fleet.conf) for fleet integration.
+┌─────────────────────────────────────────────────────────────────┐
+│                     Wave Orchestrator                           │
+│              (phases, dependencies, iterations)                 │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+    ┌──────────┐    ┌──────────┐    ┌──────────┐
+    │  Scout   │    │  Oracle  │    │ Architect│
+    │ (explore)│    │(research)│    │ (design) │
+    └────┬─────┘    └────┬─────┘    └────┬─────┘
+         │               │               │
+         └───────────────┼───────────────┘
+                         │
+    ┌────────────────────┼────────────────────┐
+    │                    │                    │
+    ▼                    ▼                    ▼
+┌────────┐         ┌──────────┐         ┌──────────┐
+│ Worker │         │  Kraken  │         │  Critic  │
+│(implem)│         │  (TDD)   │         │ (review) │
+└────────┘         └──────────┘         └──────────┘
+         ╲               │               ╱
+          ╲              ▼              ╱
+           └──────► Blackboard ◄──────┘
+                   (coordination)
+```
 
 ---
 
@@ -567,7 +462,6 @@ npm run dev          # Start with hot reload
 npm test             # Run unit tests
 npm run e2e          # Run E2E tests
 npm run lint         # Lint code
-npm run typecheck    # TypeScript check
 ```
 
 ---
