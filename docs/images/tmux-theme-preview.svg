@@ -1,0 +1,79 @@
+<svg viewBox="0 0 900 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="statusBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#12121a"/>
+      <stop offset="100%" stop-color="#0a0a0f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Terminal background -->
+  <rect width="900" height="120" fill="#0a0a0f"/>
+
+  <!-- Status bar background -->
+  <rect y="90" width="900" height="30" fill="url(#statusBg)"/>
+
+  <!-- Terminal content area -->
+  <g font-family="JetBrains Mono, SF Mono, monospace" font-size="13">
+    <!-- Sample terminal output -->
+    <text x="20" y="25" fill="#00d4ff">❯</text>
+    <text x="40" y="25" fill="#e4e4e7">tmux new -s claude-fleet</text>
+    <text x="20" y="50" fill="#71717a"># Your premium developer environment is ready</text>
+    <text x="20" y="75" fill="#00ff94">✓</text>
+    <text x="40" y="75" fill="#e4e4e7">Session created with modern gradient theme</text>
+  </g>
+
+  <!-- Status bar -->
+  <g font-family="SF Pro, system-ui, sans-serif" font-size="12">
+    <!-- LEFT: Session name with gradient -->
+    <!-- Cyan segment -->
+    <rect x="0" y="92" width="90" height="26" fill="#00d4ff"/>
+    <text x="12" y="109" fill="#12121a" font-weight="bold">  claude</text>
+    <!-- Cyan to Blue arrow -->
+    <path d="M90,92 L105,105 L90,118" fill="#00d4ff"/>
+    <!-- Blue segment -->
+    <rect x="90" y="92" width="45" height="26" fill="#0066ff"/>
+    <text x="100" y="109" fill="#12121a" font-weight="bold">λ</text>
+    <!-- Blue to BG arrow -->
+    <path d="M135,92 L150,105 L135,118" fill="#0066ff"/>
+
+    <!-- MIDDLE: Window tabs -->
+    <!-- Inactive window 1 -->
+    <path d="M170,92 L185,105 L170,118" fill="#252538"/>
+    <rect x="170" y="92" width="80" height="26" fill="#252538"/>
+    <text x="185" y="109" fill="#71717a">1  main</text>
+    <path d="M250,92 L265,105 L250,118" fill="#252538"/>
+
+    <!-- Active window (cyan) -->
+    <path d="M280,92 L295,105 L280,118" fill="#00d4ff"/>
+    <rect x="280" y="92" width="85" height="26" fill="#00d4ff"/>
+    <text x="295" y="109" fill="#12121a" font-weight="bold">2  dev</text>
+    <path d="M365,92 L380,105 L365,118" fill="#00d4ff"/>
+
+    <!-- Inactive window 3 -->
+    <path d="M395,92 L410,105 L395,118" fill="#252538"/>
+    <rect x="395" y="92" width="80" height="26" fill="#252538"/>
+    <text x="410" y="109" fill="#71717a">3  logs</text>
+    <path d="M475,92 L490,105 L475,118" fill="#252538"/>
+
+    <!-- RIGHT: System info with reverse gradient -->
+    <!-- User@host segment -->
+    <path d="M600,105 L615,92 L615,118" fill="#252538"/>
+    <rect x="615" y="92" width="95" height="26" fill="#252538"/>
+    <text x="625" y="109" fill="#71717a">seth@mbp</text>
+
+    <!-- Purple segment (time) -->
+    <path d="M710,105 L725,92 L725,118" fill="#7c3aed"/>
+    <rect x="725" y="92" width="55" height="26" fill="#7c3aed"/>
+    <text x="732" y="109" fill="#12121a" font-weight="bold"> 14:32</text>
+
+    <!-- Blue segment (date) -->
+    <path d="M780,105 L795,92 L795,118" fill="#0066ff"/>
+    <rect x="795" y="92" width="60" height="26" fill="#0066ff"/>
+    <text x="802" y="109" fill="#e4e4e7" font-weight="bold"> Jan 25</text>
+
+    <!-- Cyan segment (day) -->
+    <path d="M855,105 L870,92 L870,118" fill="#00d4ff"/>
+    <rect x="870" y="92" width="30" height="26" fill="#00d4ff"/>
+    <text x="875" y="109" fill="#12121a" font-weight="bold">Sat</text>
+  </g>
+</svg>

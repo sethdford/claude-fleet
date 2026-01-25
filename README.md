@@ -502,6 +502,44 @@ Claude Fleet supports multiple storage backends:
 - **Firestore** - Google Cloud managed NoSQL
 - **S3** - Object storage for artifacts
 
+### Tmux Theme
+
+Claude Fleet includes a premium tmux configuration with a modern gradient theme designed for multi-agent development workflows.
+
+<p align="center">
+  <img src="docs/images/tmux-theme-preview.svg" alt="Claude Fleet Tmux Theme" width="800">
+</p>
+
+**Quick Install:**
+
+```bash
+# One-liner install
+curl -fsSL https://raw.githubusercontent.com/sethdford/claude-fleet/main/config/install-tmux-theme.sh | bash
+
+# Or manually
+cp config/tmux.conf ~/.tmux.conf
+tmux source-file ~/.tmux.conf
+```
+
+**Features:**
+- Cyan → Blue → Purple gradient accent colors
+- Clean tab-style window indicators
+- Vim-style navigation (hjkl)
+- Smart pane switching (works with vim splits)
+- Session persistence with tmux-resurrect
+
+**Key Bindings (Prefix = Ctrl-a):**
+
+| Key | Action | Key | Action |
+|-----|--------|-----|--------|
+| `\|` | Split vertical | `-` | Split horizontal |
+| `h/j/k/l` | Navigate panes | `H/J/K/L` | Resize panes |
+| `c` | New window | `x` | Kill pane |
+| `s` | Session picker | `S` | Sync panes |
+| `r` | Reload config | `[` | Copy mode |
+
+See [config/tmux.conf](config/tmux.conf) for the full configuration.
+
 ---
 
 ## Contributing
