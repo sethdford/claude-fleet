@@ -1,0 +1,138 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# CODE REVIEW WORKFLOW
+# ═══════════════════════════════════════════════════════════════════════════
+# A parallel code review workflow with multiple specialized reviewers
+# checking different aspects of a pull request.
+#
+# Usage:
+#   fleet workflow-start code-review '{"pr": "123", "repo": "myorg/myrepo"}'
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: code-review
+description: Comprehensive parallel code review with specialized agents
+version: "1.0"
+
+inputs:
+  pr:
+    description: Pull request number
+    required: true
+  repo:
+    description: Repository (owner/name)
+    required: true
+
+steps:
+  # Fetch PR details first
+  - id: fetch-pr
+    name: Fetch PR Details
+    role: worker
+    prompt: |
+      Fetch the details of PR #{{inputs.pr}} from {{inputs.repo}}:
+      - Get the diff
+      - Get the description
+      - List changed files
+      - Get any existing review comments
+
+      Output the PR details in a structured format.
+
+  # Parallel reviews
+  - id: review-logic
+    name: Logic & Correctness Review
+    role: backend-dev
+    dependsOn: [fetch-pr]
+    parallel: true
+    prompt: |
+      Review PR #{{inputs.pr}} for logic and correctness:
+
+      PR Details: {{steps.fetch-pr.output}}
+
+      Check for:
+      1. Logic errors or bugs
+      2. Edge cases not handled
+      3. Incorrect assumptions
+      4. Race conditions
+      5. Resource leaks
+
+      Provide specific line-by-line feedback.
+
+  - id: review-security
+    name: Security Review
+    role: security-engineer
+    dependsOn: [fetch-pr]
+    parallel: true
+    prompt: |
+      Review PR #{{inputs.pr}} for security issues:
+
+      PR Details: {{steps.fetch-pr.output}}
+
+      Check for:
+      1. Injection vulnerabilities (SQL, XSS, command)
+      2. Authentication/authorization issues
+      3. Sensitive data exposure
+      4. Insecure dependencies
+      5. Cryptography issues
+
+      Flag any security concerns with severity levels.
+
+  - id: review-performance
+    name: Performance Review
+    role: performance-engineer
+    dependsOn: [fetch-pr]
+    parallel: true
+    prompt: |
+      Review PR #{{inputs.pr}} for performance:
+
+      PR Details: {{steps.fetch-pr.output}}
+
+      Check for:
+      1. N+1 queries
+      2. Unnecessary computations
+      3. Memory inefficiencies
+      4. Missing indexes
+      5. Blocking operations
+
+      Suggest optimizations where applicable.
+
+  - id: review-tests
+    name: Test Coverage Review
+    role: qa-engineer
+    dependsOn: [fetch-pr]
+    parallel: true
+    prompt: |
+      Review PR #{{inputs.pr}} for test coverage:
+
+      PR Details: {{steps.fetch-pr.output}}
+
+      Check for:
+      1. Adequate test coverage
+      2. Missing edge case tests
+      3. Test quality and assertions
+      4. Integration test needs
+      5. Flaky test patterns
+
+      Recommend additional tests if needed.
+
+  # Consolidate reviews
+  - id: consolidate
+    name: Consolidate Reviews
+    role: architect
+    dependsOn: [review-logic, review-security, review-performance, review-tests]
+    prompt: |
+      Consolidate all reviews for PR #{{inputs.pr}}:
+
+      Logic Review: {{steps.review-logic.output}}
+      Security Review: {{steps.review-security.output}}
+      Performance Review: {{steps.review-performance.output}}
+      Test Review: {{steps.review-tests.output}}
+
+      Create a unified review summary:
+      1. Overall recommendation (approve/request changes/comment)
+      2. Critical issues that must be addressed
+      3. Suggested improvements (non-blocking)
+      4. Positive aspects to highlight
+
+      Format as a PR review comment.
+
+metadata:
+  author: Claude Fleet
+  tags: [review, parallel, quality]
+  estimatedDuration: "15-30 minutes"

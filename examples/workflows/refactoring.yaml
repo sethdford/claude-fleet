@@ -1,0 +1,167 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# CODEBASE REFACTORING WORKFLOW
+# ═══════════════════════════════════════════════════════════════════════════
+# A systematic approach to large-scale refactoring with parallel workers
+# handling different parts of the codebase.
+#
+# Usage:
+#   fleet workflow-start refactoring '{"target": "src/api", "goal": "Convert callbacks to async/await"}'
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: refactoring
+description: Large-scale codebase refactoring with parallel workers
+version: "1.0"
+
+inputs:
+  target:
+    description: Target directory or pattern to refactor
+    required: true
+  goal:
+    description: Refactoring goal/description
+    required: true
+  dryRun:
+    description: If true, only analyze without making changes
+    required: false
+    default: false
+
+steps:
+  # Analysis phase
+  - id: analyze-codebase
+    name: Analyze Codebase
+    role: architect
+    prompt: |
+      Analyze the codebase at "{{inputs.target}}" for refactoring:
+      Goal: {{inputs.goal}}
+
+      Tasks:
+      1. Identify all files that need changes
+      2. Map dependencies between files
+      3. Identify high-risk areas
+      4. Estimate complexity of changes
+      5. Propose a safe refactoring order
+
+      Output a refactoring plan with file groups that can be done in parallel.
+
+  - id: create-test-baseline
+    name: Create Test Baseline
+    role: qa-engineer
+    dependsOn: [analyze-codebase]
+    prompt: |
+      Create a test baseline before refactoring:
+
+      Affected files: {{steps.analyze-codebase.output}}
+
+      Tasks:
+      1. Run existing tests and record results
+      2. Identify untested code paths
+      3. Add critical tests for untested areas
+      4. Create integration test markers
+      5. Document expected behavior
+
+      Output the baseline test report.
+
+  # Parallel refactoring (spawns multiple workers)
+  - id: refactor-group-a
+    name: Refactor Group A
+    role: fullstack-dev
+    dependsOn: [create-test-baseline]
+    parallel: true
+    condition: "{{not inputs.dryRun}}"
+    prompt: |
+      Refactor the first group of files:
+      Goal: {{inputs.goal}}
+
+      Plan: {{steps.analyze-codebase.output}}
+      (Focus on Group A files)
+
+      For each file:
+      1. Apply the refactoring
+      2. Update related imports
+      3. Run tests after each change
+      4. Commit incrementally
+
+      Report progress and any blockers.
+
+  - id: refactor-group-b
+    name: Refactor Group B
+    role: fullstack-dev
+    dependsOn: [create-test-baseline]
+    parallel: true
+    condition: "{{not inputs.dryRun}}"
+    prompt: |
+      Refactor the second group of files:
+      Goal: {{inputs.goal}}
+
+      Plan: {{steps.analyze-codebase.output}}
+      (Focus on Group B files)
+
+      For each file:
+      1. Apply the refactoring
+      2. Update related imports
+      3. Run tests after each change
+      4. Commit incrementally
+
+      Report progress and any blockers.
+
+  - id: refactor-group-c
+    name: Refactor Group C
+    role: fullstack-dev
+    dependsOn: [create-test-baseline]
+    parallel: true
+    condition: "{{not inputs.dryRun}}"
+    prompt: |
+      Refactor the third group of files:
+      Goal: {{inputs.goal}}
+
+      Plan: {{steps.analyze-codebase.output}}
+      (Focus on Group C files)
+
+      For each file:
+      1. Apply the refactoring
+      2. Update related imports
+      3. Run tests after each change
+      4. Commit incrementally
+
+      Report progress and any blockers.
+
+  # Verification phase
+  - id: verify-refactoring
+    name: Verify Refactoring
+    role: qa-engineer
+    dependsOn: [refactor-group-a, refactor-group-b, refactor-group-c]
+    prompt: |
+      Verify the refactoring was successful:
+
+      Baseline: {{steps.create-test-baseline.output}}
+
+      Tasks:
+      1. Run all tests
+      2. Compare with baseline
+      3. Check for regressions
+      4. Verify no functionality changed
+      5. Run linter and type checker
+
+      Output verification report.
+
+  - id: update-documentation
+    name: Update Documentation
+    role: tech-writer
+    dependsOn: [verify-refactoring]
+    prompt: |
+      Update documentation after refactoring:
+
+      Changes made:
+      - Group A: {{steps.refactor-group-a.output}}
+      - Group B: {{steps.refactor-group-b.output}}
+      - Group C: {{steps.refactor-group-c.output}}
+
+      Tasks:
+      1. Update code comments
+      2. Update README if needed
+      3. Update API docs if changed
+      4. Add migration notes if applicable
+
+metadata:
+  author: Claude Fleet
+  tags: [refactoring, parallel, large-scale]
+  estimatedDuration: "1-4 hours"

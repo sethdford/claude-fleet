@@ -6,22 +6,17 @@ labels: enhancement
 assignees: ''
 ---
 
-## Problem
-
-Describe the problem this feature would solve.
-
-## Proposed Solution
-
-How you'd like to see it solved.
-
-## Alternatives Considered
-
-Other approaches you've considered.
+## Feature Description
+A clear and concise description of the feature you'd like.
 
 ## Use Case
+Describe the problem this feature would solve or the workflow it would enable.
 
-How you would use this feature.
+## Proposed Solution
+How you envision this feature working.
+
+## Alternatives Considered
+Any alternative solutions or features you've considered.
 
 ## Additional Context
-
-Any other context or screenshots.
+Add any other context, mockups, or examples here.

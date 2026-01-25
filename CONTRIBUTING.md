@@ -1,175 +1,260 @@
 # Contributing to Claude Fleet
 
-Thanks for your interest in contributing! Claude Fleet enables multi-agent orchestration for Claude Code.
+Thank you for your interest in contributing to Claude Fleet! This document provides guidelines and instructions for contributing.
+
+## Table of Contents
+
+- [Code of Conduct](#code-of-conduct)
+- [Getting Started](#getting-started)
+- [Development Setup](#development-setup)
+- [Making Changes](#making-changes)
+- [Pull Request Process](#pull-request-process)
+- [Coding Standards](#coding-standards)
+- [Testing](#testing)
+- [Documentation](#documentation)
+
+## Code of Conduct
+
+Please be respectful and constructive in all interactions. We're building something cool together!
 
 ## Getting Started
 
-1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/claude-fleet.git`
-3. Install dependencies: `npm install`
-4. Create a branch: `git checkout -b feature/your-feature-name`
+### Prerequisites
+
+- Node.js 18+
+- npm 9+
+- Git
+- Claude API key (for testing)
+
+### Fork and Clone
+
+1. Fork the repository on GitHub
+2. Clone your fork:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/claude-fleet.git
+   cd claude-fleet
+   ```
+3. Add upstream remote:
+   ```bash
+   git remote add upstream https://github.com/sethdford/claude-fleet.git
+   ```
 
 ## Development Setup
 
+### Install Dependencies
+
 ```bash
-# Install dependencies
 npm install
+```
 
-# Start the server in dev mode (hot reload)
-npm run dev
+### Build the Project
 
-# Run tests
-npm test
+```bash
+npm run build
+```
 
-# Run E2E tests
-npm run e2e
+### Link for Local Development
 
-# Type checking
-npm run typecheck
+```bash
+npm link
+```
 
-# Linting
+This allows you to run `fleet` commands using your local development version.
+
+### Environment Setup
+
+Create a `.env` file for local testing:
+
+```bash
+ANTHROPIC_API_KEY=your_api_key_here
+FLEET_LOG_LEVEL=debug
+```
+
+## Making Changes
+
+### Branch Naming
+
+Use descriptive branch names:
+
+- `feature/add-new-command` - New features
+- `fix/worker-crash-on-startup` - Bug fixes
+- `docs/update-api-reference` - Documentation
+- `refactor/simplify-worker-manager` - Code refactoring
+
+### Commit Messages
+
+Write clear, concise commit messages:
+
+```
+Add workflow pause/resume functionality
+
+- Implement pause command for active workflows
+- Add resume command with state restoration
+- Update CLI help text
+- Add tests for pause/resume cycle
+```
+
+## Pull Request Process
+
+1. **Update your fork**:
+   ```bash
+   git fetch upstream
+   git rebase upstream/main
+   ```
+
+2. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature
+   ```
+
+3. **Make your changes** and commit them
+
+4. **Run tests**:
+   ```bash
+   npm test
+   npm run e2e
+   ```
+
+5. **Run linting and type checking**:
+   ```bash
+   npm run lint
+   npm run typecheck
+   ```
+
+6. **Push and create PR**:
+   ```bash
+   git push origin feature/your-feature
+   ```
+   Then open a pull request on GitHub.
+
+### PR Requirements
+
+- [ ] All tests pass
+- [ ] TypeScript compiles without errors
+- [ ] Linting passes
+- [ ] Documentation updated if needed
+- [ ] CHANGELOG updated for notable changes
+
+## Coding Standards
+
+### TypeScript
+
+- Use strict TypeScript (`strict: true`)
+- Prefer `interface` over `type` for object shapes
+- Use explicit return types for public functions
+- Avoid `any` - use `unknown` and type guards instead
+
+### Code Style
+
+We use ESLint and Prettier. Run before committing:
+
+```bash
 npm run lint
-npm run lint:fix  # Auto-fix issues
+npm run format
 ```
 
-## Project Structure
+### File Organization
 
 ```
-claude-fleet/
-├── src/
-│   ├── index.ts           # Entry point
-│   ├── server.ts          # Main server class
-│   ├── cli.ts             # CLI tool
-│   ├── types.ts           # TypeScript types
-│   ├── routes/            # Route handlers (modular)
-│   │   ├── core.ts        # Health, auth, metrics
-│   │   ├── chats.ts       # Chat/message routes
-│   │   ├── tasks.ts       # Task routes
-│   │   ├── orchestrate.ts # Worker routes
-│   │   ├── fleet.ts       # Swarm/blackboard routes
-│   │   └── ...
-│   ├── storage/           # Database layer
-│   │   ├── sqlite.ts      # Main SQLite storage
-│   │   ├── blackboard.ts  # Blackboard messages
-│   │   ├── checkpoint.ts  # Agent checkpoints
-│   │   └── ...
-│   ├── workers/           # Worker management
-│   │   ├── manager.ts     # Worker lifecycle
-│   │   ├── worktree.ts    # Git worktree
-│   │   └── spawn-controller.ts
-│   ├── middleware/        # Express middleware
-│   ├── mcp/               # MCP server
-│   └── validation/        # Zod schemas
-├── tests/                 # Unit tests
-├── scripts/               # E2E test scripts
-├── docs/                  # Documentation
-└── public/                # Dashboard
+src/
+├── index.ts          # CLI entry point
+├── server.ts         # HTTP server
+├── types.ts          # Type definitions
+├── storage/          # Data persistence
+├── workers/          # Worker management
+├── mcp/              # MCP server implementation
+└── utils/            # Utility functions
 ```
 
-## How to Contribute
+### Naming Conventions
 
-### Reporting Bugs
-
-- Check existing issues first
-- Include steps to reproduce
-- Include Node.js version and OS
-- Include relevant logs
-
-### Suggesting Features
-
-- Open an issue describing the feature
-- Explain the use case
-- Be open to discussion
-
-### Submitting Pull Requests
-
-1. **Keep PRs focused** - One feature or fix per PR
-2. **Update documentation** - If you change behavior
-3. **Add tests** - For new features or bug fixes
-4. **Follow code style** - Match existing patterns
-5. **Write clear commit messages**
-
-## Code Style
-
-- TypeScript with strict mode
-- 2-space indentation
-- Single quotes for strings
-- Zod for runtime validation
-- JSDoc comments for public functions
-
-### Example
-
-```typescript
-/**
- * Creates a new task and broadcasts to the team
- */
-export function createTaskHandler(deps: RouteDependencies) {
-  return async (req: Request, res: Response): Promise<void> => {
-    const validation = validateBody(createTaskSchema, req.body);
-    if (!validation.success) {
-      res.status(400).json({ error: validation.error });
-      return;
-    }
-    // ...
-  };
-}
-```
+- Files: `kebab-case.ts`
+- Classes: `PascalCase`
+- Functions/variables: `camelCase`
+- Constants: `UPPER_SNAKE_CASE`
+- Types/Interfaces: `PascalCase`
 
 ## Testing
+
+### Running Tests
 
 ```bash
 # Unit tests
 npm test
 
-# Unit tests with coverage
-npm run test:coverage
-
-# E2E tests
+# End-to-end tests
 npm run e2e
 
-# All E2E tests
-npm run e2e:all
+# Watch mode
+npm run test:watch
+
+# Coverage report
+npm run test:coverage
 ```
 
 ### Writing Tests
 
-- Use Vitest for unit tests
-- Place tests in `tests/` or alongside source (`*.test.ts`)
-- E2E tests go in `scripts/`
+- Place tests in `tests/` directory
+- Name test files `*.test.ts`
+- Use descriptive test names
+- Test both happy paths and error cases
 
-## Areas for Contribution
+Example:
 
-### High Priority
-- Performance optimization for large swarms
-- Better error messages and recovery
-- Dashboard improvements
+```typescript
+describe('WorkerManager', () => {
+  describe('spawnWorker', () => {
+    it('should spawn a worker with valid configuration', async () => {
+      // Test implementation
+    });
 
-### Nice to Have
-- Additional MCP tools
-- Metrics visualization
-- Plugin system
-
-### Documentation
-- More usage examples
-- Tutorial videos
-- Architecture diagrams
-
-## Commit Messages
-
-Follow conventional commits:
-
+    it('should throw error when max workers exceeded', async () => {
+      // Test implementation
+    });
+  });
+});
 ```
-feat: add swarm priority support
-fix: resolve worktree cleanup race condition
-docs: update API reference
-test: add checkpoint storage tests
-refactor: extract route handlers
-```
+
+## Documentation
+
+### Code Comments
+
+- Add JSDoc comments for public APIs
+- Explain "why" not "what" in inline comments
+- Keep comments up to date with code changes
+
+### README Updates
+
+Update README.md when:
+- Adding new commands
+- Changing configuration options
+- Adding new features
+
+### Examples
+
+Add examples in `examples/` for:
+- New workflow types
+- Complex configurations
+- Integration patterns
+
+## Architecture Decisions
+
+When making significant architectural changes:
+
+1. Open an issue first to discuss
+2. Document the decision in the PR
+3. Update architecture docs if needed
 
 ## Questions?
 
-Open an issue with the `question` label.
+- Open an issue for bugs or feature requests
+- Check existing issues before creating new ones
+- Be as detailed as possible in bug reports
 
 ## License
 
 By contributing, you agree that your contributions will be licensed under the MIT License.
+
+---
+
+Thank you for contributing to Claude Fleet!

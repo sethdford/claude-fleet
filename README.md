@@ -528,6 +528,21 @@ tmux source-file ~/.tmux.conf
 - Smart pane switching (works with vim splits)
 - Session persistence with tmux-resurrect
 
+**Fleet Status Integration:**
+
+For real-time fleet monitoring in your status bar:
+
+```bash
+# Install with fleet integration
+curl -fsSL https://raw.githubusercontent.com/sethdford/claude-fleet/main/config/install-tmux-theme.sh | bash -s -- --fleet
+```
+
+This adds:
+- Live worker count (active/total)
+- Active task indicator
+- Swarm status display
+- Fleet server health check
+
 **Key Bindings (Prefix = Ctrl-a):**
 
 | Key | Action | Key | Action |
@@ -538,7 +553,7 @@ tmux source-file ~/.tmux.conf
 | `s` | Session picker | `S` | Sync panes |
 | `r` | Reload config | `[` | Copy mode |
 
-See [config/tmux.conf](config/tmux.conf) for the full configuration.
+See [config/tmux.conf](config/tmux.conf) for the basic theme, or [config/tmux-fleet.conf](config/tmux-fleet.conf) for fleet integration.
 
 ---
 

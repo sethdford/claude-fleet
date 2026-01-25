@@ -1,123 +1,80 @@
 # Changelog
 
-All notable changes to Claude Fleet are documented here.
+All notable changes to Claude Fleet will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2025-01-24
+## [2.0.2] - 2025-01-24
 
 ### Added
-
-- **Fleet Orchestration**
-  - Swarm coordination with blackboard messaging pattern
-  - Spawn queue with dependency management and depth limits
-  - Checkpoint system for agent state persistence
-  - Agent hierarchy tracking (depth levels)
-
-- **CLI Tool (`fleet`)**
-  - 25+ commands for server management
-  - Health checks, metrics, worker management
-  - Swarm creation and monitoring
-  - Work item and batch management
-
-- **MCP Integration**
-  - 25+ MCP tools for Claude Code integration
-  - Role-based permission system
-  - Blackboard, checkpoint, and spawn queue tools
-  - Team coordination tools
-
-- **Worker Management**
-  - Git worktree isolation per worker
-  - Auto-restart with configurable health monitoring
-  - NDJSON streaming for bidirectional communication
-  - Session resumption support
-
-- **Work Items & Batches**
-  - Work item tracking with status management
-  - Batch operations for bulk task dispatch
-  - Event history for audit trails
-
-- **Mail System**
-  - Inter-agent messaging with read tracking
-  - Handoff support for agent transitions
-
-- **TLDR Integration**
-  - Token-efficient code analysis storage
-  - File summaries and dependency graphs
-  - Codebase overview caching
-
-- **Observability**
-  - Prometheus metrics endpoint (`/metrics`)
-  - JSON metrics endpoint (`/metrics/json`)
-  - Real-time HTML dashboard
-  - Comprehensive health checks
+- Shell completions for Bash, Zsh, and Fish
+- Example workflow templates (feature-development, code-review, refactoring)
+- GitHub issue and PR templates
+- Premium tmux theme with fleet status integration
+- Animated dashboard visualization on website
+- Comprehensive CLI demo GIF
+- CONTRIBUTING.md guidelines
 
 ### Changed
+- Complete README rewrite with full CLI and MCP tool reference
+- Updated website with professional SVG icons
+- Migrated repository from claude-code-collab to claude-fleet
 
-- **Full TypeScript Rewrite**
-  - Type-safe codebase with strict mode
-  - Zod validation for all API inputs
-  - Modular route architecture (12 route modules)
-  - 116 unit tests with Vitest
+### Fixed
+- CI/CD pipeline configuration
+- Version mismatch in package.json
 
-- **Project Rename**
-  - Renamed from `claude-code-collab` to `claude-fleet`
-  - CLI renamed from `collab` to `fleet`
-  - Updated environment variables (`CLAUDE_FLEET_*`)
-
-- **Architecture Improvements**
-  - Route handlers split into focused modules
-  - Dependency injection for testability
-  - Storage layer abstraction
-
-### Security
-
-- JWT authentication with configurable expiration
-- Role-based access control (team-lead, worker, coordinator, monitor, merger)
-- Input validation and sanitization via Zod schemas
-- Rate limiting middleware
-
-## [1.0.0] - 2025-01-08
+## [2.0.1] - 2025-01-23
 
 ### Added
+- GitHub Pages documentation site
+- Dashboard web interface with real-time updates
+- Health monitoring and metrics collection
 
-- Initial release of Claude Code Collab
-- **Local Collaboration Server**
-  - Express + WebSocket server
-  - SQLite persistence for messages, tasks, and agent state
-  - Real-time message delivery via WebSocket
-  - RESTful API for all operations
+### Fixed
+- Dashboard SVG icon rendering
+- WebSocket connection stability
 
-- **CLI Patcher** (`patch-cli.js`)
-  - Enables hidden feature flags
-  - Injects local collaboration client
-  - Backup and unpatch support
+## [2.0.0] - 2025-01-22
 
-- **Shell Scripts**
-  - `run-lead.sh` - Run Claude Code as team lead
-  - `run-worker.sh` - Run Claude Code as worker
-  - Server health checks before launch
+### Added
+- Complete TypeScript rewrite
+- Worker orchestration system with 15+ specialized agent roles
+- MCP (Model Context Protocol) server with 25+ tools
+- Workflow engine with YAML-based definitions
+- Swarm coordination for parallel task execution
+- SQLite-based persistent storage
+- Real-time dashboard with WebSocket updates
+- Linear integration for issue tracking
+- Launchd service management for macOS
+- Health check endpoints
+- Metrics collection system
 
-- **Database Schema**
-  - `users` - Agent registration and metadata
-  - `chats` - Conversation threads between agents
-  - `messages` - Message history with status tracking
-  - `unread` - Unread message counts per user per chat
-  - `tasks` - Task delegation and tracking
+### Changed
+- CLI completely redesigned with intuitive command structure
+- Configuration system moved to YAML
+- Logging system improved with structured output
 
-- **API Endpoints**
-  - `/auth` - Agent authentication/registration
-  - `/chats` - Chat listing and creation
-  - `/chats/:id/messages` - Message operations
-  - `/teams/:name/broadcast` - Team-wide broadcasts
-  - `/tasks` - Task CRUD operations
-  - `/health` - Server health check
-  - `/ws` - WebSocket endpoint
+### Removed
+- Legacy bash-based implementation
+- Old configuration format
 
-### Technical Details
+## [1.0.0] - 2025-01-15
 
-- Node.js >= 18.0.0 required (native fetch)
-- SQLite via better-sqlite3 for persistence
-- WebSocket for real-time updates
-- Graceful shutdown handling
+### Added
+- Initial release
+- Basic worker spawning
+- Simple task coordination
+- CLI interface
+
+---
+
+## Version History Summary
+
+| Version | Date | Highlights |
+|---------|------|------------|
+| 2.0.2 | 2025-01-24 | Shell completions, workflows, tmux theme |
+| 2.0.1 | 2025-01-23 | Dashboard, GitHub Pages |
+| 2.0.0 | 2025-01-22 | TypeScript rewrite, MCP, workflows |
+| 1.0.0 | 2025-01-15 | Initial release |

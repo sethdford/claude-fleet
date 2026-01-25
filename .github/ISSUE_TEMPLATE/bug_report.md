@@ -6,36 +6,30 @@ labels: bug
 assignees: ''
 ---
 
-## Description
-
-A clear description of the bug.
+## Bug Description
+A clear and concise description of what the bug is.
 
 ## Steps to Reproduce
-
-1. Start the server with `./start.sh`
-2. Run command `fleet ...`
+1. Run command '...'
+2. Configure '...'
 3. See error
 
 ## Expected Behavior
-
 What you expected to happen.
 
 ## Actual Behavior
-
 What actually happened.
 
 ## Environment
-
-- Node.js version:
-- OS:
-- Claude Fleet version:
+- **OS**: [e.g., macOS 14.0, Ubuntu 22.04]
+- **Node.js**: [e.g., 20.10.0]
+- **Claude Fleet Version**: [e.g., 2.0.2]
+- **Installation Method**: [npm global / from source]
 
 ## Logs
-
-```
+\`\`\`
 Paste relevant logs here
-```
+\`\`\`
 
 ## Additional Context
-
-Any other context about the problem.
+Add any other context about the problem here.

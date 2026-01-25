@@ -1,0 +1,204 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# FEATURE DEVELOPMENT WORKFLOW
+# ═══════════════════════════════════════════════════════════════════════════
+# A complete workflow for developing a new feature with multiple agents
+# coordinating across discovery, development, quality, and delivery phases.
+#
+# Usage:
+#   fleet workflow-start feature-development '{"feature": "user-auth", "branch": "feature/user-auth"}'
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: feature-development
+description: Complete feature development workflow with SDLC phases
+version: "1.0"
+
+# Input parameters
+inputs:
+  feature:
+    description: Feature name/identifier
+    required: true
+  branch:
+    description: Git branch name
+    required: true
+  requirements:
+    description: Optional requirements document or user story
+    required: false
+
+# Workflow steps
+steps:
+  # ─────────────────────────────────────────────────────────────────────────
+  # PHASE 1: DISCOVERY
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: analyze-requirements
+    name: Analyze Requirements
+    phase: discovery
+    role: product-analyst
+    prompt: |
+      Analyze the requirements for the "{{inputs.feature}}" feature.
+
+      {{#if inputs.requirements}}
+      Requirements provided:
+      {{inputs.requirements}}
+      {{/if}}
+
+      Please:
+      1. Break down the feature into user stories
+      2. Define acceptance criteria for each story
+      3. Identify edge cases and error scenarios
+      4. Note any dependencies or prerequisites
+
+      Output a structured requirements document.
+
+  - id: design-architecture
+    name: Design Architecture
+    phase: discovery
+    role: architect
+    dependsOn: [analyze-requirements]
+    prompt: |
+      Based on the requirements analysis:
+      {{steps.analyze-requirements.output}}
+
+      Design the architecture for "{{inputs.feature}}":
+      1. Define the component structure
+      2. Specify API contracts (endpoints, request/response schemas)
+      3. Design data models and database schema changes
+      4. Identify integration points with existing code
+      5. Document technical decisions and trade-offs
+
+      Output an architecture design document.
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PHASE 2: DEVELOPMENT
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: implement-backend
+    name: Implement Backend
+    phase: development
+    role: backend-dev
+    dependsOn: [design-architecture]
+    worktree: "{{inputs.branch}}-backend"
+    prompt: |
+      Implement the backend for "{{inputs.feature}}" based on:
+      {{steps.design-architecture.output}}
+
+      Tasks:
+      1. Create/modify API endpoints
+      2. Implement business logic
+      3. Add database migrations if needed
+      4. Write unit tests for new code
+      5. Update API documentation
+
+      Commit your changes with clear commit messages.
+
+  - id: implement-frontend
+    name: Implement Frontend
+    phase: development
+    role: frontend-dev
+    dependsOn: [design-architecture]
+    worktree: "{{inputs.branch}}-frontend"
+    parallel: true  # Can run in parallel with backend
+    prompt: |
+      Implement the frontend for "{{inputs.feature}}" based on:
+      {{steps.design-architecture.output}}
+
+      Tasks:
+      1. Create/modify UI components
+      2. Implement state management
+      3. Connect to API endpoints
+      4. Add loading and error states
+      5. Write component tests
+
+      Commit your changes with clear commit messages.
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PHASE 3: QUALITY
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: integration-testing
+    name: Integration Testing
+    phase: quality
+    role: qa-engineer
+    dependsOn: [implement-backend, implement-frontend]
+    prompt: |
+      Perform integration testing for "{{inputs.feature}}":
+
+      Requirements: {{steps.analyze-requirements.output}}
+
+      Tasks:
+      1. Write integration tests covering all acceptance criteria
+      2. Test happy path scenarios
+      3. Test edge cases and error handling
+      4. Verify API contract compliance
+      5. Report any bugs or issues found
+
+      Create a test report with pass/fail status.
+
+  - id: security-review
+    name: Security Review
+    phase: quality
+    role: security-engineer
+    dependsOn: [implement-backend, implement-frontend]
+    parallel: true  # Can run in parallel with testing
+    prompt: |
+      Perform a security review for "{{inputs.feature}}":
+
+      Architecture: {{steps.design-architecture.output}}
+
+      Tasks:
+      1. Review authentication/authorization
+      2. Check for injection vulnerabilities
+      3. Verify input validation
+      4. Review data exposure risks
+      5. Check for OWASP Top 10 issues
+
+      Output a security assessment with any findings.
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PHASE 4: DELIVERY
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - id: create-documentation
+    name: Create Documentation
+    phase: delivery
+    role: tech-writer
+    dependsOn: [integration-testing, security-review]
+    prompt: |
+      Create documentation for "{{inputs.feature}}":
+
+      Based on:
+      - Requirements: {{steps.analyze-requirements.output}}
+      - Architecture: {{steps.design-architecture.output}}
+
+      Tasks:
+      1. Write user-facing documentation
+      2. Update API documentation
+      3. Add code comments where needed
+      4. Create changelog entry
+      5. Update README if applicable
+
+  - id: prepare-release
+    name: Prepare Release
+    phase: delivery
+    role: release-manager
+    dependsOn: [create-documentation]
+    prompt: |
+      Prepare the release for "{{inputs.feature}}":
+
+      Test Results: {{steps.integration-testing.output}}
+      Security Review: {{steps.security-review.output}}
+
+      Tasks:
+      1. Merge feature branches
+      2. Create release notes
+      3. Tag the release
+      4. Create PR to main branch
+      5. Notify stakeholders
+
+      Output the PR URL and release notes.
+
+# Workflow metadata
+metadata:
+  author: Claude Fleet
+  tags: [feature, sdlc, full-cycle]
+  estimatedDuration: "2-4 hours"

@@ -9,24 +9,55 @@ CYAN='\033[0;36m'
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
-echo -e "${CYAN}"
-echo "╔═══════════════════════════════════════════════════════════════════════════╗"
-echo "║                     Claude Fleet Tmux Theme Installer                      ║"
-echo "╚═══════════════════════════════════════════════════════════════════════════╝"
-echo -e "${NC}"
+# Parse arguments
+FLEET_MODE=false
+for arg in "$@"; do
+    case $arg in
+        --fleet)
+            FLEET_MODE=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: install-tmux-theme.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --fleet    Install with real-time Fleet status integration"
+            echo "  --help     Show this help message"
+            echo ""
+            exit 0
+            ;;
+    esac
+done
+
+if [ "$FLEET_MODE" = true ]; then
+    echo -e "${PURPLE}"
+    echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+    echo "║           Claude Fleet Tmux Theme Installer (Fleet Integration)           ║"
+    echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+    CONFIG_NAME="tmux-fleet.conf"
+else
+    echo -e "${CYAN}"
+    echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+    echo "║                     Claude Fleet Tmux Theme Installer                      ║"
+    echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+    CONFIG_NAME="tmux.conf"
+fi
 
 # Determine script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${SCRIPT_DIR}/tmux.conf"
+CONFIG_FILE="${SCRIPT_DIR}/${CONFIG_NAME}"
 
 # Check if config file exists
 if [ ! -f "$CONFIG_FILE" ]; then
     echo -e "${YELLOW}Config file not found at ${CONFIG_FILE}${NC}"
     echo "Downloading from GitHub..."
     CONFIG_FILE="/tmp/claude-fleet-tmux.conf"
-    curl -fsSL https://raw.githubusercontent.com/sethdford/claude-fleet/main/config/tmux.conf -o "$CONFIG_FILE"
+    curl -fsSL "https://raw.githubusercontent.com/sethdford/claude-fleet/main/config/${CONFIG_NAME}" -o "$CONFIG_FILE"
 fi
 
 # Backup existing config
@@ -72,3 +103,16 @@ echo "  - Alacritty"
 echo "  - Kitty"
 echo "  - WezTerm"
 echo ""
+
+if [ "$FLEET_MODE" = true ]; then
+    echo -e "${PURPLE}Fleet Integration Features:${NC}"
+    echo "  - Real-time worker count in status bar"
+    echo "  - Active task count display"
+    echo "  - Swarm status indicator"
+    echo "  - Fleet server health monitoring"
+    echo ""
+    echo -e "${CYAN}Make sure the Fleet server is running:${NC}"
+    echo "  fleet server                 # Start the server"
+    echo "  export FLEET_PORT=3000       # Custom port (optional)"
+    echo ""
+fi
