@@ -46,10 +46,37 @@
       padding: 140px 0 80px;
     }
 
+    .hero-home .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-2xl);
+      align-items: center;
+    }
+
+    @media (max-width: 1024px) {
+      .hero-home .container {
+        grid-template-columns: 1fr;
+      }
+      .hero-visual {
+        display: none;
+      }
+    }
+
     .hero-home h1 {
-      font-size: clamp(44px, 8vw, 72px);
+      font-size: clamp(40px, 6vw, 64px);
       line-height: 1.05;
       margin-bottom: 24px;
+    }
+
+    .hero-visual {
+      position: relative;
+    }
+
+    .hero-visual img {
+      width: 100%;
+      max-width: 500px;
+      height: auto;
+      filter: drop-shadow(0 20px 40px rgba(0,102,255,0.2));
     }
 
     .hero-stats {
@@ -545,6 +572,11 @@
               <div class="hero-stat-label">Autonomous Ops</div>
             </div>
           </div>
+        </div>
+
+        <!-- Hero Visual - Wave Animation -->
+        <div class="hero-visual">
+          <img src="images/hero-wave-animation.svg" alt="Wave orchestration visualization showing 7 agents working in 4 phases">
         </div>
       </div>
     </section>

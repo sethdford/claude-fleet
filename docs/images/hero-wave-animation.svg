@@ -1,0 +1,194 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 400">
+  <defs>
+    <style>
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+      }
+      @keyframes dash {
+        to { stroke-dashoffset: -20; }
+      }
+      @keyframes wave1 {
+        0%, 100% { transform: translateX(0); }
+        50% { transform: translateX(10px); }
+      }
+      @keyframes fadeInOut {
+        0%, 20%, 100% { opacity: 0; }
+        30%, 90% { opacity: 1; }
+      }
+      .bg-glow { fill: url(#bgGrad); }
+      .wave-path { fill: none; stroke-width: 2; stroke-linecap: round; }
+      .wave-1 { stroke: #7dcfff; stroke-dasharray: 8 4; animation: dash 1s linear infinite; }
+      .wave-2 { stroke: #ff9e64; stroke-dasharray: 8 4; animation: dash 1.2s linear infinite; }
+      .wave-3 { stroke: #9ece6a; stroke-dasharray: 8 4; animation: dash 0.8s linear infinite; }
+      .wave-4 { stroke: #e0af68; stroke-dasharray: 8 4; animation: dash 1s linear infinite; }
+      .agent-node { filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); }
+      .node-bg { rx: 8; }
+      .node-icon { font-family: system-ui, sans-serif; font-size: 14px; text-anchor: middle; dominant-baseline: middle; }
+      .node-label { font-family: system-ui, sans-serif; font-size: 9px; fill: #a0a0a0; text-anchor: middle; }
+      .connector { fill: none; stroke: #3b4261; stroke-width: 1; stroke-dasharray: 4 2; }
+      .success-check { fill: #9ece6a; }
+      .pr-badge { fill: #1a1b26; stroke: #9ece6a; stroke-width: 1; }
+      .pr-text { font-family: system-ui, sans-serif; font-size: 10px; fill: #9ece6a; text-anchor: middle; }
+    </style>
+
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0066FF" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#00D4FF" stop-opacity="0.05"/>
+    </linearGradient>
+
+    <linearGradient id="wave1Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7dcfff"/>
+      <stop offset="100%" stop-color="#bb9af7"/>
+    </linearGradient>
+
+    <linearGradient id="nodeGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2a2e3d"/>
+      <stop offset="100%" stop-color="#1a1b26"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Subtle background -->
+  <rect class="bg-glow" width="500" height="400" rx="16"/>
+
+  <!-- Wave Labels -->
+  <g class="wave-labels" opacity="0.7">
+    <text x="80" y="30" font-family="system-ui" font-size="11" fill="#7dcfff" font-weight="600">Wave 1</text>
+    <text x="200" y="30" font-family="system-ui" font-size="11" fill="#ff9e64" font-weight="600">Wave 2</text>
+    <text x="320" y="30" font-family="system-ui" font-size="11" fill="#9ece6a" font-weight="600">Wave 3</text>
+    <text x="430" y="30" font-family="system-ui" font-size="11" fill="#e0af68" font-weight="600">Wave 4</text>
+  </g>
+
+  <!-- Wave 1: Discovery -->
+  <g class="wave-1-group" style="animation: float 3s ease-in-out infinite;">
+    <!-- Scout -->
+    <g class="agent-node" transform="translate(50, 80)">
+      <rect class="node-bg" width="60" height="50" fill="url(#nodeGrad1)" stroke="#7dcfff" stroke-width="2"/>
+      <text class="node-icon" x="30" y="22" fill="#7dcfff">🔍</text>
+      <text class="node-label" x="30" y="42">Scout</text>
+    </g>
+
+    <!-- Oracle -->
+    <g class="agent-node" transform="translate(50, 150)" style="animation-delay: 0.2s;">
+      <rect class="node-bg" width="60" height="50" fill="url(#nodeGrad1)" stroke="#bb9af7" stroke-width="2"/>
+      <text class="node-icon" x="30" y="22" fill="#bb9af7">📚</text>
+      <text class="node-label" x="30" y="42">Oracle</text>
+    </g>
+  </g>
+
+  <!-- Connector Wave 1 to 2 -->
+  <path class="wave-path wave-1" d="M115 105 Q145 130, 170 130"/>
+  <path class="wave-path wave-1" d="M115 175 Q145 150, 170 150"/>
+
+  <!-- Wave 2: Design -->
+  <g class="wave-2-group" style="animation: float 3s ease-in-out infinite; animation-delay: 0.5s;">
+    <!-- Architect -->
+    <g class="agent-node" transform="translate(170, 115)">
+      <rect class="node-bg" width="60" height="50" fill="url(#nodeGrad1)" stroke="#ff9e64" stroke-width="2"/>
+      <text class="node-icon" x="30" y="22" fill="#ff9e64">📐</text>
+      <text class="node-label" x="30" y="42">Architect</text>
+    </g>
+  </g>
+
+  <!-- Connector Wave 2 to 3 -->
+  <path class="wave-path wave-2" d="M235 130 Q265 105, 290 105"/>
+  <path class="wave-path wave-2" d="M235 150 Q265 175, 290 175"/>
+
+  <!-- Wave 3: Implementation -->
+  <g class="wave-3-group" style="animation: float 3s ease-in-out infinite; animation-delay: 1s;">
+    <!-- Worker -->
+    <g class="agent-node" transform="translate(290, 80)">
+      <rect class="node-bg" width="60" height="50" fill="url(#nodeGrad1)" stroke="#9ece6a" stroke-width="2"/>
+      <text class="node-icon" x="30" y="22" fill="#9ece6a">💻</text>
+      <text class="node-label" x="30" y="42">Worker</text>
+    </g>
+
+    <!-- Kraken -->
+    <g class="agent-node" transform="translate(290, 150)">
+      <rect class="node-bg" width="60" height="50" fill="url(#nodeGrad1)" stroke="#f7768e" stroke-width="2"/>
+      <text class="node-icon" x="30" y="22" fill="#f7768e">🐙</text>
+      <text class="node-label" x="30" y="42">Kraken</text>
+    </g>
+  </g>
+
+  <!-- Connector Wave 3 to 4 -->
+  <path class="wave-path wave-3" d="M355 105 Q385 130, 405 130"/>
+  <path class="wave-path wave-3" d="M355 175 Q385 150, 405 150"/>
+
+  <!-- Wave 4: Review -->
+  <g class="wave-4-group" style="animation: float 3s ease-in-out infinite; animation-delay: 1.5s;">
+    <!-- Critic -->
+    <g class="agent-node" transform="translate(405, 115)">
+      <rect class="node-bg" width="60" height="50" fill="url(#nodeGrad1)" stroke="#e0af68" stroke-width="2"/>
+      <text class="node-icon" x="30" y="22" fill="#e0af68">🛡️</text>
+      <text class="node-label" x="30" y="42">Critic</text>
+    </g>
+  </g>
+
+  <!-- Output: PRs Created -->
+  <g transform="translate(250, 230)">
+    <!-- Success glow -->
+    <ellipse cx="0" cy="30" rx="120" ry="20" fill="#9ece6a" opacity="0.1">
+      <animate attributeName="opacity" values="0.05;0.15;0.05" dur="2s" repeatCount="indefinite"/>
+    </ellipse>
+
+    <!-- PR badges -->
+    <g transform="translate(-80, 20)" style="animation: fadeInOut 6s ease-in-out infinite;">
+      <rect class="pr-badge" x="0" y="0" width="50" height="24" rx="4"/>
+      <text class="pr-text" x="25" y="16">PR #1</text>
+    </g>
+    <g transform="translate(-25, 20)" style="animation: fadeInOut 6s ease-in-out infinite; animation-delay: 0.3s;">
+      <rect class="pr-badge" x="0" y="0" width="50" height="24" rx="4"/>
+      <text class="pr-text" x="25" y="16">PR #2</text>
+    </g>
+    <g transform="translate(30, 20)" style="animation: fadeInOut 6s ease-in-out infinite; animation-delay: 0.6s;">
+      <rect class="pr-badge" x="0" y="0" width="50" height="24" rx="4"/>
+      <text class="pr-text" x="25" y="16">PR #3</text>
+    </g>
+
+    <!-- Success text -->
+    <text x="0" y="70" font-family="system-ui" font-size="12" fill="#9ece6a" text-anchor="middle" font-weight="600" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.7;0.8;0.95;1"/>
+      ✓ Objective Achieved
+    </text>
+  </g>
+
+  <!-- Repos indicator at bottom -->
+  <g transform="translate(250, 340)">
+    <text x="0" y="0" font-family="system-ui" font-size="10" fill="#565f89" text-anchor="middle">across 3 repositories</text>
+    <g transform="translate(-60, 15)">
+      <rect width="35" height="18" rx="3" fill="#1a1b26" stroke="#3b4261"/>
+      <text x="17" y="13" font-family="monospace" font-size="8" fill="#7dcfff" text-anchor="middle">api</text>
+    </g>
+    <g transform="translate(-15, 15)">
+      <rect width="50" height="18" rx="3" fill="#1a1b26" stroke="#3b4261"/>
+      <text x="25" y="13" font-family="monospace" font-size="8" fill="#bb9af7" text-anchor="middle">frontend</text>
+    </g>
+    <g transform="translate(45, 15)">
+      <rect width="45" height="18" rx="3" fill="#1a1b26" stroke="#3b4261"/>
+      <text x="22" y="13" font-family="monospace" font-size="8" fill="#ff9e64" text-anchor="middle">shared</text>
+    </g>
+  </g>
+
+  <!-- Floating particles for ambiance -->
+  <g class="particles" opacity="0.4">
+    <circle cx="30" cy="250" r="2" fill="#7dcfff">
+      <animate attributeName="cy" values="250;230;250" dur="4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.4;0.8;0.4" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="470" cy="80" r="2" fill="#9ece6a">
+      <animate attributeName="cy" values="80;60;80" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.4;0.8;0.4" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="200" cy="300" r="1.5" fill="#ff9e64">
+      <animate attributeName="cy" values="300;280;300" dur="5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="380" cy="280" r="1.5" fill="#bb9af7">
+      <animate attributeName="cy" values="280;260;280" dur="4.5s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+</svg>
