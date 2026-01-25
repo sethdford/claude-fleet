@@ -56,10 +56,14 @@ const routes: Route[] = [
     path: /^\/api\/sessions$/,
     handler: async (ctx, req) => {
       const url = new URL(req.url || '', `http://${req.headers.host}`);
-      const projectPath = url.searchParams.get('projectPath') || undefined;
+      const projectPath = url.searchParams.get('projectPath');
       const limit = parseInt(url.searchParams.get('limit') || '20');
       const offset = parseInt(url.searchParams.get('offset') || '0');
-      return ctx.sessionManager.list({ projectPath, limit, offset });
+      return ctx.sessionManager.list({
+        ...(projectPath ? { projectPath } : {}),
+        limit,
+        offset,
+      });
     },
   },
   {
@@ -85,7 +89,10 @@ const routes: Route[] = [
     path: /^\/api\/sessions\/search$/,
     handler: async (ctx, _req, _params, body) => {
       const { query, projectPath, limit } = body as { query: string; projectPath?: string; limit?: number };
-      return ctx.sessionManager.search(query, { projectPath, limit });
+      return ctx.sessionManager.search(query, {
+        ...(projectPath ? { projectPath } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+      });
     },
   },
   {
@@ -119,7 +126,12 @@ const routes: Route[] = [
         prompt?: string;
         worktree?: boolean;
       };
-      return ctx.fleetManager.spawn({ handle, role: role as any, prompt, worktree });
+      return ctx.fleetManager.spawn({
+        handle,
+        ...(role ? { role: role as any } : {}),
+        ...(prompt ? { prompt } : {}),
+        ...(worktree !== undefined ? { worktree } : {}),
+      });
     },
   },
   {
@@ -168,9 +180,13 @@ const routes: Route[] = [
     handler: async (ctx, req) => {
       const url = new URL(req.url || '', `http://${req.headers.host}`);
       const status = url.searchParams.get('status') as any;
-      const assignedTo = url.searchParams.get('assignedTo') || undefined;
+      const assignedTo = url.searchParams.get('assignedTo');
       const limit = parseInt(url.searchParams.get('limit') || '50');
-      return ctx.taskStore.list({ status, assignedTo, limit });
+      return ctx.taskStore.list({
+        ...(status ? { status } : {}),
+        ...(assignedTo ? { assignedTo } : {}),
+        limit,
+      });
     },
   },
   {
@@ -183,7 +199,14 @@ const routes: Route[] = [
         priority?: number;
         assignedTo?: string;
       };
-      return ctx.taskStore.create({ title, description, priority: priority as any, assignedTo });
+      return ctx.taskStore.create({
+        id: `task-${Date.now()}`,
+        title,
+        status: 'pending',
+        priority: (priority as 1 | 2 | 3 | 4 | 5) ?? 3,
+        ...(description ? { description } : {}),
+        ...(assignedTo ? { assignedTo } : {}),
+      });
     },
   },
   {
@@ -203,8 +226,11 @@ const routes: Route[] = [
     handler: async (ctx, req) => {
       const url = new URL(req.url || '', `http://${req.headers.host}`);
       const status = url.searchParams.get('status') as any;
-      const convoyId = url.searchParams.get('convoyId') || undefined;
-      return ctx.beadStore.list({ status, convoyId });
+      const convoyId = url.searchParams.get('convoyId');
+      return ctx.beadStore.list({
+        ...(status ? { status } : {}),
+        ...(convoyId ? { convoyId } : {}),
+      });
     },
   },
   {
@@ -216,7 +242,11 @@ const routes: Route[] = [
         description?: string;
         convoyId?: string;
       };
-      return ctx.beadStore.create({ title, description, convoyId });
+      return ctx.beadStore.create({
+        title,
+        ...(description ? { description } : {}),
+        ...(convoyId ? { convoyId } : {}),
+      });
     },
   },
   {
@@ -242,7 +272,10 @@ const routes: Route[] = [
     path: /^\/api\/convoys$/,
     handler: async (ctx, _req, _params, body) => {
       const { name, description } = body as { name: string; description?: string };
-      return ctx.beadStore.createConvoy({ name, description });
+      return ctx.beadStore.createConvoy({
+        name,
+        ...(description ? { description } : {}),
+      });
     },
   },
 
@@ -278,7 +311,13 @@ const routes: Route[] = [
         remaining?: string[];
         context?: Record<string, unknown>;
       };
-      return ctx.checkpointStore.create({ workerHandle, goal, worked, remaining, context });
+      return ctx.checkpointStore.create({
+        workerHandle,
+        goal,
+        ...(worked ? { worked } : {}),
+        ...(remaining ? { remaining } : {}),
+        ...(context ? { context } : {}),
+      });
     },
   },
 
@@ -302,7 +341,12 @@ const routes: Route[] = [
         subject?: string;
         body: string;
       };
-      return ctx.mailStore.send({ from, to, subject, body: mailBody });
+      return ctx.mailStore.send({
+        from,
+        to,
+        ...(subject ? { subject } : {}),
+        body: mailBody,
+      });
     },
   },
 
@@ -324,7 +368,12 @@ const routes: Route[] = [
         filePath?: string;
         content?: string;
       };
-      return ctx.safetyManager.check({ operation: operation as any, command, filePath, content });
+      return ctx.safetyManager.check({
+        operation: operation as any,
+        ...(command ? { command } : {}),
+        ...(filePath ? { filePath } : {}),
+        ...(content ? { content } : {}),
+      });
     },
   },
   {

@@ -122,7 +122,7 @@ export class FleetManager extends EventEmitter {
       handle,
       status: 'pending',
       role,
-      initialPrompt: prompt,
+      ...(prompt && { initialPrompt: prompt }),
       lastHeartbeat: Date.now(),
       restartCount: 0,
       createdAt: Date.now(),
@@ -214,7 +214,7 @@ export class FleetManager extends EventEmitter {
     this.mailStore.send({
       from,
       to,
-      subject,
+      ...(subject && { subject }),
       body: message,
     });
   }
@@ -230,7 +230,7 @@ export class FleetManager extends EventEmitter {
   }> {
     return this.mailStore.getUnread(handle).map((m) => ({
       from: m.from,
-      subject: m.subject,
+      ...(m.subject && { subject: m.subject }),
       body: m.body,
       createdAt: m.createdAt,
     }));

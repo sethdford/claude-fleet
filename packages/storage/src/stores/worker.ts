@@ -213,15 +213,15 @@ export class WorkerStore {
       handle: row.handle,
       status: row.status as WorkerStatus,
       role: row.role as WorkerRole,
-      worktreePath: row.worktree_path || undefined,
-      worktreeBranch: row.worktree_branch || undefined,
-      pid: row.pid || undefined,
-      sessionId: row.session_id || undefined,
-      initialPrompt: row.initial_prompt || undefined,
+      ...(row.worktree_path && { worktreePath: row.worktree_path }),
+      ...(row.worktree_branch && { worktreeBranch: row.worktree_branch }),
+      ...(row.pid && { pid: row.pid }),
+      ...(row.session_id && { sessionId: row.session_id }),
+      ...(row.initial_prompt && { initialPrompt: row.initial_prompt }),
       lastHeartbeat: row.last_heartbeat,
       restartCount: row.restart_count,
       createdAt: row.created_at,
-      dismissedAt: row.dismissed_at || undefined,
+      ...(row.dismissed_at && { dismissedAt: row.dismissed_at }),
     };
   }
 }

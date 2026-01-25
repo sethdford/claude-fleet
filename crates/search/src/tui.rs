@@ -10,17 +10,17 @@ use crossterm::{
 };
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    text::Text,
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
 use std::io;
 use tantivy::{
     collector::TopDocs,
     query::QueryParser,
-    schema::Schema,
+    schema::{Schema, Value},
     Index, IndexReader, TantivyDocument,
 };
 
@@ -150,7 +150,7 @@ pub fn run_tui(index: &Index, reader: &IndexReader, schema: &Schema) -> Result<(
                                                 let snippet = doc
                                                     .get_first(content_field)
                                                     .and_then(|v| v.as_str())
-                                                    .map(|s| s.chars().take(100).collect())
+                                                    .map(|s: &str| s.chars().take(100).collect::<String>())
                                                     .unwrap_or_default();
                                                 let timestamp = doc
                                                     .get_first(timestamp_field)
@@ -224,7 +224,7 @@ fn ui(f: &mut Frame, app: &App) {
             Constraint::Min(10),    // Results
             Constraint::Length(3),  // Help
         ])
-        .split(f.area());
+        .split(f.size());
 
     // Search input
     let input_style = if app.mode == Mode::Search {
@@ -240,7 +240,7 @@ fn ui(f: &mut Frame, app: &App) {
 
     // Show cursor in search mode
     if app.mode == Mode::Search {
-        f.set_cursor_position((chunks[0].x + app.cursor_position as u16 + 1, chunks[0].y + 1));
+        f.set_cursor(chunks[0].x + app.cursor_position as u16 + 1, chunks[0].y + 1);
     }
 
     // Results list

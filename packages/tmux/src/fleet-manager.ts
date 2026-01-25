@@ -7,7 +7,6 @@
 
 import { TmuxController } from './controller.js';
 import type {
-  TmuxPane,
   FleetPaneMapping,
   CreatePaneOptions,
   ExecuteResult,
@@ -69,12 +68,15 @@ export class FleetTmuxManager {
     }
 
     const panes = this.controller.listPanes();
+    const currentSession = this.controller.getCurrentSession();
+    const currentWindow = this.controller.getCurrentWindow();
+    const currentPane = this.controller.getCurrentPane();
 
     return {
       insideTmux: true,
-      session: this.controller.getCurrentSession(),
-      window: this.controller.getCurrentWindow(),
-      pane: this.controller.getCurrentPane(),
+      ...(currentSession && { session: currentSession }),
+      ...(currentWindow && { window: currentWindow }),
+      ...(currentPane && { pane: currentPane }),
       workers: Array.from(this.workers.values()),
       totalPanes: panes.length,
     };
@@ -106,8 +108,8 @@ export class FleetTmuxManager {
     // Create the pane
     const paneOptions: CreatePaneOptions = {
       direction,
-      cwd,
-      command,
+      ...(cwd && { cwd }),
+      ...(command && { command }),
     };
 
     const pane = this.controller.createPane(paneOptions);
@@ -120,12 +122,14 @@ export class FleetTmuxManager {
     this.controller.setPaneTitle(pane.id, paneTitle);
 
     // Create mapping
+    const currentSessionId = this.controller.getCurrentSession();
+    const currentWindowId = this.controller.getCurrentWindow();
     const mapping: FleetPaneMapping = {
       workerId,
       handle,
       paneId: pane.id,
-      sessionId: this.controller.getCurrentSession(),
-      windowId: this.controller.getCurrentWindow(),
+      ...(currentSessionId && { sessionId: currentSessionId }),
+      ...(currentWindowId && { windowId: currentWindowId }),
       createdAt: Date.now(),
     };
 
@@ -204,7 +208,7 @@ export class FleetTmuxManager {
       throw new Error(`Worker "${handle}" not found`);
     }
 
-    return this.controller.capture(worker.paneId, { lines });
+    return this.controller.capture(worker.paneId, lines !== undefined ? { lines } : {});
   }
 
   /**

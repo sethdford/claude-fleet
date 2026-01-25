@@ -6,7 +6,7 @@
  */
 
 export { SessionManager } from './manager.js';
-export { resumeSession, ResumeStrategy, generateSummary } from './resume.js';
-export type { ResumeOptions, ResumeResult } from './resume.js';
+export { resumeSession, generateSummary } from './resume.js';
+export type { ResumeStrategy, ResumeOptions, ResumeResult } from './resume.js';
 export { SessionExporter } from './export.js';
 export type { ExportFormat, ExportOptions } from './export.js';

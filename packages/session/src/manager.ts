@@ -44,15 +44,15 @@ export class SessionManager {
     return this.store.create({
       id: generateId(),
       projectPath: options.projectPath,
-      tags: options.tags,
+      ...(options.tags && { tags: options.tags }),
       messageCount: 0,
       totalTokens: 0,
-      lineage: parentSession
-        ? {
-            parentId: parentSession.id,
-            depth: (parentSession.lineage?.depth || 0) + 1,
-          }
-        : undefined,
+      ...(parentSession && {
+        lineage: {
+          parentId: parentSession.id,
+          depth: (parentSession.lineage?.depth || 0) + 1,
+        },
+      }),
     });
   }
 
@@ -151,7 +151,7 @@ export class SessionManager {
     return this.create({
       projectPath: parent.projectPath,
       parentId: parent.id,
-      tags: options?.tags,
+      ...(options?.tags && { tags: options.tags }),
     });
   }
 
@@ -171,7 +171,7 @@ export class SessionManager {
     recentActivity: number;
   } {
     const sessions = this.store.list({
-      projectPath,
+      ...(projectPath && { projectPath }),
       limit: 1000,
     });
 

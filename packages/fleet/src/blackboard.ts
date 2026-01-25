@@ -48,9 +48,9 @@ export class Blackboard {
       id: Number(result.lastInsertRowid),
       topic: message.topic,
       message: message.message,
-      from: message.from,
+      ...(message.from && { from: message.from }),
       priority: message.priority || 0,
-      expiresAt,
+      ...(expiresAt && { expiresAt }),
       createdAt: now,
     };
   }
@@ -96,9 +96,9 @@ export class Blackboard {
       id: row.id,
       topic: row.topic,
       message: row.message,
-      from: row.from_handle || undefined,
+      ...(row.from_handle && { from: row.from_handle }),
       priority: row.priority,
-      expiresAt: row.expires_at || undefined,
+      ...(row.expires_at && { expiresAt: row.expires_at }),
       createdAt: row.created_at,
     }));
   }
@@ -134,15 +134,14 @@ export class Blackboard {
       id: row.id,
       topic: row.topic,
       message: row.message,
-      from: row.from_handle || undefined,
+      ...(row.from_handle && { from: row.from_handle }),
       priority: row.priority,
-      expiresAt: row.expires_at || undefined,
+      ...(row.expires_at && { expiresAt: row.expires_at }),
       createdAt: row.created_at,
     }));
 
-    const lastId = messages.length > 0
-      ? messages[messages.length - 1].id
-      : lastReadId;
+    const lastMessage = messages[messages.length - 1];
+    const lastId = lastMessage ? lastMessage.id : lastReadId;
 
     return { messages, lastId };
   }
@@ -202,7 +201,7 @@ export class Blackboard {
     return this.post({
       topic: 'broadcast',
       message,
-      from,
+      ...(from && { from }),
       priority: 10,
     });
   }
@@ -214,7 +213,7 @@ export class Blackboard {
     return this.post({
       topic: 'alerts',
       message,
-      from,
+      ...(from && { from }),
       priority: 100,
       expiresIn: 24 * 60 * 60 * 1000, // 24 hours
     });
@@ -243,8 +242,9 @@ export class Blackboard {
     for (const { topic } of topics) {
       const handle = topic.replace('status/', '');
       const messages = this.readTopic(topic, { limit: 1 });
-      if (messages.length > 0) {
-        statuses.set(handle, messages[0].message);
+      const firstMessage = messages[0];
+      if (firstMessage) {
+        statuses.set(handle, firstMessage.message);
       }
     }
 

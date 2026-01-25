@@ -95,10 +95,13 @@ describe('Fleet Commands', () => {
     });
 
     it('has checkpoint subcommand group', () => {
-      const checkpointCreate = fleet.commands.find(c => c.name() === 'checkpoint create');
-      const checkpointLoad = fleet.commands.find(c => c.name() === 'checkpoint load');
-      expect(checkpointCreate).toBeDefined();
-      expect(checkpointLoad).toBeDefined();
+      const checkpoint = fleet.commands.find(c => c.name() === 'checkpoint');
+      expect(checkpoint).toBeDefined();
+      expect(checkpoint?.description()).toBe('Worker checkpoint management');
+      const create = checkpoint?.commands.find(c => c.name() === 'create');
+      const load = checkpoint?.commands.find(c => c.name() === 'load');
+      expect(create).toBeDefined();
+      expect(load).toBeDefined();
     });
   });
 
@@ -177,39 +180,41 @@ describe('Fleet Commands', () => {
   });
 
   describe('Checkpoint Commands Options', () => {
+    const getCheckpointCmd = () => fleet.commands.find(c => c.name() === 'checkpoint')!;
+
     it('checkpoint create has required handle option', () => {
-      const create = fleet.commands.find(c => c.name() === 'checkpoint create')!;
+      const create = getCheckpointCmd().commands.find(c => c.name() === 'create')!;
       const handleOpt = create.options.find(o => o.long === '--handle');
       expect(handleOpt).toBeDefined();
       expect(handleOpt?.required).toBe(true);
     });
 
     it('checkpoint create has required goal option', () => {
-      const create = fleet.commands.find(c => c.name() === 'checkpoint create')!;
+      const create = getCheckpointCmd().commands.find(c => c.name() === 'create')!;
       const goalOpt = create.options.find(o => o.long === '--goal');
       expect(goalOpt).toBeDefined();
       expect(goalOpt?.required).toBe(true);
     });
 
     it('checkpoint create has worked option', () => {
-      const create = fleet.commands.find(c => c.name() === 'checkpoint create')!;
+      const create = getCheckpointCmd().commands.find(c => c.name() === 'create')!;
       const options = create.options.map(o => o.long);
       expect(options).toContain('--worked');
     });
 
     it('checkpoint create has remaining option', () => {
-      const create = fleet.commands.find(c => c.name() === 'checkpoint create')!;
+      const create = getCheckpointCmd().commands.find(c => c.name() === 'create')!;
       const options = create.options.map(o => o.long);
       expect(options).toContain('--remaining');
     });
 
     it('checkpoint load requires handle argument', () => {
-      const load = fleet.commands.find(c => c.name() === 'checkpoint load')!;
+      const load = getCheckpointCmd().commands.find(c => c.name() === 'load')!;
       expect(load.registeredArguments.length).toBeGreaterThan(0);
     });
 
     it('checkpoint load has json option', () => {
-      const load = fleet.commands.find(c => c.name() === 'checkpoint load')!;
+      const load = getCheckpointCmd().commands.find(c => c.name() === 'load')!;
       const options = load.options.map(o => o.long);
       expect(options).toContain('--json');
     });

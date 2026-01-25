@@ -5,7 +5,7 @@
  * Handles common LLM mistakes: auto-Enter, delays, proper escaping.
  */
 
-import { spawn, execSync, type SpawnOptions } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import type {
   TmuxPane,
@@ -54,31 +54,6 @@ export class TmuxController {
       const err = error as { stderr?: Buffer; message: string };
       throw new Error(`tmux command failed: ${err.stderr?.toString() || err.message}`);
     }
-  }
-
-  /**
-   * Run tmux command async
-   */
-  private async runTmuxAsync(args: string[]): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const child = spawn('tmux', args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      child.stdout?.on('data', (data) => { stdout += data; });
-      child.stderr?.on('data', (data) => { stderr += data; });
-
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve(stdout.trim());
-        } else {
-          reject(new Error(`tmux failed: ${stderr || `exit code ${code}`}`));
-        }
-      });
-    });
   }
 
   // ============ Session Management ============
@@ -131,13 +106,13 @@ export class TmuxController {
       ]);
 
       return output.split('\n').filter(Boolean).map((line) => {
-        const [id, name, created, attached, windows] = line.split('|');
+        const parts = line.split('|');
         return {
-          id,
-          name,
-          created: parseInt(created, 10) * 1000,
-          attached: attached === '1',
-          windowCount: parseInt(windows, 10),
+          id: parts[0] ?? '',
+          name: parts[1] ?? '',
+          created: parseInt(parts[2] ?? '0', 10) * 1000,
+          attached: parts[3] === '1',
+          windowCount: parseInt(parts[4] ?? '0', 10),
         };
       });
     } catch {
@@ -159,13 +134,13 @@ export class TmuxController {
       ]);
 
       return output.split('\n').filter(Boolean).map((line) => {
-        const [id, index, name, active, panes] = line.split('|');
+        const parts = line.split('|');
         return {
-          id,
-          index: parseInt(index, 10),
-          name,
-          active: active === '1',
-          paneCount: parseInt(panes, 10),
+          id: parts[0] ?? '',
+          index: parseInt(parts[1] ?? '0', 10),
+          name: parts[2] ?? '',
+          active: parts[3] === '1',
+          paneCount: parseInt(parts[4] ?? '0', 10),
         };
       });
     } catch {
@@ -187,16 +162,16 @@ export class TmuxController {
       ]);
 
       return output.split('\n').filter(Boolean).map((line) => {
-        const [id, index, title, active, width, height, command, pid] = line.split('|');
+        const parts = line.split('|');
         return {
-          id,
-          index: parseInt(index, 10),
-          title,
-          active: active === '1',
-          width: parseInt(width, 10),
-          height: parseInt(height, 10),
-          command,
-          pid: parseInt(pid, 10),
+          id: parts[0] ?? '',
+          index: parseInt(parts[1] ?? '0', 10),
+          title: parts[2] ?? '',
+          active: parts[3] === '1',
+          width: parseInt(parts[4] ?? '0', 10),
+          height: parseInt(parts[5] ?? '0', 10),
+          command: parts[6] ?? '',
+          pid: parseInt(parts[7] ?? '0', 10),
         };
       });
     } catch {
@@ -515,7 +490,7 @@ export class TmuxController {
 
         return {
           output,
-          exitCode: parseInt(endMatch[1], 10),
+          exitCode: parseInt(endMatch[1] ?? '-1', 10),
           completed: true,
           duration: Date.now() - startTime,
         };

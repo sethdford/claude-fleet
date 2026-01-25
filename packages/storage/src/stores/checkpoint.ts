@@ -41,9 +41,9 @@ export class CheckpointStore {
       id,
       workerHandle: checkpoint.workerHandle,
       goal: checkpoint.goal,
-      worked: checkpoint.worked,
-      remaining: checkpoint.remaining,
-      context: checkpoint.context,
+      ...(checkpoint.worked && { worked: checkpoint.worked }),
+      ...(checkpoint.remaining && { remaining: checkpoint.remaining }),
+      ...(checkpoint.context && { context: checkpoint.context }),
       createdAt: now,
     };
   }

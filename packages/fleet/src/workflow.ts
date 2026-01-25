@@ -62,10 +62,10 @@ export class WorkflowEngine extends EventEmitter {
     return {
       id,
       name: workflow.name,
-      description: workflow.description,
+      ...(workflow.description && { description: workflow.description }),
       status: 'pending',
       steps: workflow.steps,
-      context: workflow.context,
+      ...(workflow.context && { context: workflow.context }),
       createdAt: now,
     };
   }
@@ -208,7 +208,10 @@ export class WorkflowEngine extends EventEmitter {
       for (let i = 0; i < ready.length; i++) {
         const step = ready[i];
         const result = results[i];
-        const exec = executions.get(step.id)!;
+        if (!step || !result) continue;
+
+        const exec = executions.get(step.id);
+        if (!exec) continue;
 
         if (result.status === 'fulfilled') {
           exec.status = 'completed';
@@ -323,10 +326,10 @@ export class WorkflowEngine extends EventEmitter {
     return rows.map((row) => ({
       stepId: row.step_id,
       status: row.status as WorkflowExecution['status'],
-      result: row.result ? JSON.parse(row.result) : undefined,
-      error: row.error || undefined,
-      startedAt: row.started_at || undefined,
-      completedAt: row.completed_at || undefined,
+      ...(row.result && { result: JSON.parse(row.result) }),
+      ...(row.error && { error: row.error }),
+      ...(row.started_at && { startedAt: row.started_at }),
+      ...(row.completed_at && { completedAt: row.completed_at }),
     }));
   }
 
@@ -342,13 +345,13 @@ export class WorkflowEngine extends EventEmitter {
     return {
       id: row.id,
       name: row.name,
-      description: row.description || undefined,
+      ...(row.description && { description: row.description }),
       status: row.status as WorkflowStatus,
       steps: JSON.parse(row.steps),
-      context: row.context ? JSON.parse(row.context) : undefined,
+      ...(row.context && { context: JSON.parse(row.context) }),
       createdAt: row.created_at,
-      startedAt: row.started_at || undefined,
-      completedAt: row.completed_at || undefined,
+      ...(row.started_at && { startedAt: row.started_at }),
+      ...(row.completed_at && { completedAt: row.completed_at }),
     };
   }
 }

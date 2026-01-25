@@ -74,8 +74,8 @@ export class AuthorizationError extends CCTError {
  * Worker error for fleet orchestration issues
  */
 export class WorkerError extends CCTError {
-  public readonly handle?: string;
-  public readonly workerId?: string;
+  public readonly handle: string | undefined;
+  public readonly workerId: string | undefined;
 
   constructor(message: string, options?: { handle?: string; workerId?: string; details?: unknown }) {
     super(message, 'WORKER_ERROR', options?.details);
@@ -99,9 +99,9 @@ export class SpawnError extends CCTError {
  * Workflow error for execution issues
  */
 export class WorkflowError extends CCTError {
-  public readonly workflowId?: string;
-  public readonly executionId?: string;
-  public readonly stepId?: string;
+  public readonly workflowId: string | undefined;
+  public readonly executionId: string | undefined;
+  public readonly stepId: string | undefined;
 
   constructor(message: string, options?: {
     workflowId?: string;
@@ -121,8 +121,8 @@ export class WorkflowError extends CCTError {
  * Safety error for blocked operations
  */
 export class SafetyError extends CCTError {
-  public readonly hookId?: string;
-  public readonly command?: string;
+  public readonly hookId: string | undefined;
+  public readonly command: string | undefined;
 
   constructor(message: string, options?: { hookId?: string; command?: string; details?: unknown }) {
     super(message, 'SAFETY_BLOCKED', options?.details);
@@ -146,7 +146,7 @@ export class StorageError extends CCTError {
  * Session error for session management issues
  */
 export class SessionError extends CCTError {
-  public readonly sessionId?: string;
+  public readonly sessionId: string | undefined;
 
   constructor(message: string, options?: { sessionId?: string; details?: unknown }) {
     super(message, 'SESSION_ERROR', options?.details);
@@ -159,7 +159,7 @@ export class SessionError extends CCTError {
  * Timeout error for operations that exceed time limits
  */
 export class TimeoutError extends CCTError {
-  public readonly timeoutMs?: number;
+  public readonly timeoutMs: number | undefined;
 
   constructor(message: string, timeoutMs?: number, details?: unknown) {
     super(message, 'TIMEOUT', details);

@@ -114,7 +114,7 @@ export class SafetyManager {
             allowed: false,
             blockedBy: hook.id,
             reason: result.reason ?? `Blocked by ${hook.name}`,
-            suggestions: result.suggestions,
+            ...(result.suggestions && { suggestions: result.suggestions }),
             warnings,
             checksPerformed,
           };
@@ -151,8 +151,8 @@ export class SafetyManager {
     const result = this.check(context);
     if (!result.allowed) {
       throw new SafetyError(result.reason ?? 'Operation blocked', {
-        hookId: result.blockedBy,
-        command: context.command,
+        ...(result.blockedBy && { hookId: result.blockedBy }),
+        ...(context.command && { command: context.command }),
         details: {
           suggestions: result.suggestions,
           checksPerformed: result.checksPerformed,
@@ -220,7 +220,7 @@ export class SafetyManager {
     enabled: boolean;
     activeHooks: number;
     totalHooks: number;
-    hooks: { id: string; name: string; enabled: boolean }[];
+    hooks: { id: string; name: string; description: string; enabled: boolean }[];
   } {
     const hooks = Array.from(this.hooks.values());
     return {
@@ -230,6 +230,7 @@ export class SafetyManager {
       hooks: hooks.map(h => ({
         id: h.id,
         name: h.name,
+        description: h.description,
         enabled: h.enabled,
       })),
     };

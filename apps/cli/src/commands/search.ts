@@ -6,7 +6,13 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { SessionManager } from '@claude-fleet/session';
+
+function getDefaultIndexPath(): string {
+  return resolve(homedir(), '.cct', 'search-index');
+}
 
 export function searchCommand(): Command {
   const search = new Command('search')
@@ -20,8 +26,8 @@ export function searchCommand(): Command {
       if (options.tui) {
         // Try to launch Rust TUI
         try {
-          const { SearchIndex } = await import('@cct/search');
-          const index = new SearchIndex();
+          const { SearchIndex } = await import('@claude-fleet/search');
+          const index = new SearchIndex(getDefaultIndexPath());
           index.launchTui();
           return;
         } catch {

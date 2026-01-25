@@ -229,14 +229,14 @@ export class SessionStore {
       lastAccessed: row.last_accessed,
       messageCount: row.message_count,
       totalTokens: row.total_tokens,
-      summary: row.summary || undefined,
-      tags: row.tags ? JSON.parse(row.tags) : undefined,
-      lineage: row.lineage_parent_id
-        ? {
-            parentId: row.lineage_parent_id,
-            depth: row.lineage_depth,
-          }
-        : undefined,
+      ...(row.summary && { summary: row.summary }),
+      ...(row.tags && { tags: JSON.parse(row.tags) }),
+      ...(row.lineage_parent_id && {
+        lineage: {
+          parentId: row.lineage_parent_id,
+          depth: row.lineage_depth,
+        },
+      }),
     };
   }
 }

@@ -130,10 +130,11 @@ export function tmuxCommands(): Command {
           process.exit(1);
         }
 
+        const delayValue = options.delay ? parseInt(options.delay, 10) : undefined;
         await controller.sendKeys(worker.paneId, text, {
           noEnter: !options.enter,
           instant: options.instant,
-          delay: options.delay ? parseInt(options.delay, 10) : undefined,
+          ...(delayValue !== undefined ? { delay: delayValue } : {}),
         });
         console.log(chalk.green(`Sent to ${handle}`));
       } catch (error) {

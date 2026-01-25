@@ -126,11 +126,11 @@ export class MCPServer {
       return this.context.sessionManager.search(args.query as string, args as any);
     }
     if (name === 'session_resume') {
-      const { resumeSession } = await import('@cct/session');
+      const { resumeSession } = await import('@claude-fleet/session');
       return resumeSession(args.id as string, args as any);
     }
     if (name === 'session_export') {
-      const { SessionExporter } = await import('@cct/session');
+      const { SessionExporter } = await import('@claude-fleet/session');
       const exporter = new SessionExporter();
       return exporter.export(args.id as string, args as any);
     }
@@ -198,9 +198,10 @@ export class MCPServer {
     }
     if (name === 'team_claim') {
       const tasks = this.context.taskStore.getUnassigned({ limit: 1 });
-      if (tasks.length === 0) return null;
-      this.context.taskStore.assign(tasks[0].id, args.handle as string);
-      return tasks[0];
+      const task = tasks[0];
+      if (!task) return null;
+      this.context.taskStore.assign(task.id, args.handle as string);
+      return task;
     }
     if (name === 'team_complete') {
       this.context.taskStore.updateStatus(args.id as string, 'completed');
@@ -272,9 +273,9 @@ export class MCPServer {
       }
       const controller = this.context.tmuxManager.getController();
       await controller.sendKeys(worker.paneId, args.text as string, {
-        noEnter: args.noEnter as boolean | undefined,
-        instant: args.instant as boolean | undefined,
-        delay: args.delay as number | undefined,
+        ...(args.noEnter !== undefined && { noEnter: args.noEnter as boolean }),
+        ...(args.instant !== undefined && { instant: args.instant as boolean }),
+        ...(args.delay !== undefined && { delay: args.delay as number }),
       });
       return { success: true };
     }
@@ -290,15 +291,17 @@ export class MCPServer {
       return this.context.tmuxManager.executeInWorker(
         args.handle as string,
         args.command as string,
-        { timeout: args.timeout as number | undefined }
+        {
+          ...(args.timeout !== undefined && { timeout: args.timeout as number }),
+        }
       );
     }
     if (name === 'tmux_wait_idle') {
       const idle = await this.context.tmuxManager.waitForWorkerIdle(
         args.handle as string,
         {
-          timeout: args.timeout as number | undefined,
-          stableTime: args.stableTime as number | undefined,
+          ...(args.timeout !== undefined && { timeout: args.timeout as number }),
+          ...(args.stableTime !== undefined && { stableTime: args.stableTime as number }),
         }
       );
       return { idle };
@@ -307,7 +310,9 @@ export class MCPServer {
       const found = await this.context.tmuxManager.waitForWorkerPattern(
         args.handle as string,
         new RegExp(args.pattern as string),
-        { timeout: args.timeout as number | undefined }
+        {
+          ...(args.timeout !== undefined && { timeout: args.timeout as number }),
+        }
       );
       return { found };
     }
@@ -356,10 +361,12 @@ export class MCPServer {
     }
     if (name === 'tmux_create_session') {
       const controller = this.context.tmuxManager.getController();
+      const cwd = args.cwd as string | undefined;
+      const command = args.command as string | undefined;
       const sessionId = controller.createSession({
         name: args.name as string,
-        cwd: args.cwd as string | undefined,
-        command: args.command as string | undefined,
+        ...(cwd ? { cwd } : {}),
+        ...(command ? { command } : {}),
       });
       return { sessionId, success: !!sessionId };
     }

@@ -55,10 +55,10 @@ export class BeadStore {
     return {
       id,
       title: bead.title,
-      description: bead.description,
+      ...(bead.description && { description: bead.description }),
       status: 'pending',
-      convoyId: bead.convoyId,
-      metadata: bead.metadata,
+      ...(bead.convoyId && { convoyId: bead.convoyId }),
+      ...(bead.metadata && { metadata: bead.metadata }),
       createdAt: now,
     };
   }
@@ -190,8 +190,8 @@ export class BeadStore {
 
     return rows.map((row) => ({
       eventType: row.event_type,
-      actor: row.actor || undefined,
-      details: row.details ? JSON.parse(row.details) : undefined,
+      ...(row.actor && { actor: row.actor }),
+      ...(row.details && { details: JSON.parse(row.details) }),
       createdAt: row.created_at,
     }));
   }
@@ -217,7 +217,7 @@ export class BeadStore {
     return {
       id,
       name: convoy.name,
-      description: convoy.description,
+      ...(convoy.description && { description: convoy.description }),
       status: 'open',
       createdAt: now,
     };
@@ -236,10 +236,10 @@ export class BeadStore {
     return {
       id: row.id,
       name: row.name,
-      description: row.description || undefined,
+      ...(row.description && { description: row.description }),
       status: row.status as 'open' | 'closed',
       createdAt: row.created_at,
-      closedAt: row.closed_at || undefined,
+      ...(row.closed_at && { closedAt: row.closed_at }),
     };
   }
 
@@ -262,10 +262,10 @@ export class BeadStore {
     return rows.map((row) => ({
       id: row.id,
       name: row.name,
-      description: row.description || undefined,
+      ...(row.description && { description: row.description }),
       status: row.status as 'open' | 'closed',
       createdAt: row.created_at,
-      closedAt: row.closed_at || undefined,
+      ...(row.closed_at && { closedAt: row.closed_at }),
     }));
   }
 
@@ -297,13 +297,13 @@ export class BeadStore {
     return {
       id: row.id,
       title: row.title,
-      description: row.description || undefined,
+      ...(row.description && { description: row.description }),
       status: row.status as BeadStatus,
-      assignedTo: row.assigned_to || undefined,
-      convoyId: row.convoy_id || undefined,
-      metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
+      ...(row.assigned_to && { assignedTo: row.assigned_to }),
+      ...(row.convoy_id && { convoyId: row.convoy_id }),
+      ...(row.metadata && { metadata: JSON.parse(row.metadata) }),
       createdAt: row.created_at,
-      completedAt: row.completed_at || undefined,
+      ...(row.completed_at && { completedAt: row.completed_at }),
     };
   }
 }

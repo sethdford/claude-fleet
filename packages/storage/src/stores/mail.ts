@@ -51,7 +51,7 @@ export class MailStore {
       id: Number(result.lastInsertRowid),
       from: mail.from,
       to: mail.to,
-      subject: mail.subject,
+      ...(mail.subject && { subject: mail.subject }),
       body: mail.body,
       createdAt: Date.now(),
     };
@@ -234,9 +234,9 @@ export class MailStore {
       id: row.id,
       from: row.from_handle,
       to: row.to_handle,
-      subject: row.subject || undefined,
+      ...(row.subject && { subject: row.subject }),
       body: row.body,
-      readAt: row.read_at || undefined,
+      ...(row.read_at && { readAt: row.read_at }),
       createdAt: row.created_at,
     };
   }
@@ -247,7 +247,7 @@ export class MailStore {
       from: row.from_handle,
       to: row.to_handle,
       context: JSON.parse(row.context),
-      acceptedAt: row.accepted_at || undefined,
+      ...(row.accepted_at && { acceptedAt: row.accepted_at }),
       createdAt: row.created_at,
     };
   }

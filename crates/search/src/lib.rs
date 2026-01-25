@@ -12,8 +12,8 @@ use tantivy::{
     directory::MmapDirectory,
     doc,
     query::QueryParser,
-    schema::{Schema, STORED, TEXT},
-    Document, Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument,
+    schema::{Schema, Value, STORED, TEXT},
+    Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument,
 };
 
 mod tui;
@@ -59,11 +59,11 @@ impl SearchIndex {
 
         // Define schema
         let mut schema_builder = Schema::builder();
-        let session_id = schema_builder.add_text_field("session_id", TEXT | STORED);
-        let content = schema_builder.add_text_field("content", TEXT | STORED);
-        let timestamp = schema_builder.add_i64_field("timestamp", tantivy::schema::INDEXED | STORED);
-        let model = schema_builder.add_text_field("model", TEXT | STORED);
-        let project_path = schema_builder.add_text_field("project_path", TEXT | STORED);
+        let _session_id = schema_builder.add_text_field("session_id", TEXT | STORED);
+        let _content = schema_builder.add_text_field("content", TEXT | STORED);
+        let _timestamp = schema_builder.add_i64_field("timestamp", tantivy::schema::INDEXED | STORED);
+        let _model = schema_builder.add_text_field("model", TEXT | STORED);
+        let _project_path = schema_builder.add_text_field("project_path", TEXT | STORED);
         let schema = schema_builder.build();
 
         // Open or create index
@@ -113,7 +113,7 @@ impl SearchIndex {
             doc.add_text(project_path, p);
         }
 
-        let mut writer = self.writer.write().map_err(|_| {
+        let writer = self.writer.write().map_err(|_| {
             Error::new(Status::GenericFailure, "Failed to acquire writer lock")
         })?;
 
@@ -173,7 +173,7 @@ impl SearchIndex {
             let snippet = retrieved_doc
                 .get_first(content_field)
                 .and_then(|v| v.as_str())
-                .map(|s| s.chars().take(200).collect::<String>())
+                .map(|s: &str| s.chars().take(200).collect::<String>())
                 .unwrap_or_default();
 
             let timestamp = retrieved_doc
@@ -184,7 +184,7 @@ impl SearchIndex {
             let model = retrieved_doc
                 .get_first(model_field)
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+                .map(|s: &str| s.to_string());
 
             results.push(SearchResult {
                 session_id,
@@ -204,7 +204,7 @@ impl SearchIndex {
         let session_id_field = self.schema.get_field("session_id").unwrap();
         let term = tantivy::Term::from_field_text(session_id_field, &session_id);
 
-        let mut writer = self.writer.write().map_err(|_| {
+        let writer = self.writer.write().map_err(|_| {
             Error::new(Status::GenericFailure, "Failed to acquire writer lock")
         })?;
 

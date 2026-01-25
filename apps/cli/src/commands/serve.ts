@@ -18,7 +18,7 @@ export function serveCommand(): Command {
     .action(async (options) => {
       if (options.mcp) {
         // Start MCP server
-        const { createServer } = await import('@cct/mcp');
+        const { createServer } = await import('@claude-fleet/mcp');
         const server = createServer();
         await server.start();
         return;

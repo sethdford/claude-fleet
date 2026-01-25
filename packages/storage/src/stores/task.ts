@@ -227,13 +227,13 @@ export class TaskStore {
     return {
       id: row.id,
       title: row.title,
-      description: row.description || undefined,
+      ...(row.description && { description: row.description }),
       status: row.status as TaskStatus,
       priority: row.priority as TaskPriority,
-      assignedTo: row.assigned_to || undefined,
-      createdBy: row.created_by || undefined,
-      dueAt: row.due_at || undefined,
-      completedAt: row.completed_at || undefined,
+      ...(row.assigned_to && { assignedTo: row.assigned_to }),
+      ...(row.created_by && { createdBy: row.created_by }),
+      ...(row.due_at && { dueAt: row.due_at }),
+      ...(row.completed_at && { completedAt: row.completed_at }),
       createdAt: row.created_at,
     };
   }

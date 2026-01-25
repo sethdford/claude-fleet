@@ -145,8 +145,12 @@ export function fleetCommands(): Command {
       console.log(chalk.green('Message broadcast successfully'));
     });
 
-  fleet
-    .command('checkpoint create')
+  // Checkpoint subcommand group
+  const checkpoint = new Command('checkpoint')
+    .description('Worker checkpoint management');
+
+  checkpoint
+    .command('create')
     .description('Create a checkpoint')
     .requiredOption('-h, --handle <handle>', 'Worker handle')
     .requiredOption('-g, --goal <goal>', 'Current goal')
@@ -162,8 +166,8 @@ export function fleetCommands(): Command {
       console.log(chalk.green(`Checkpoint created for ${options.handle}`));
     });
 
-  fleet
-    .command('checkpoint load <handle>')
+  checkpoint
+    .command('load <handle>')
     .description('Load latest checkpoint for a worker')
     .option('--json', 'Output as JSON')
     .action(async (handle, options) => {
@@ -196,6 +200,8 @@ export function fleetCommands(): Command {
       }
       console.log();
     });
+
+  fleet.addCommand(checkpoint);
 
   return fleet;
 }

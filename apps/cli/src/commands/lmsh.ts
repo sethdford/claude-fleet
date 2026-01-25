@@ -39,7 +39,7 @@ export function lmshCommand(): Command {
       // Try to load the Rust NAPI module
       let translator: LmshTranslator;
       try {
-        const lmshModule = await import('@cct/lmsh') as LmshModule;
+        const lmshModule = await import('@claude-fleet/lmsh') as LmshModule;
         translator = lmshModule.createTranslator();
       } catch (err) {
         console.log(chalk.yellow('LMSH native module not available.'));
@@ -82,7 +82,7 @@ export function lmshCommand(): Command {
     .action(async (action, args) => {
       let translator: LmshTranslator;
       try {
-        const lmshModule = await import('@cct/lmsh') as LmshModule;
+        const lmshModule = await import('@claude-fleet/lmsh') as LmshModule;
         translator = lmshModule.createTranslator();
       } catch {
         console.log(chalk.yellow('LMSH native module not available.'));
@@ -225,11 +225,11 @@ async function runInteractiveMode(translator: LmshTranslator, options: { execute
 
       if (input.startsWith('/alias')) {
         const parts = input.slice(6).trim().split(/\s+/);
-        if (parts[0] === 'add' && parts.length >= 3) {
-          const alias = parts[1];
+        const aliasName = parts[1];
+        if (parts[0] === 'add' && parts.length >= 3 && aliasName) {
           const command = parts.slice(2).join(' ');
-          translator.addAlias(alias, command);
-          console.log(chalk.green(`Added alias: ${alias} -> ${command}`));
+          translator.addAlias(aliasName, command);
+          console.log(chalk.green(`Added alias: ${aliasName} -> ${command}`));
         } else if (parts[0] === 'list') {
           const aliases = translator.getAliases();
           if (Object.keys(aliases).length === 0) {
