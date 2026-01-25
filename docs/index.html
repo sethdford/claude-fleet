@@ -4,71 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Claude Fleet - Multi-Agent Orchestration Platform</title>
-  <meta name="description" content="The infrastructure for coordinating AI agent fleets. Build, orchestrate, and scale multi-agent systems with Claude Code.">
+  <meta name="description" content="Orchestrate multiple Claude Code instances with intelligent coordination. Build production-grade multi-agent systems.">
 
-  <!-- Premium Fonts -->
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- Geist (Vercel's font) for headings, Inter for body -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <!-- JetBrains Mono for code -->
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <!-- Outfit for modern display headings -->
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="images/logo.svg">
-  <link rel="apple-touch-icon" href="images/logo.svg">
-
-  <!-- Canonical -->
   <link rel="canonical" href="https://sethdford.github.io/claude-fleet/">
-
-  <!-- Theme Color -->
   <meta name="theme-color" content="#0066FF">
 
   <!-- Open Graph -->
   <meta property="og:title" content="Claude Fleet - Multi-Agent Orchestration">
-  <meta property="og:description" content="The infrastructure for coordinating AI agent fleets.">
+  <meta property="og:description" content="Orchestrate multiple Claude Code instances with intelligent coordination.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sethdford.github.io/claude-fleet/">
-  <meta property="og:image" content="https://sethdford.github.io/claude-fleet/images/og-image.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
 
-  <!-- Twitter Cards -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Claude Fleet - Multi-Agent Orchestration">
-  <meta name="twitter:description" content="The infrastructure for coordinating AI agent fleets.">
-  <meta name="twitter:image" content="https://sethdford.github.io/claude-fleet/images/og-image.png">
-
-  <!-- Keywords -->
-  <meta name="keywords" content="claude code, multi-agent, AI orchestration, fleet management, MCP, typescript">
+  <!-- Shared Styles -->
+  <link rel="stylesheet" href="styles/shared.css">
 
   <style>
-    :root {
-      --bg-primary: #000000;
-      --bg-secondary: #0a0a0a;
-      --bg-card: #111111;
-      --border: rgba(255,255,255,0.08);
-      --border-hover: rgba(255,255,255,0.15);
-      --text-primary: #ffffff;
-      --text-secondary: rgba(255,255,255,0.7);
-      --text-muted: rgba(255,255,255,0.5);
-      --accent-blue: #0066FF;
-      --accent-purple: #7C3AED;
-      --accent-cyan: #00D4FF;
-      --accent-green: #00FF94;
-      --gradient-1: linear-gradient(135deg, #0066FF 0%, #00D4FF 50%, #00FF94 100%);
-      --gradient-2: linear-gradient(135deg, #7C3AED 0%, #0066FF 100%);
-      --glow-blue: 0 0 60px rgba(0,102,255,0.4);
-      --glow-cyan: 0 0 60px rgba(0,212,255,0.3);
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html { scroll-behavior: smooth; }
-
-    /* Skip Link (A11y) */
     .skip-link {
       position: absolute;
       top: -40px;
@@ -80,570 +37,179 @@
       border-radius: 0 0 8px 0;
       transition: top 0.3s;
     }
-    .skip-link:focus {
-      top: 0;
-    }
+    .skip-link:focus { top: 0; }
 
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      line-height: 1.6;
-      overflow-x: hidden;
-      font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-    }
-
-    /* Typography */
-    h1, h2, h3, h4 {
-      font-family: 'Outfit', 'Inter', sans-serif;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-    }
-
-    code, .code-body, .install-code {
-      font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-      font-feature-settings: 'liga' on, 'calt' on;
-    }
-
-    /* Container */
-    .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
-
-    /* Navigation */
-    nav {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 1000;
-      padding: 20px 0;
-      background: rgba(0,0,0,0.8);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    nav .container {
+    .hero-home {
+      min-height: 90vh;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      padding: 140px 0 80px;
     }
 
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      text-decoration: none;
-      color: var(--text-primary);
-    }
-
-    .logo-mark {
-      width: 36px;
-      height: 36px;
-    }
-
-    .logo-text {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-    }
-
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 32px;
-    }
-
-    .nav-links a {
-      color: var(--text-secondary);
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 500;
-      transition: color 0.2s;
-    }
-
-    .nav-links a:hover { color: var(--text-primary); }
-
-    .nav-cta {
-      display: flex;
-      gap: 12px;
-    }
-
-    /* Buttons */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      text-decoration: none;
-      transition: all 0.2s;
-      cursor: pointer;
-      border: none;
-    }
-
-    .btn-primary {
-      background: var(--text-primary);
-      color: var(--bg-primary);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 30px rgba(255,255,255,0.2);
-    }
-
-    .btn-secondary {
-      background: transparent;
-      color: var(--text-primary);
-      border: 1px solid var(--border);
-    }
-
-    .btn-secondary:hover {
-      border-color: var(--border-hover);
-      background: rgba(255,255,255,0.05);
-    }
-
-    .btn-gradient {
-      background: var(--gradient-1);
-      color: var(--bg-primary);
-      font-weight: 700;
-    }
-
-    .btn-gradient:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--glow-blue);
-    }
-
-    .btn-large {
-      padding: 16px 32px;
-      font-size: 16px;
-      border-radius: 12px;
-    }
-
-    /* Hero */
-    .hero {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      position: relative;
-      padding: 140px 0 100px;
-      overflow: hidden;
-    }
-
-    .hero-bg {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-    }
-
-    .hero-gradient {
-      position: absolute;
-      width: 800px;
-      height: 800px;
-      border-radius: 50%;
-      filter: blur(120px);
-      opacity: 0.4;
-      animation: float 20s ease-in-out infinite;
-    }
-
-    .hero-gradient-1 {
-      background: var(--accent-blue);
-      top: -400px;
-      right: -200px;
-    }
-
-    .hero-gradient-2 {
-      background: var(--accent-purple);
-      bottom: -400px;
-      left: -200px;
-      animation-delay: -10s;
-    }
-
-    .hero-gradient-3 {
-      background: var(--accent-cyan);
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 600px;
-      height: 600px;
-      opacity: 0.2;
-      animation-delay: -5s;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      33% { transform: translate(30px, -30px) scale(1.05); }
-      66% { transform: translate(-20px, 20px) scale(0.95); }
-    }
-
-    .hero-grid {
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-      background-size: 60px 60px;
-      mask-image: radial-gradient(ellipse 80% 50% at 50% 50%, black 40%, transparent 100%);
-    }
-
-    .hero-content {
-      position: relative;
-      z-index: 1;
-      max-width: 900px;
-    }
-
-    .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      margin-bottom: 32px;
-    }
-
-    .hero-badge-dot {
-      width: 8px;
-      height: 8px;
-      background: var(--accent-green);
-      border-radius: 50%;
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .hero h1 {
-      font-family: 'Outfit', sans-serif;
-      font-size: clamp(52px, 9vw, 88px);
-      font-weight: 800;
-      line-height: 1.0;
-      margin-bottom: 28px;
-      letter-spacing: -0.04em;
-    }
-
-    .hero h1 .gradient-text {
-      background: var(--gradient-1);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .hero-description {
-      font-size: 20px;
-      color: var(--text-secondary);
-      max-width: 600px;
-      margin-bottom: 48px;
-      line-height: 1.7;
-    }
-
-    .hero-buttons {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-      margin-bottom: 80px;
+    .hero-home h1 {
+      font-size: clamp(44px, 8vw, 72px);
+      line-height: 1.05;
+      margin-bottom: 24px;
     }
 
     .hero-stats {
       display: flex;
-      gap: 64px;
-    }
-
-    .hero-stat {
-      display: flex;
-      flex-direction: column;
+      gap: 48px;
+      margin-top: var(--space-2xl);
     }
 
     .hero-stat-value {
-      font-size: 32px;
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
       font-weight: 800;
-      background: var(--gradient-1);
+      background: var(--gradient-primary);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      background-clip: text;
     }
 
     .hero-stat-label {
-      font-size: 14px;
+      font-size: var(--text-sm);
       color: var(--text-muted);
     }
 
-    /* Hero Visualization */
-    .hero-visual {
-      padding: 40px 0 80px;
-      position: relative;
-    }
-
-    .hero-visual-frame {
+    /* Terminal Demo */
+    .terminal-demo {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 20px;
+      border-radius: var(--radius-xl);
       overflow: hidden;
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,0.05),
-        0 25px 80px -20px rgba(0,102,255,0.3),
-        0 40px 100px -40px rgba(0,0,0,0.8);
+      margin: 80px 0;
+      box-shadow: 0 25px 80px -20px rgba(0,102,255,0.2);
     }
 
-    .hero-visual-img {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-
-    /* Code Preview */
-    .code-preview {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-      margin: 100px 0;
-    }
-
-    .code-header {
+    .terminal-header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 16px 20px;
+      gap: var(--space-sm);
+      padding: var(--space-md) var(--space-lg);
+      background: rgba(255,255,255,0.02);
       border-bottom: 1px solid var(--border);
     }
 
-    .code-dot {
+    .terminal-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .terminal-dot {
       width: 12px;
       height: 12px;
       border-radius: 50%;
+      background: var(--border);
     }
 
-    .code-dot-red { background: #FF5F56; }
-    .code-dot-yellow { background: #FFBD2E; }
-    .code-dot-green { background: #27C93F; }
+    .terminal-dot:nth-child(1) { background: #ff5f56; }
+    .terminal-dot:nth-child(2) { background: #ffbd2e; }
+    .terminal-dot:nth-child(3) { background: #27ca40; }
 
-    .code-body {
-      padding: 24px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 14px;
+    .terminal-body {
+      padding: var(--space-xl);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
       line-height: 1.8;
-      overflow-x: auto;
     }
 
-    .code-line { display: block; }
-    .code-comment { color: var(--text-muted); }
-    .code-keyword { color: var(--accent-purple); }
-    .code-string { color: var(--accent-green); }
-    .code-function { color: var(--accent-cyan); }
+    .terminal-line { display: block; margin-bottom: 4px; }
+    .terminal-comment { color: var(--text-muted); }
+    .terminal-prompt { color: var(--accent-cyan); }
+    .terminal-output { color: var(--text-secondary); }
+    .terminal-success { color: var(--accent-green); }
 
-    /* Features */
-    .features {
-      padding: 120px 0;
-      position: relative;
+    /* Capabilities */
+    .capabilities-section {
+      padding: var(--space-4xl) 0;
+      background: var(--bg-secondary);
     }
 
-    .section-header {
-      text-align: center;
-      max-width: 700px;
-      margin: 0 auto 80px;
-    }
-
-    .section-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      background: rgba(0,102,255,0.1);
-      border: 1px solid rgba(0,102,255,0.2);
-      border-radius: 100px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--accent-blue);
-      margin-bottom: 24px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .section-header h2 {
-      font-size: clamp(36px, 5vw, 56px);
-      margin-bottom: 20px;
-      letter-spacing: -0.03em;
-    }
-
-    .section-header p {
-      font-size: 18px;
-      color: var(--text-secondary);
-    }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-    }
-
-    @media (max-width: 1024px) {
-      .features-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-
-    @media (max-width: 640px) {
-      .features-grid { grid-template-columns: 1fr; }
-    }
-
-    .feature-card {
+    .capability-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 40px;
-      transition: all 0.3s;
-      position: relative;
-      overflow: hidden;
+      border-radius: var(--radius-xl);
+      padding: var(--space-xl);
+      height: 100%;
     }
 
-    .feature-card::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, rgba(0,102,255,0.1) 0%, transparent 50%);
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    .feature-card:hover {
-      border-color: var(--border-hover);
-      transform: translateY(-4px);
-    }
-
-    .feature-card:hover::before {
-      opacity: 1;
-    }
-
-    .feature-icon {
-      width: 56px;
-      height: 56px;
+    .capability-icon {
+      width: 48px;
+      height: 48px;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(135deg, rgba(0,102,255,0.2) 0%, rgba(124,58,237,0.2) 100%);
-      border-radius: 14px;
-      margin-bottom: 24px;
-      position: relative;
+      background: rgba(0,102,255,0.1);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-lg);
     }
 
-    .feature-icon svg {
-      width: 28px;
-      height: 28px;
+    .capability-icon svg {
+      width: 24px;
+      height: 24px;
       stroke: var(--accent-cyan);
-      stroke-width: 1.5;
       fill: none;
+      stroke-width: 1.5;
     }
 
-    .feature-card h3 {
-      font-size: 20px;
-      margin-bottom: 12px;
+    .capability-card h3 {
+      font-size: var(--text-lg);
+      margin-bottom: var(--space-sm);
     }
 
-    .feature-card p {
+    .capability-card p {
       color: var(--text-secondary);
-      font-size: 15px;
+      font-size: var(--text-sm);
       line-height: 1.7;
     }
 
-    /* Dashboard Preview */
-    .dashboard-section {
-      padding: 120px 0;
-      background: var(--bg-secondary);
-      position: relative;
-    }
-
-    .dashboard-section::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--border), transparent);
-    }
-
-    .dashboard-preview {
-      margin-top: 60px;
-      position: relative;
-    }
-
-    .dashboard-frame {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      overflow: hidden;
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,0.05),
-        0 20px 50px rgba(0,0,0,0.5),
-        var(--glow-blue);
-    }
-
-    .dashboard-frame img {
-      width: 100%;
-      display: block;
+    .capability-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(0,255,148,0.1);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-xs);
+      color: var(--accent-green);
+      margin-top: var(--space-md);
     }
 
     /* Architecture */
-    .architecture {
-      padding: 120px 0;
-    }
-
     .arch-visual {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 60px;
-      position: relative;
-      overflow: hidden;
+      border-radius: var(--radius-2xl);
+      padding: var(--space-3xl);
+      margin-top: var(--space-2xl);
     }
 
-    .arch-visual::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse at center, rgba(0,102,255,0.1) 0%, transparent 70%);
-    }
-
-    .arch-diagram {
-      display: flex;
-      flex-direction: column;
-      gap: 40px;
-      position: relative;
-      z-index: 1;
-    }
-
-    .arch-layer {
+    .arch-flow {
       display: flex;
       justify-content: center;
-      gap: 20px;
+      align-items: center;
+      gap: var(--space-lg);
       flex-wrap: wrap;
     }
 
     .arch-node {
       background: var(--bg-primary);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px 32px;
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
       text-align: center;
-      min-width: 160px;
-      transition: all 0.3s;
+      min-width: 140px;
+      transition: all var(--transition-normal);
     }
 
     .arch-node:hover {
-      border-color: var(--accent-blue);
-      box-shadow: var(--glow-blue);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 20px rgba(0,212,255,0.2);
     }
 
     .arch-node-icon {
       width: 40px;
       height: 40px;
-      margin: 0 auto 12px;
+      margin: 0 auto var(--space-sm);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -659,844 +225,446 @@
 
     .arch-node-title {
       font-weight: 600;
-      font-size: 14px;
-      margin-bottom: 4px;
+      font-size: var(--text-sm);
     }
 
     .arch-node-subtitle {
-      font-size: 12px;
+      font-size: var(--text-xs);
       color: var(--text-muted);
+      margin-top: 4px;
     }
 
-    .arch-connector {
-      display: flex;
-      justify-content: center;
+    .arch-arrow {
+      color: var(--border);
+      font-size: 24px;
     }
 
-    .arch-connector svg {
-      width: 40px;
-      height: 40px;
-      stroke: var(--border);
-      stroke-width: 1;
-      fill: none;
+    /* Install Section */
+    .install-section {
+      padding: var(--space-4xl) 0;
     }
 
-    /* Install */
-    .install {
-      padding: 120px 0;
-      background: var(--bg-secondary);
-    }
-
-    .install-grid {
+    .install-steps {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-      margin-top: 60px;
+      gap: var(--space-lg);
+      margin-top: var(--space-2xl);
     }
 
     @media (max-width: 768px) {
-      .install-grid { grid-template-columns: 1fr; }
-    }
-
-    .install-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 32px;
+      .install-steps { grid-template-columns: 1fr; }
+      .hero-stats { gap: 24px; flex-wrap: wrap; }
+      .arch-flow { flex-direction: column; }
+      .arch-arrow { transform: rotate(90deg); }
     }
 
     .install-step {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-xl);
+    }
+
+    .install-number {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       width: 32px;
       height: 32px;
-      background: var(--gradient-1);
-      border-radius: 8px;
+      background: var(--gradient-primary);
+      border-radius: var(--radius-md);
       font-weight: 700;
-      font-size: 14px;
+      font-size: var(--text-sm);
       color: var(--bg-primary);
-      margin-bottom: 20px;
+      margin-bottom: var(--space-lg);
     }
 
-    .install-card h3 {
-      font-size: 18px;
-      margin-bottom: 12px;
+    .install-step h3 {
+      font-size: var(--text-lg);
+      margin-bottom: var(--space-sm);
     }
 
-    .install-card p {
+    .install-step p {
       color: var(--text-secondary);
-      font-size: 14px;
-      margin-bottom: 20px;
+      font-size: var(--text-sm);
+      margin-bottom: var(--space-lg);
     }
 
     .install-code {
       background: var(--bg-primary);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 16px;
-      font-family: 'SF Mono', monospace;
-      font-size: 13px;
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
       color: var(--accent-cyan);
-      overflow-x: auto;
-    }
-
-    /* Use Cases */
-    .use-cases {
-      padding: 120px 0;
-      background: var(--bg-secondary);
-    }
-
-    .use-cases-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-    }
-
-    @media (max-width: 768px) {
-      .use-cases-grid { grid-template-columns: 1fr; }
-    }
-
-    .use-case-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 32px;
-      transition: all 0.3s;
-    }
-
-    .use-case-card:hover {
-      border-color: var(--accent-blue);
-      transform: translateY(-4px);
-    }
-
-    .use-case-icon {
-      width: 48px;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,102,255,0.1);
-      border-radius: 12px;
-      margin-bottom: 20px;
-    }
-
-    .use-case-icon svg {
-      width: 24px;
-      height: 24px;
-      stroke: var(--accent-cyan);
-    }
-
-    .use-case-card h3 {
-      font-size: 18px;
-      margin-bottom: 12px;
-    }
-
-    .use-case-card p {
-      color: var(--text-secondary);
-      font-size: 14px;
-      line-height: 1.7;
-    }
-
-    /* FAQ */
-    .faq {
-      padding: 120px 0;
-    }
-
-    .faq-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 32px;
-    }
-
-    @media (max-width: 768px) {
-      .faq-grid { grid-template-columns: 1fr; }
-    }
-
-    .faq-item {
-      padding: 24px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-    }
-
-    .faq-item h3 {
-      font-size: 16px;
-      margin-bottom: 12px;
-      color: var(--text-primary);
-    }
-
-    .faq-item p {
-      font-size: 14px;
-      color: var(--text-secondary);
-      line-height: 1.7;
-    }
-
-    /* CTA */
-    .cta {
-      padding: 160px 0;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .cta-bg {
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse at center, rgba(0,102,255,0.2) 0%, transparent 60%);
-    }
-
-    .cta-content {
-      position: relative;
-      z-index: 1;
-    }
-
-    .cta h2 {
-      font-size: clamp(40px, 6vw, 64px);
-      margin-bottom: 24px;
-      letter-spacing: -0.03em;
-    }
-
-    .cta p {
-      font-size: 20px;
-      color: var(--text-secondary);
-      max-width: 600px;
-      margin: 0 auto 48px;
-    }
-
-    .cta-buttons {
-      display: flex;
-      gap: 16px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    /* Footer */
-    footer {
-      padding: 60px 0;
-      border-top: 1px solid var(--border);
-    }
-
-    .footer-content {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 24px;
-    }
-
-    .footer-links {
-      display: flex;
-      gap: 32px;
-    }
-
-    .footer-links a {
-      color: var(--text-secondary);
-      text-decoration: none;
-      font-size: 14px;
-      transition: color 0.2s;
-    }
-
-    .footer-links a:hover { color: var(--text-primary); }
-
-    .footer-copyright {
-      color: var(--text-muted);
-      font-size: 14px;
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      .nav-links { display: none; }
-      .hero-stats { gap: 32px; flex-wrap: wrap; }
-      .hero h1 { font-size: 40px; }
     }
   </style>
 </head>
 <body>
-  <!-- Skip to main content (A11y) -->
   <a href="#main" class="skip-link">Skip to main content</a>
 
   <!-- Navigation -->
-  <nav>
-    <div class="container">
-      <a href="#" class="logo">
-        <svg class="logo-mark" viewBox="0 0 36 36" fill="none">
-          <rect width="36" height="36" rx="8" fill="url(#logo-gradient)"/>
+  <nav class="nav">
+    <div class="container nav-inner">
+      <a href="index.html" class="nav-logo">
+        <svg width="32" height="32" viewBox="0 0 36 36" fill="none">
+          <rect width="36" height="36" rx="8" fill="url(#g1)"/>
           <path d="M18 8L26 12V24L18 28L10 24V12L18 8Z" stroke="white" stroke-width="1.5" fill="none"/>
           <circle cx="18" cy="16" r="3" fill="white"/>
           <circle cx="13" cy="22" r="2" fill="white" opacity="0.7"/>
           <circle cx="23" cy="22" r="2" fill="white" opacity="0.7"/>
           <line x1="18" y1="16" x2="13" y2="22" stroke="white" stroke-width="1" opacity="0.5"/>
           <line x1="18" y1="16" x2="23" y2="22" stroke="white" stroke-width="1" opacity="0.5"/>
-          <defs>
-            <linearGradient id="logo-gradient" x1="0" y1="0" x2="36" y2="36">
-              <stop offset="0%" stop-color="#0066FF"/>
-              <stop offset="100%" stop-color="#00D4FF"/>
-            </linearGradient>
-          </defs>
+          <defs><linearGradient id="g1" x1="0" y1="0" x2="36" y2="36"><stop stop-color="#0066FF"/><stop offset="1" stop-color="#00D4FF"/></linearGradient></defs>
         </svg>
-        <span class="logo-text">Claude Fleet</span>
+        Claude Fleet
       </a>
 
       <div class="nav-links">
-        <a href="#features">Features</a>
-        <a href="wave-demo.html">Wave Demo</a>
-        <a href="metrics.html">Metrics</a>
-        <a href="autonomous-ops.html">24/7 Ops</a>
-        <a href="https://github.com/sethdford/claude-fleet">Docs</a>
+        <a href="index.html" class="nav-link active">Home</a>
+        <a href="documentation.html" class="nav-link">Docs</a>
+        <a href="demo.html" class="nav-link">Demo</a>
+        <a href="autonomous-ops.html" class="nav-link">24/7 Ops</a>
       </div>
 
       <div class="nav-cta">
-        <a href="https://github.com/sethdford/claude-fleet" class="btn btn-secondary">GitHub</a>
-        <a href="#install" class="btn btn-primary">Get Started</a>
+        <a href="https://github.com/sethdford/claude-fleet" class="btn btn-secondary btn-sm">GitHub</a>
+        <a href="#install" class="btn btn-primary btn-sm">Get Started</a>
       </div>
     </div>
   </nav>
 
-  <!-- Hero -->
   <main id="main">
-  <section class="hero">
-    <div class="hero-bg">
-      <div class="hero-gradient hero-gradient-1"></div>
-      <div class="hero-gradient hero-gradient-2"></div>
-      <div class="hero-gradient hero-gradient-3"></div>
-      <div class="hero-grid"></div>
-    </div>
+    <!-- Hero -->
+    <section class="hero hero-home">
+      <div class="hero-bg">
+        <div class="hero-gradient hero-gradient-1"></div>
+        <div class="hero-gradient hero-gradient-2"></div>
+        <div class="hero-grid-bg"></div>
+      </div>
 
-    <div class="container">
-      <div class="hero-content">
-        <div class="hero-badge">
-          <span class="hero-badge-dot"></span>
-          v2.0 Now Available
-        </div>
-
-        <h1>
-          The infrastructure for<br>
-          <span class="gradient-text">AI agent fleets</span>
-        </h1>
-
-        <p class="hero-description">
-          Orchestrate multiple Claude Code instances with intelligent coordination,
-          swarm intelligence, and real-time collaboration. Build production-grade
-          multi-agent systems.
-        </p>
-
-        <div class="hero-buttons">
-          <a href="#install" class="btn btn-gradient btn-large">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Install Now
-          </a>
-          <a href="https://github.com/sethdford/claude-fleet" class="btn btn-secondary btn-large">
-            View Documentation
-          </a>
-        </div>
-
-        <div class="hero-stats">
-          <div class="hero-stat">
-            <span class="hero-stat-value">100%</span>
-            <span class="hero-stat-label">TypeScript</span>
+      <div class="container">
+        <div class="hero-content">
+          <div class="badge badge-success" style="margin-bottom: var(--space-lg);">
+            <span class="badge-dot"></span>
+            v2.0 Production Ready
           </div>
-          <div class="hero-stat">
-            <span class="hero-stat-value">148+</span>
-            <span class="hero-stat-label">Tests Passing</span>
+
+          <h1>
+            Orchestrate<br>
+            <span class="gradient-text">AI agent fleets</span>
+          </h1>
+
+          <p class="hero-description">
+            Run multiple Claude Code instances in parallel with intelligent coordination,
+            git worktree isolation, and real-time monitoring. Production-grade infrastructure
+            for multi-agent development workflows.
+          </p>
+
+          <div class="hero-buttons">
+            <a href="#install" class="btn btn-gradient btn-lg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Install Now
+            </a>
+            <a href="documentation.html" class="btn btn-secondary btn-lg">
+              View Docs
+            </a>
           </div>
-          <div class="hero-stat">
-            <span class="hero-stat-value">MIT</span>
-            <span class="hero-stat-label">Licensed</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
 
-  <!-- Hero Visualization -->
-  <section class="hero-visual">
-    <div class="container">
-      <div class="hero-visual-frame">
-        <img src="images/hero-animation.svg" alt="Fleet orchestration visualization" class="hero-visual-img">
-      </div>
-    </div>
-  </section>
-
-  <!-- Code Preview -->
-  <section class="container">
-    <div class="code-preview">
-      <div class="code-header">
-        <div class="code-dot code-dot-red"></div>
-        <div class="code-dot code-dot-yellow"></div>
-        <div class="code-dot code-dot-green"></div>
-      </div>
-      <div class="code-body">
-        <span class="code-line"><span class="code-comment"># Install Claude Fleet globally</span></span>
-        <span class="code-line">npm install -g <span class="code-string">claude-fleet</span></span>
-        <span class="code-line"></span>
-        <span class="code-line"><span class="code-comment"># Start the fleet orchestration server</span></span>
-        <span class="code-line">claude-fleet</span>
-        <span class="code-line"></span>
-        <span class="code-line"><span class="code-comment"># Fleet server running at http://localhost:3847</span></span>
-        <span class="code-line"><span class="code-comment"># Dashboard available at http://localhost:3847/dashboard.html</span></span>
-      </div>
-    </div>
-  </section>
-
-  <!-- Features -->
-  <section class="features" id="features">
-    <div class="container">
-      <div class="section-header">
-        <div class="section-label">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-          </svg>
-          Features
-        </div>
-        <h2>Everything you need to orchestrate AI agents</h2>
-        <p>Built for developers who need to coordinate multiple Claude Code instances at scale.</p>
-      </div>
-
-      <div class="features-grid">
-        <div class="feature-card">
-          <div class="feature-icon">
-            <!-- Worker Orchestration: Network of connected nodes -->
-            <svg viewBox="0 0 24 24">
-              <circle cx="12" cy="5" r="2.5"/>
-              <circle cx="5" cy="19" r="2.5"/>
-              <circle cx="19" cy="19" r="2.5"/>
-              <path d="M12 7.5v4"/>
-              <path d="M8.5 13.5l-2 4"/>
-              <path d="M15.5 13.5l2 4"/>
-              <circle cx="12" cy="13" r="3" stroke-dasharray="2 1"/>
-            </svg>
-          </div>
-          <h3>Worker Orchestration</h3>
-          <p>Spawn, manage, and coordinate multiple Claude Code instances with automatic git worktree isolation and process lifecycle management.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">
-            <!-- Swarm Intelligence: Honeycomb/hive pattern -->
-            <svg viewBox="0 0 24 24">
-              <path d="M12 2l4 2.5v5L12 12 8 9.5v-5L12 2z"/>
-              <path d="M20 7l4 2.5v5L20 17l-4-2.5v-5L20 7z" transform="translate(-8, 5)"/>
-              <path d="M20 7l4 2.5v5L20 17l-4-2.5v-5L20 7z" transform="translate(0, 5)"/>
-              <circle cx="12" cy="7" r="1.5" fill="currentColor"/>
-              <circle cx="8" cy="14.5" r="1.5" fill="currentColor"/>
-              <circle cx="16" cy="14.5" r="1.5" fill="currentColor"/>
-            </svg>
-          </div>
-          <h3>Swarm Intelligence</h3>
-          <p>Coordinate agent swarms with blackboard messaging, shared context propagation, and intelligent spawn queuing with depth limits.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">
-            <!-- Real-Time Dashboard: Monitor with pulse line -->
-            <svg viewBox="0 0 24 24">
-              <rect x="2" y="3" width="20" height="14" rx="2"/>
-              <path d="M6 10h2l2 -3 2 6 2 -3h4"/>
-              <line x1="8" y1="21" x2="16" y2="21"/>
-              <line x1="12" y1="17" x2="12" y2="21"/>
-            </svg>
-          </div>
-          <h3>Real-Time Dashboard</h3>
-          <p>Monitor fleet health, worker status, and system metrics through an interactive web dashboard with WebSocket updates.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">
-            <!-- Role-Based Access: Shield with checkmark -->
-            <svg viewBox="0 0 24 24">
-              <path d="M12 2L4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3z"/>
-              <path d="M9 12l2 2 4-4"/>
-            </svg>
-          </div>
-          <h3>Role-Based Access</h3>
-          <p>Team-lead and worker roles with JWT authentication, permission-based API access, and secure token management.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">
-            <!-- Persistent Storage: Stacked disks with save arrow -->
-            <svg viewBox="0 0 24 24">
-              <ellipse cx="12" cy="6" rx="8" ry="3"/>
-              <path d="M4 6v4c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/>
-              <path d="M4 10v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4"/>
-              <path d="M4 14v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4"/>
-            </svg>
-          </div>
-          <h3>Persistent Storage</h3>
-          <p>SQLite-based persistence for workers, checkpoints, messages, and work items with automatic crash recovery and state restoration.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">
-            <!-- MCP Integration: Plug/connection icon -->
-            <svg viewBox="0 0 24 24">
-              <path d="M12 2v4"/>
-              <path d="M12 18v4"/>
-              <path d="M4.93 4.93l2.83 2.83"/>
-              <path d="M16.24 16.24l2.83 2.83"/>
-              <path d="M2 12h4"/>
-              <path d="M18 12h4"/>
-              <path d="M4.93 19.07l2.83-2.83"/>
-              <path d="M16.24 7.76l2.83-2.83"/>
-              <circle cx="12" cy="12" r="4"/>
-              <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-            </svg>
-          </div>
-          <h3>MCP Integration</h3>
-          <p>Model Context Protocol server for seamless integration with Claude Code, enabling tool-based fleet control from any MCP client.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Dashboard -->
-  <section class="dashboard-section" id="dashboard">
-    <div class="container">
-      <div class="section-header">
-        <div class="section-label">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-            <line x1="3" y1="9" x2="21" y2="9"/>
-          </svg>
-          Dashboard
-        </div>
-        <h2>Monitor your fleet in real-time</h2>
-        <p>A beautiful, responsive dashboard for tracking worker health, metrics, and events.</p>
-      </div>
-
-      <div class="dashboard-preview">
-        <div class="dashboard-frame">
-          <img src="images/dashboard-animation.svg" alt="Claude Fleet Dashboard - Real-time monitoring visualization" style="width: 100%; height: auto;">
-        </div>
-      </div>
-
-      <div class="dashboard-cta" style="text-align: center; margin-top: 40px;">
-        <a href="swarm-planner-demo.html" class="btn btn-gradient btn-large" style="display: inline-flex;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>
-          </svg>
-          Try Interactive Swarm Planner
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- Architecture -->
-  <section class="architecture" id="architecture">
-    <div class="container">
-      <div class="section-header">
-        <div class="section-label">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-            <polyline points="2 17 12 22 22 17"/>
-            <polyline points="2 12 12 17 22 12"/>
-          </svg>
-          Architecture
-        </div>
-        <h2>Built for scale and reliability</h2>
-        <p>A modular architecture designed for production multi-agent workloads.</p>
-      </div>
-
-      <div class="arch-visual">
-        <div class="arch-diagram">
-          <div class="arch-layer">
-            <div class="arch-node">
-              <div class="arch-node-icon">
-                <!-- Team Lead: Crown/leadership icon -->
-                <svg viewBox="0 0 24 24"><path d="M12 2L15 8L22 9L17 14L18 21L12 18L6 21L7 14L2 9L9 8L12 2Z"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
-              </div>
-              <div class="arch-node-title">Team Lead</div>
-              <div class="arch-node-subtitle">Orchestrator</div>
+          <div class="hero-stats">
+            <div>
+              <span class="hero-stat-value">TypeScript</span>
+              <div class="hero-stat-label">100% Type-Safe</div>
+            </div>
+            <div>
+              <span class="hero-stat-value">SQLite</span>
+              <div class="hero-stat-label">Persistent State</div>
+            </div>
+            <div>
+              <span class="hero-stat-value">MIT</span>
+              <div class="hero-stat-label">Open Source</div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
 
-          <div class="arch-connector">
-            <svg viewBox="0 0 40 40"><path d="M20 5 L20 35 M10 25 L20 35 L30 25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <!-- Terminal Demo -->
+    <section class="container">
+      <div class="terminal-demo">
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+            <div class="terminal-dot"></div>
+          </div>
+          <span style="color: var(--text-muted); font-size: var(--text-xs); margin-left: var(--space-md);">Terminal</span>
+        </div>
+        <div class="terminal-body">
+          <span class="terminal-line terminal-comment"># Install Claude Fleet</span>
+          <span class="terminal-line"><span class="terminal-prompt">$</span> npm install -g claude-fleet</span>
+          <span class="terminal-line"></span>
+          <span class="terminal-line terminal-comment"># Start the orchestration server</span>
+          <span class="terminal-line"><span class="terminal-prompt">$</span> claude-fleet</span>
+          <span class="terminal-line"></span>
+          <span class="terminal-line terminal-output">Claude Fleet Server v2.0</span>
+          <span class="terminal-line terminal-success">HTTP API:    http://localhost:3847</span>
+          <span class="terminal-line terminal-success">WebSocket:   ws://localhost:3847/ws</span>
+          <span class="terminal-line terminal-success">Dashboard:   http://localhost:3847/dashboard.html</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Capabilities -->
+    <section class="capabilities-section" id="features">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            Capabilities
+          </span>
+          <h2>What Claude Fleet <span class="gradient-text">does</span></h2>
+          <p>Production infrastructure for coordinating multiple Claude Code instances.</p>
+        </div>
+
+        <div class="grid grid-3">
+          <div class="capability-card">
+            <div class="capability-icon">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="5" r="2.5"/>
+                <circle cx="5" cy="19" r="2.5"/>
+                <circle cx="19" cy="19" r="2.5"/>
+                <path d="M12 7.5v4"/>
+                <path d="M8.5 13.5l-2 4"/>
+                <path d="M15.5 13.5l2 4"/>
+              </svg>
+            </div>
+            <h3>Worker Orchestration</h3>
+            <p>Spawn and manage multiple Claude Code instances. Each worker runs in an isolated git worktree, preventing conflicts.</p>
+            <span class="capability-badge">Implemented</span>
           </div>
 
-          <div class="arch-layer">
+          <div class="capability-card">
+            <div class="capability-icon">
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="M3 9h18"/>
+                <path d="M9 21V9"/>
+              </svg>
+            </div>
+            <h3>Blackboard Messaging</h3>
+            <p>Shared context propagation via blackboard messaging. Workers post discoveries, others subscribe to updates.</p>
+            <span class="capability-badge">Implemented</span>
+          </div>
+
+          <div class="capability-card">
+            <div class="capability-icon">
+              <svg viewBox="0 0 24 24">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <path d="M6 10h2l2-3 2 6 2-3h4"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </div>
+            <h3>Real-Time Dashboard</h3>
+            <p>Monitor worker health, task progress, and fleet metrics through a WebSocket-powered web dashboard.</p>
+            <span class="capability-badge">Implemented</span>
+          </div>
+
+          <div class="capability-card">
+            <div class="capability-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M9 12l2 2 4-4"/>
+              </svg>
+            </div>
+            <h3>JWT Authentication</h3>
+            <p>Role-based access control with team-lead and worker roles. Secure API endpoints with token-based auth.</p>
+            <span class="capability-badge">Implemented</span>
+          </div>
+
+          <div class="capability-card">
+            <div class="capability-icon">
+              <svg viewBox="0 0 24 24">
+                <ellipse cx="12" cy="6" rx="8" ry="3"/>
+                <path d="M4 6v4c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/>
+                <path d="M4 10v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4"/>
+                <path d="M4 14v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4"/>
+              </svg>
+            </div>
+            <h3>SQLite Persistence</h3>
+            <p>Workers, checkpoints, messages, and work items persisted to SQLite. Automatic crash recovery.</p>
+            <span class="capability-badge">Implemented</span>
+          </div>
+
+          <div class="capability-card">
+            <div class="capability-icon">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 2v4"/>
+                <path d="M12 18v4"/>
+                <path d="M4.93 4.93l2.83 2.83"/>
+                <path d="M16.24 16.24l2.83 2.83"/>
+                <path d="M2 12h4"/>
+                <path d="M18 12h4"/>
+              </svg>
+            </div>
+            <h3>MCP Integration</h3>
+            <p>Model Context Protocol server for seamless integration. Control your fleet from any MCP-compatible client.</p>
+            <span class="capability-badge">Implemented</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture -->
+    <section class="section" id="architecture">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+              <polyline points="2 17 12 22 22 17"/>
+              <polyline points="2 12 12 17 22 12"/>
+            </svg>
+            Architecture
+          </span>
+          <h2>How it <span class="gradient-text">works</span></h2>
+          <p>A modular system for orchestrating multiple Claude Code instances.</p>
+        </div>
+
+        <div class="arch-visual">
+          <div class="arch-flow">
             <div class="arch-node">
               <div class="arch-node-icon">
-                <!-- Worker: Terminal/code window -->
-                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3"/><line x1="13" y1="15" x2="17" y2="15"/></svg>
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
               </div>
-              <div class="arch-node-title">Worker Alpha</div>
+              <div class="arch-node-title">Scheduler</div>
+              <div class="arch-node-subtitle">Cron + Webhooks</div>
+            </div>
+
+            <span class="arch-arrow">→</span>
+
+            <div class="arch-node">
+              <div class="arch-node-icon">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </div>
+              <div class="arch-node-title">Task Queue</div>
+              <div class="arch-node-subtitle">Priority-based</div>
+            </div>
+
+            <span class="arch-arrow">→</span>
+
+            <div class="arch-node">
+              <div class="arch-node-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path d="M12 8v4M9 14l-2.5 3M15 14l2.5 3"/></svg>
+              </div>
+              <div class="arch-node-title">Workers</div>
               <div class="arch-node-subtitle">Claude Code</div>
             </div>
-            <div class="arch-node">
-              <div class="arch-node-icon">
-                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3"/><line x1="13" y1="15" x2="17" y2="15"/></svg>
-              </div>
-              <div class="arch-node-title">Worker Beta</div>
-              <div class="arch-node-subtitle">Claude Code</div>
-            </div>
-            <div class="arch-node">
-              <div class="arch-node-icon">
-                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3"/><line x1="13" y1="15" x2="17" y2="15"/></svg>
-              </div>
-              <div class="arch-node-title">Worker Gamma</div>
-              <div class="arch-node-subtitle">Claude Code</div>
-            </div>
-          </div>
 
-          <div class="arch-connector">
-            <svg viewBox="0 0 40 40"><path d="M20 5 L20 35 M10 25 L20 35 L30 25" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
+            <span class="arch-arrow">→</span>
 
-          <div class="arch-layer">
             <div class="arch-node">
               <div class="arch-node-icon">
-                <!-- Coordination: Network/graph icon -->
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/><path d="M9.5 10.5L5.5 7.5"/><path d="M14.5 10.5L18.5 7.5"/><path d="M9.5 13.5L5.5 16.5"/><path d="M14.5 13.5L18.5 16.5"/></svg>
-              </div>
-              <div class="arch-node-title">Coordination</div>
-              <div class="arch-node-subtitle">Blackboard + Queue</div>
-            </div>
-            <div class="arch-node">
-              <div class="arch-node-icon">
-                <!-- Storage: Database cylinder -->
                 <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
               </div>
               <div class="arch-node-title">Storage</div>
-              <div class="arch-node-subtitle">SQLite</div>
-            </div>
-            <div class="arch-node">
-              <div class="arch-node-icon">
-                <!-- Messaging: Chat bubbles -->
-                <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/></svg>
-              </div>
-              <div class="arch-node-title">Messaging</div>
-              <div class="arch-node-subtitle">Mail + Handoffs</div>
+              <div class="arch-node-subtitle">SQLite + Blackboard</div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- Install -->
-  <section class="install" id="install">
-    <div class="container">
-      <div class="section-header">
-        <div class="section-label">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="4 17 10 11 4 5"/>
-            <line x1="12" y1="19" x2="20" y2="19"/>
-          </svg>
-          Quick Start
-        </div>
-        <h2>Get started in minutes</h2>
-        <p>Install Claude Fleet and start orchestrating your agent fleet.</p>
-      </div>
-
-      <div class="install-grid">
-        <div class="install-card">
-          <div class="install-step">1</div>
-          <h3>Install</h3>
-          <p>Install Claude Fleet globally via npm.</p>
-          <div class="install-code">npm install -g claude-fleet</div>
-        </div>
-
-        <div class="install-card">
-          <div class="install-step">2</div>
-          <h3>Start Server</h3>
-          <p>Launch the fleet orchestration server.</p>
-          <div class="install-code">claude-fleet</div>
-        </div>
-
-        <div class="install-card">
-          <div class="install-step">3</div>
-          <h3>Open Dashboard</h3>
-          <p>Access the real-time monitoring dashboard.</p>
-          <div class="install-code">open http://localhost:3847/dashboard.html</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Use Cases -->
-  <section class="use-cases" id="use-cases">
-    <div class="container">
-      <div class="section-header">
-        <div class="section-label">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="8.5" cy="7" r="4"/>
-            <polyline points="17 11 19 13 23 9"/>
-          </svg>
-          Use Cases
-        </div>
-        <h2>Built for ambitious teams</h2>
-        <p>From solo developers to enterprise teams, Claude Fleet scales with your needs.</p>
-      </div>
-
-      <div class="use-cases-grid">
-        <div class="use-case-card">
-          <div class="use-case-icon">
-            <!-- Large Codebase Refactoring: Code blocks with arrows -->
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <rect x="2" y="3" width="7" height="7" rx="1"/>
-              <rect x="15" y="3" width="7" height="7" rx="1"/>
-              <rect x="2" y="14" width="7" height="7" rx="1"/>
-              <rect x="15" y="14" width="7" height="7" rx="1"/>
-              <path d="M9 6.5h6"/>
-              <path d="M12 6.5l-2 -2"/>
-              <path d="M12 6.5l-2 2"/>
-              <path d="M9 17.5h6"/>
-              <path d="M12 17.5l2 -2"/>
-              <path d="M12 17.5l2 2"/>
+    <!-- Install -->
+    <section class="install-section" id="install">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 17 10 11 4 5"/>
+              <line x1="12" y1="19" x2="20" y2="19"/>
             </svg>
+            Quick Start
+          </span>
+          <h2>Get started in <span class="gradient-text">3 steps</span></h2>
+        </div>
+
+        <div class="install-steps">
+          <div class="install-step">
+            <div class="install-number">1</div>
+            <h3>Install</h3>
+            <p>Install Claude Fleet globally via npm.</p>
+            <div class="install-code">npm install -g claude-fleet</div>
           </div>
-          <h3>Large Codebase Refactoring</h3>
-          <p>Parallelize massive refactoring tasks across multiple workers, each handling different modules while staying coordinated through the blackboard.</p>
-        </div>
 
-        <div class="use-case-card">
-          <div class="use-case-icon">
-            <!-- Multi-Feature Development: Git branches -->
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <circle cx="6" cy="6" r="2"/>
-              <circle cx="18" cy="6" r="2"/>
-              <circle cx="6" cy="18" r="2"/>
-              <circle cx="18" cy="18" r="2"/>
-              <path d="M6 8v10"/>
-              <path d="M18 8v2c0 2-2 4-6 4"/>
-              <path d="M18 16v-2c0-2-2-4-6-4"/>
-            </svg>
+          <div class="install-step">
+            <div class="install-number">2</div>
+            <h3>Start Server</h3>
+            <p>Launch the orchestration server.</p>
+            <div class="install-code">claude-fleet</div>
           </div>
-          <h3>Multi-Feature Development</h3>
-          <p>Develop multiple features simultaneously with isolated git worktrees. Each worker handles a feature branch without conflicts.</p>
-        </div>
 
-        <div class="use-case-card">
-          <div class="use-case-icon">
-            <!-- Automated Code Review: Magnifying glass with checkmark -->
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <circle cx="10" cy="10" r="7"/>
-              <path d="M21 21l-4.35-4.35"/>
-              <path d="M7 10l2 2 4-4"/>
-            </svg>
+          <div class="install-step">
+            <div class="install-number">3</div>
+            <h3>Open Dashboard</h3>
+            <p>Access the monitoring dashboard.</p>
+            <div class="install-code">http://localhost:3847/dashboard.html</div>
           </div>
-          <h3>Automated Code Review</h3>
-          <p>Deploy reviewer agents that analyze PRs in parallel, checking for different concerns: security, performance, style, and tests.</p>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- FAQ -->
-  <section class="faq" id="faq">
-    <div class="container">
-      <div class="section-header">
-        <div class="section-label">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-          FAQ
-        </div>
-        <h2>Frequently asked questions</h2>
-      </div>
-
-      <div class="faq-grid">
-        <div class="faq-item">
-          <h3>What is Claude Fleet?</h3>
-          <p>Claude Fleet is an orchestration layer for running multiple Claude Code CLI instances in parallel. It provides coordination, task management, and real-time monitoring for multi-agent workflows.</p>
-        </div>
-
-        <div class="faq-item">
-          <h3>Do I need an Anthropic API key?</h3>
-          <p>Yes, each Claude Code worker requires access to the Anthropic API through your existing Claude Code CLI setup. Claude Fleet orchestrates the workers but doesn't handle API authentication directly.</p>
-        </div>
-
-        <div class="faq-item">
-          <h3>How does git worktree isolation work?</h3>
-          <p>Each worker operates in its own git worktree, allowing them to work on different branches simultaneously without conflicts. Changes are merged back through standard git workflows.</p>
-        </div>
-
-        <div class="faq-item">
-          <h3>Can I use this in production?</h3>
-          <p>Claude Fleet is designed for production use with SQLite persistence, automatic crash recovery, health monitoring, and Prometheus metrics. It's MIT licensed for any use case.</p>
-        </div>
-
-        <div class="faq-item">
-          <h3>How many workers can I run?</h3>
-          <p>The default limit is 5 concurrent workers, configurable via MAX_WORKERS. Actual limits depend on your system resources and Anthropic API rate limits.</p>
-        </div>
-
-        <div class="faq-item">
-          <h3>What's the MCP integration for?</h3>
-          <p>The Model Context Protocol server lets any MCP-compatible client (including Claude Code itself) control the fleet, enabling agents to spawn and coordinate other agents.</p>
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="cta-bg"></div>
+      <div class="container">
+        <div class="cta-content">
+          <h2>Ready to orchestrate?</h2>
+          <p>Start running multi-agent workflows today.</p>
+          <div class="cta-buttons">
+            <a href="https://github.com/sethdford/claude-fleet" class="btn btn-gradient btn-lg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+              </svg>
+              View on GitHub
+            </a>
+            <a href="https://www.npmjs.com/package/claude-fleet" class="btn btn-secondary btn-lg">
+              View on NPM
+            </a>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <section class="cta">
-    <div class="cta-bg"></div>
-    <div class="container">
-      <div class="cta-content">
-        <h2>Ready to orchestrate your fleet?</h2>
-        <p>Join developers building the next generation of multi-agent AI systems.</p>
-        <div class="cta-buttons">
-          <a href="https://github.com/sethdford/claude-fleet" class="btn btn-gradient btn-large">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-            </svg>
-            Star on GitHub
-          </a>
-          <a href="https://www.npmjs.com/package/claude-fleet" class="btn btn-secondary btn-large">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M0 7.334v8h6.666v1.332H12v-1.332h12v-8H0zm6.666 6.664H5.334v-4H3.999v4H1.335V8.667h5.331v5.331zm4 0v1.336H8.001V8.667h5.334v5.332h-2.669v-.001zm12.001 0h-1.33v-4h-1.336v4h-1.335v-4h-1.33v4h-2.671V8.667h8.002v5.331zM10.665 10H12v2.667h-1.335V10z"/>
-            </svg>
-            View on NPM
-          </a>
-        </div>
-      </div>
-    </div>
-  </section>
-
+    </section>
   </main>
 
   <!-- Footer -->
-  <footer>
+  <footer class="footer">
     <div class="container">
-      <div class="footer-content">
-        <a href="#" class="logo">
-          <svg class="logo-mark" viewBox="0 0 36 36" fill="none" width="28" height="28">
-            <rect width="36" height="36" rx="8" fill="url(#logo-gradient-footer)"/>
+      <div class="footer-bottom" style="margin-top: 0; padding-top: 0; border-top: none;">
+        <div class="nav-logo" style="font-size: var(--text-sm);">
+          <svg width="24" height="24" viewBox="0 0 36 36" fill="none">
+            <rect width="36" height="36" rx="8" fill="url(#g2)"/>
             <path d="M18 8L26 12V24L18 28L10 24V12L18 8Z" stroke="white" stroke-width="1.5" fill="none"/>
             <circle cx="18" cy="16" r="3" fill="white"/>
-            <circle cx="13" cy="22" r="2" fill="white" opacity="0.7"/>
-            <circle cx="23" cy="22" r="2" fill="white" opacity="0.7"/>
-            <defs>
-              <linearGradient id="logo-gradient-footer" x1="0" y1="0" x2="36" y2="36">
-                <stop offset="0%" stop-color="#0066FF"/>
-                <stop offset="100%" stop-color="#00D4FF"/>
-              </linearGradient>
-            </defs>
+            <defs><linearGradient id="g2" x1="0" y1="0" x2="36" y2="36"><stop stop-color="#0066FF"/><stop offset="1" stop-color="#00D4FF"/></linearGradient></defs>
           </svg>
-          <span class="logo-text">Claude Fleet</span>
-        </a>
-
-        <div class="footer-links">
-          <a href="https://github.com/sethdford/claude-fleet">GitHub</a>
-          <a href="https://www.npmjs.com/package/claude-fleet">NPM</a>
-          <a href="https://github.com/sethdford/claude-fleet/issues">Issues</a>
-          <a href="https://github.com/sethdford">@sethdford</a>
+          Claude Fleet
         </div>
-
-        <div class="footer-copyright">
-          MIT License
+        <div style="display: flex; gap: var(--space-xl);">
+          <a href="https://github.com/sethdford/claude-fleet" style="color: var(--text-secondary); text-decoration: none; font-size: var(--text-sm);">GitHub</a>
+          <a href="https://www.npmjs.com/package/claude-fleet" style="color: var(--text-secondary); text-decoration: none; font-size: var(--text-sm);">NPM</a>
+          <a href="documentation.html" style="color: var(--text-secondary); text-decoration: none; font-size: var(--text-sm);">Docs</a>
         </div>
+        <span>MIT License</span>
       </div>
     </div>
   </footer>

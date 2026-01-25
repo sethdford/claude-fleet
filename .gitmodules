@@ -1,0 +1,3 @@
+[submodule "external/claude-code-tools"]
+	path = external/claude-code-tools
+	url = https://github.com/pchalasani/claude-code-tools.git

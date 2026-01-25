@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Demo - Claude Fleet</title>
+  <meta name="description" content="Try Claude Fleet's worker orchestration and swarm planning in your browser.">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="images/logo.svg">
+
+  <!-- Shared Styles -->
+  <link rel="stylesheet" href="styles/shared.css">
+
+  <style>
+    /* Demo Navigation */
+    .demo-nav {
+      display: flex;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-xl);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: var(--space-md);
+    }
+
+    .demo-nav-btn {
+      padding: var(--space-sm) var(--space-lg);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .demo-nav-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-secondary);
+    }
+
+    .demo-nav-btn.active {
+      color: var(--accent-cyan);
+      border-color: var(--accent-cyan);
+      background: rgba(0,212,255,0.05);
+    }
+
+    .demo-panel {
+      display: none;
+    }
+
+    .demo-panel.active {
+      display: block;
+    }
+
+    /* Orchestration Demo */
+    .orchestration-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: var(--space-xl);
+    }
+
+    @media (max-width: 1024px) {
+      .orchestration-grid { grid-template-columns: 1fr; }
+    }
+
+    .terminal-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-md) var(--space-lg);
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .terminal-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .terminal-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .terminal-dot:nth-child(1) { background: #ff5f56; }
+    .terminal-dot:nth-child(2) { background: #ffbd2e; }
+    .terminal-dot:nth-child(3) { background: #27ca40; }
+
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+
+    .terminal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      height: 400px;
+    }
+
+    .terminal-pane {
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .terminal-pane:nth-child(2) { border-right: none; }
+    .terminal-pane:nth-child(4) { border-right: none; }
+    .terminal-pane:nth-child(3), .terminal-pane:nth-child(4) { border-bottom: none; }
+
+    .pane-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pane-title {
+      font-size: var(--text-xs);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .pane-status {
+      font-size: var(--text-xs);
+      padding: 2px 8px;
+      border-radius: var(--radius-sm);
+      background: rgba(0,212,255,0.1);
+      color: var(--accent-cyan);
+    }
+
+    .pane-status.idle { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+    .pane-status.active { background: rgba(0,255,148,0.1); color: var(--accent-green); }
+
+    .pane-content {
+      flex: 1;
+      padding: var(--space-md);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.6;
+      overflow-y: auto;
+      background: #0d1117;
+    }
+
+    .pane-content .line {
+      margin-bottom: 2px;
+    }
+
+    .pane-content .prompt { color: var(--accent-cyan); }
+    .pane-content .command { color: var(--text-primary); }
+    .pane-content .output { color: var(--text-secondary); }
+    .pane-content .success { color: var(--accent-green); }
+    .pane-content .muted { color: var(--text-muted); }
+
+    /* Control Panel */
+    .control-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-lg);
+    }
+
+    .panel-title {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 700;
+      margin-bottom: var(--space-lg);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .panel-title svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--accent-cyan);
+    }
+
+    .worker-list {
+      margin-bottom: var(--space-lg);
+    }
+
+    .worker-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .worker-item:last-child { border-bottom: none; }
+
+    .worker-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+
+    .worker-dot.active { background: var(--accent-green); animation: pulse 2s infinite; }
+    .worker-dot.spawning { background: var(--accent-cyan); animation: pulse 1s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .worker-name {
+      flex: 1;
+      font-size: var(--text-sm);
+      font-weight: 500;
+    }
+
+    .worker-task {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-lg);
+    }
+
+    .stat-card {
+      background: var(--bg-secondary);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      text-align: center;
+    }
+
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      font-weight: 700;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .stat-label {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    /* Swarm Planner */
+    .planner-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+    }
+
+    .planner-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-md) var(--space-lg);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: var(--space-md);
+    }
+
+    .planner-title {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .planner-title svg {
+      width: 24px;
+      height: 24px;
+      stroke: var(--accent-cyan);
+    }
+
+    .planner-controls {
+      display: flex;
+      gap: var(--space-md);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .planner-input {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-sm) var(--space-md);
+      color: var(--text-primary);
+      font-size: var(--text-sm);
+      width: 180px;
+    }
+
+    .planner-input:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+    }
+
+    .agent-count {
+      background: var(--accent-blue);
+      color: white;
+      padding: var(--space-xs) var(--space-md);
+      border-radius: var(--radius-md);
+      font-size: var(--text-xs);
+      font-weight: 600;
+    }
+
+    .planner-body {
+      display: flex;
+    }
+
+    .phases-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      border-right: 1px solid var(--border);
+    }
+
+    @media (max-width: 900px) {
+      .phases-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      .phases-grid { grid-template-columns: 1fr; }
+      .planner-body { flex-direction: column; }
+      .roles-sidebar { width: 100%; border-left: none; border-top: 1px solid var(--border); }
+    }
+
+    .phase-column {
+      border-right: 1px solid var(--border);
+    }
+
+    .phase-column:last-child { border-right: none; }
+
+    .phase-header {
+      padding: var(--space-md);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid;
+    }
+
+    .phase-header.discovery { border-color: var(--accent-purple); }
+    .phase-header.implementation { border-color: var(--accent-blue); }
+    .phase-header.testing { border-color: var(--accent-green); }
+    .phase-header.review { border-color: var(--accent-orange); }
+
+    .phase-title {
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .phase-header.discovery .phase-title { color: var(--accent-purple); }
+    .phase-header.implementation .phase-title { color: var(--accent-blue); }
+    .phase-header.testing .phase-title { color: var(--accent-green); }
+    .phase-header.review .phase-title { color: var(--accent-orange); }
+
+    .phase-count {
+      background: rgba(255,255,255,0.1);
+      padding: 2px var(--space-sm);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+
+    .phase-content {
+      min-height: 200px;
+      padding: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .phase-content.drag-over {
+      background: rgba(0,212,255,0.05);
+    }
+
+    .role-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-sm) var(--space-md);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      cursor: grab;
+      transition: all var(--transition-fast);
+      user-select: none;
+    }
+
+    .role-card:hover {
+      border-color: var(--border-hover);
+      background: var(--bg-elevated);
+    }
+
+    .role-card.dragging { opacity: 0.5; }
+
+    .role-icon {
+      width: 16px;
+      height: 16px;
+    }
+
+    .role-icon svg {
+      width: 100%;
+      height: 100%;
+      stroke: var(--accent-cyan);
+    }
+
+    .role-name {
+      flex: 1;
+      font-size: var(--text-xs);
+      font-weight: 500;
+    }
+
+    .role-remove {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      opacity: 0;
+      transition: all var(--transition-fast);
+      font-size: 14px;
+    }
+
+    .role-card:hover .role-remove { opacity: 1; }
+    .role-remove:hover { color: var(--accent-red); }
+
+    .drop-placeholder {
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-xl) var(--space-md);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+    }
+
+    .roles-sidebar {
+      width: 240px;
+      background: var(--bg-secondary);
+      overflow-y: auto;
+      max-height: 400px;
+    }
+
+    .sidebar-header {
+      padding: var(--space-md);
+      border-bottom: 1px solid var(--border);
+      font-size: var(--text-sm);
+      font-weight: 600;
+    }
+
+    .sidebar-section {
+      padding: var(--space-md);
+    }
+
+    .sidebar-section-title {
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: var(--space-sm);
+    }
+
+    .sidebar-role {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-md);
+      cursor: grab;
+      transition: all var(--transition-fast);
+      margin-bottom: 4px;
+      font-size: var(--text-xs);
+    }
+
+    .sidebar-role:hover {
+      background: var(--bg-elevated);
+    }
+
+    .sidebar-role-icon {
+      width: 14px;
+      height: 14px;
+    }
+
+    .sidebar-role-icon svg {
+      width: 100%;
+      height: 100%;
+      stroke: var(--text-secondary);
+    }
+
+    .sidebar-role:hover .sidebar-role-icon svg {
+      stroke: var(--accent-cyan);
+    }
+
+    /* How It Works */
+    .how-it-works {
+      background: var(--bg-secondary);
+      padding: var(--space-4xl) 0;
+    }
+
+    .how-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-xl);
+    }
+
+    @media (max-width: 768px) {
+      .how-grid { grid-template-columns: 1fr; }
+    }
+
+    .how-card {
+      text-align: center;
+    }
+
+    .how-number {
+      width: 48px;
+      height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--gradient-primary);
+      border-radius: 50%;
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      font-weight: 800;
+      color: var(--bg-primary);
+      margin-bottom: var(--space-lg);
+    }
+
+    .how-card h3 {
+      font-size: var(--text-lg);
+      margin-bottom: var(--space-sm);
+    }
+
+    .how-card p {
+      color: var(--text-secondary);
+      font-size: var(--text-sm);
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="container nav-inner">
+      <a href="index.html" class="nav-logo">
+        <svg width="32" height="32" viewBox="0 0 36 36" fill="none">
+          <rect width="36" height="36" rx="8" fill="url(#g1)"/>
+          <path d="M18 8L26 12V24L18 28L10 24V12L18 8Z" stroke="white" stroke-width="1.5" fill="none"/>
+          <circle cx="18" cy="16" r="3" fill="white"/>
+          <circle cx="13" cy="22" r="2" fill="white" opacity="0.7"/>
+          <circle cx="23" cy="22" r="2" fill="white" opacity="0.7"/>
+          <defs><linearGradient id="g1" x1="0" y1="0" x2="36" y2="36"><stop stop-color="#0066FF"/><stop offset="1" stop-color="#00D4FF"/></linearGradient></defs>
+        </svg>
+        Claude Fleet
+      </a>
+
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="documentation.html" class="nav-link">Docs</a>
+        <a href="demo.html" class="nav-link active">Demo</a>
+        <a href="autonomous-ops.html" class="nav-link">24/7 Ops</a>
+      </div>
+
+      <div class="nav-cta">
+        <a href="https://github.com/sethdford/claude-fleet" class="btn btn-secondary btn-sm">GitHub</a>
+        <a href="index.html#install" class="btn btn-primary btn-sm">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <main style="padding-top: 80px;">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero-content centered">
+          <h1>Interactive <span class="gradient-text">Demo</span></h1>
+          <p class="hero-description" style="margin: var(--space-lg) auto 0;">
+            Explore Claude Fleet's worker orchestration and swarm planning capabilities.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Demo Section -->
+    <section class="section">
+      <div class="container">
+        <div class="demo-nav">
+          <button class="demo-nav-btn active" onclick="showDemo('orchestration')">Worker Orchestration</button>
+          <button class="demo-nav-btn" onclick="showDemo('planner')">Swarm Planner</button>
+        </div>
+
+        <!-- Orchestration Demo -->
+        <div class="demo-panel active" id="orchestration-demo">
+          <div class="orchestration-grid">
+            <div class="terminal-panel">
+              <div class="terminal-header">
+                <div class="terminal-dots">
+                  <div class="terminal-dot"></div>
+                  <div class="terminal-dot"></div>
+                  <div class="terminal-dot"></div>
+                </div>
+                <span class="terminal-title">fleet-orchestration - 4 workers</span>
+              </div>
+              <div class="terminal-grid">
+                <div class="terminal-pane">
+                  <div class="pane-header">
+                    <span class="pane-title">Team Lead</span>
+                    <span class="pane-status" id="lead-status">Idle</span>
+                  </div>
+                  <div class="pane-content" id="lead-output">
+                    <div class="line muted"># Team lead ready for orchestration</div>
+                    <div class="line"><span class="prompt">$</span> <span class="command">Waiting for commands...</span></div>
+                  </div>
+                </div>
+                <div class="terminal-pane">
+                  <div class="pane-header">
+                    <span class="pane-title">Worker Alpha</span>
+                    <span class="pane-status idle" id="alpha-status">Idle</span>
+                  </div>
+                  <div class="pane-content" id="alpha-output">
+                    <div class="line muted"># Worker awaiting task assignment</div>
+                  </div>
+                </div>
+                <div class="terminal-pane">
+                  <div class="pane-header">
+                    <span class="pane-title">Worker Beta</span>
+                    <span class="pane-status idle" id="beta-status">Idle</span>
+                  </div>
+                  <div class="pane-content" id="beta-output">
+                    <div class="line muted"># Worker awaiting task assignment</div>
+                  </div>
+                </div>
+                <div class="terminal-pane">
+                  <div class="pane-header">
+                    <span class="pane-title">Worker Gamma</span>
+                    <span class="pane-status idle" id="gamma-status">Idle</span>
+                  </div>
+                  <div class="pane-content" id="gamma-output">
+                    <div class="line muted"># Worker awaiting task assignment</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="control-panel">
+              <h3 class="panel-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>
+                </svg>
+                Control Panel
+              </h3>
+
+              <div class="worker-list">
+                <div class="worker-item">
+                  <span class="worker-dot" id="lead-dot"></span>
+                  <span class="worker-name">Team Lead</span>
+                  <span class="worker-task" id="lead-task">Orchestrator</span>
+                </div>
+                <div class="worker-item">
+                  <span class="worker-dot" id="alpha-dot"></span>
+                  <span class="worker-name">Worker Alpha</span>
+                  <span class="worker-task" id="alpha-task">-</span>
+                </div>
+                <div class="worker-item">
+                  <span class="worker-dot" id="beta-dot"></span>
+                  <span class="worker-name">Worker Beta</span>
+                  <span class="worker-task" id="beta-task">-</span>
+                </div>
+                <div class="worker-item">
+                  <span class="worker-dot" id="gamma-dot"></span>
+                  <span class="worker-name">Worker Gamma</span>
+                  <span class="worker-task" id="gamma-task">-</span>
+                </div>
+              </div>
+
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <div class="stat-value" id="active-count">0</div>
+                  <div class="stat-label">Active Workers</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value" id="task-count">0</div>
+                  <div class="stat-label">Tasks Done</div>
+                </div>
+              </div>
+
+              <div class="action-buttons">
+                <button class="btn btn-gradient w-full" id="start-demo-btn" onclick="startOrchestrationDemo()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
+                  Start Demo
+                </button>
+                <button class="btn btn-secondary w-full" onclick="resetOrchestrationDemo()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 4v6h6M23 20v-6h-6"/>
+                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                  </svg>
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Swarm Planner Demo -->
+        <div class="demo-panel" id="planner-demo">
+          <div class="planner-container">
+            <div class="planner-header">
+              <div class="planner-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>
+                </svg>
+                Swarm Planner
+              </div>
+              <div class="planner-controls">
+                <input type="text" class="planner-input" placeholder="Swarm name..." value="feature-dev" id="swarmName">
+                <span class="agent-count" id="agentCount">4 agents</span>
+                <button class="btn btn-secondary btn-sm" onclick="clearSwarm()">Clear</button>
+                <button class="btn btn-gradient btn-sm" onclick="runSwarm()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
+                  Run Swarm
+                </button>
+              </div>
+            </div>
+
+            <div class="planner-body">
+              <div class="phases-grid">
+                <div class="phase-column">
+                  <div class="phase-header discovery">
+                    <span class="phase-title">Discovery</span>
+                    <span class="phase-count" id="discovery-count">1</span>
+                  </div>
+                  <div class="phase-content" id="discovery-content" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'discovery')">
+                    <div class="role-card" draggable="true" data-role="architect" ondragstart="handleDragStart(event)">
+                      <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/></svg></span>
+                      <span class="role-name">Architect</span>
+                      <span class="role-remove" onclick="removeRole(this)">x</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="phase-column">
+                  <div class="phase-header implementation">
+                    <span class="phase-title">Implementation</span>
+                    <span class="phase-count" id="implementation-count">2</span>
+                  </div>
+                  <div class="phase-content" id="implementation-content" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'implementation')">
+                    <div class="role-card" draggable="true" data-role="frontend" ondragstart="handleDragStart(event)">
+                      <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg></span>
+                      <span class="role-name">Frontend</span>
+                      <span class="role-remove" onclick="removeRole(this)">x</span>
+                    </div>
+                    <div class="role-card" draggable="true" data-role="backend" ondragstart="handleDragStart(event)">
+                      <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/></svg></span>
+                      <span class="role-name">Backend</span>
+                      <span class="role-remove" onclick="removeRole(this)">x</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="phase-column">
+                  <div class="phase-header testing">
+                    <span class="phase-title">Testing</span>
+                    <span class="phase-count" id="testing-count">1</span>
+                  </div>
+                  <div class="phase-content" id="testing-content" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'testing')">
+                    <div class="role-card" draggable="true" data-role="qa" ondragstart="handleDragStart(event)">
+                      <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+                      <span class="role-name">QA Engineer</span>
+                      <span class="role-remove" onclick="removeRole(this)">x</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="phase-column">
+                  <div class="phase-header review">
+                    <span class="phase-title">Review</span>
+                    <span class="phase-count" id="review-count">0</span>
+                  </div>
+                  <div class="phase-content" id="review-content" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'review')">
+                    <div class="drop-placeholder">Drop roles here</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="roles-sidebar">
+                <div class="sidebar-header">Available Roles</div>
+                <div class="sidebar-section">
+                  <div class="sidebar-section-title">Roles</div>
+                  <div class="sidebar-role" draggable="true" data-role="architect" ondragstart="handleSidebarDragStart(event)">
+                    <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/></svg></span>
+                    <span>Architect</span>
+                  </div>
+                  <div class="sidebar-role" draggable="true" data-role="frontend" ondragstart="handleSidebarDragStart(event)">
+                    <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg></span>
+                    <span>Frontend</span>
+                  </div>
+                  <div class="sidebar-role" draggable="true" data-role="backend" ondragstart="handleSidebarDragStart(event)">
+                    <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/></svg></span>
+                    <span>Backend</span>
+                  </div>
+                  <div class="sidebar-role" draggable="true" data-role="qa" ondragstart="handleSidebarDragStart(event)">
+                    <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+                    <span>QA Engineer</span>
+                  </div>
+                  <div class="sidebar-role" draggable="true" data-role="security" ondragstart="handleSidebarDragStart(event)">
+                    <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                    <span>Security</span>
+                  </div>
+                  <div class="sidebar-role" draggable="true" data-role="devops" ondragstart="handleSidebarDragStart(event)">
+                    <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg></span>
+                    <span>DevOps</span>
+                  </div>
+                  <div class="sidebar-role" draggable="true" data-role="docs" ondragstart="handleSidebarDragStart(event)">
+                    <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+                    <span>Tech Writer</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works">
+      <div class="container">
+        <div class="section-header">
+          <h2>How it <span class="gradient-text">works</span></h2>
+          <p>Claude Fleet coordinates multiple AI agents for parallel development.</p>
+        </div>
+
+        <div class="how-grid">
+          <div class="how-card">
+            <div class="how-number">1</div>
+            <h3>Plan Your Swarm</h3>
+            <p>Define the roles and phases for your development task. Each agent gets a specialized focus area.</p>
+          </div>
+          <div class="how-card">
+            <div class="how-number">2</div>
+            <h3>Spawn Workers</h3>
+            <p>Claude Fleet spawns isolated Claude Code instances, each in their own git worktree to prevent conflicts.</p>
+          </div>
+          <div class="how-card">
+            <div class="how-number">3</div>
+            <h3>Coordinate & Merge</h3>
+            <p>Workers communicate via blackboard messaging. Results are merged back through standard git workflows.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="cta-bg"></div>
+      <div class="container">
+        <div class="cta-content">
+          <h2>Ready to try it?</h2>
+          <p>Install Claude Fleet and start orchestrating your own agent swarms.</p>
+          <div class="cta-buttons">
+            <a href="index.html#install" class="btn btn-gradient btn-lg">
+              Install Now
+            </a>
+            <a href="documentation.html" class="btn btn-secondary btn-lg">
+              Read Docs
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom" style="margin-top: 0; padding-top: 0; border-top: none;">
+        <div class="nav-logo" style="font-size: var(--text-sm);">
+          <svg width="24" height="24" viewBox="0 0 36 36" fill="none">
+            <rect width="36" height="36" rx="8" fill="url(#g2)"/>
+            <path d="M18 8L26 12V24L18 28L10 24V12L18 8Z" stroke="white" stroke-width="1.5" fill="none"/>
+            <circle cx="18" cy="16" r="3" fill="white"/>
+            <defs><linearGradient id="g2" x1="0" y1="0" x2="36" y2="36"><stop stop-color="#0066FF"/><stop offset="1" stop-color="#00D4FF"/></linearGradient></defs>
+          </svg>
+          Claude Fleet
+        </div>
+        <div style="display: flex; gap: var(--space-xl);">
+          <a href="https://github.com/sethdford/claude-fleet" style="color: var(--text-secondary); text-decoration: none; font-size: var(--text-sm);">GitHub</a>
+          <a href="https://www.npmjs.com/package/claude-fleet" style="color: var(--text-secondary); text-decoration: none; font-size: var(--text-sm);">NPM</a>
+          <a href="documentation.html" style="color: var(--text-secondary); text-decoration: none; font-size: var(--text-sm);">Docs</a>
+        </div>
+        <span>MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Demo Navigation
+    function showDemo(type) {
+      document.querySelectorAll('.demo-nav-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.demo-panel').forEach(panel => panel.classList.remove('active'));
+
+      event.target.classList.add('active');
+      document.getElementById(`${type}-demo`).classList.add('active');
+    }
+
+    // Orchestration Demo
+    let demoRunning = false;
+    let taskCount = 0;
+
+    function startOrchestrationDemo() {
+      if (demoRunning) return;
+      demoRunning = true;
+      taskCount = 0;
+
+      document.getElementById('start-demo-btn').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Running...';
+      document.getElementById('start-demo-btn').disabled = true;
+
+      // Simulate orchestration
+      simulateLeadStart();
+      setTimeout(() => simulateWorkerStart('alpha', 'Codebase analysis'), 500);
+      setTimeout(() => simulateWorkerStart('beta', 'API exploration'), 1000);
+      setTimeout(() => simulateWorkerStart('gamma', 'Test review'), 1500);
+
+      setTimeout(() => completeDemo(), 6000);
+    }
+
+    function simulateLeadStart() {
+      document.getElementById('lead-status').textContent = 'Orchestrating';
+      document.getElementById('lead-status').className = 'pane-status active';
+      document.getElementById('lead-dot').classList.add('active');
+
+      document.getElementById('lead-output').innerHTML = `
+        <div class="line"><span class="prompt">$</span> <span class="command">fleet spawn feature-dev</span></div>
+        <div class="line output">Starting swarm: feature-development</div>
+        <div class="line success">Spawning 3 workers...</div>
+      `;
+      updateStats();
+    }
+
+    function simulateWorkerStart(worker, task) {
+      document.getElementById(`${worker}-status`).textContent = 'Working';
+      document.getElementById(`${worker}-status`).className = 'pane-status active';
+      document.getElementById(`${worker}-dot`).classList.add('active');
+      document.getElementById(`${worker}-task`).textContent = task;
+
+      document.getElementById(`${worker}-output`).innerHTML = `
+        <div class="line"><span class="prompt">$</span> <span class="command">${task}...</span></div>
+        <div class="line output">Processing...</div>
+      `;
+      updateStats();
+
+      // Complete after delay
+      setTimeout(() => {
+        document.getElementById(`${worker}-output`).innerHTML += `
+          <div class="line success">Done.</div>
+        `;
+        taskCount++;
+        document.getElementById('task-count').textContent = taskCount;
+      }, 2500 + Math.random() * 2000);
+    }
+
+    function completeDemo() {
+      demoRunning = false;
+      document.getElementById('start-demo-btn').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Start Demo';
+      document.getElementById('start-demo-btn').disabled = false;
+
+      document.getElementById('lead-output').innerHTML += `
+        <div class="line success">All tasks complete!</div>
+      `;
+    }
+
+    function updateStats() {
+      const activeCount = document.querySelectorAll('.worker-dot.active').length;
+      document.getElementById('active-count').textContent = activeCount;
+    }
+
+    function resetOrchestrationDemo() {
+      demoRunning = false;
+      taskCount = 0;
+
+      document.getElementById('start-demo-btn').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Start Demo';
+      document.getElementById('start-demo-btn').disabled = false;
+
+      ['lead', 'alpha', 'beta', 'gamma'].forEach(w => {
+        document.getElementById(`${w}-status`).textContent = 'Idle';
+        document.getElementById(`${w}-status`).className = 'pane-status idle';
+        document.getElementById(`${w}-dot`).classList.remove('active', 'spawning');
+        if (w !== 'lead') {
+          document.getElementById(`${w}-task`).textContent = '-';
+        }
+      });
+
+      document.getElementById('lead-output').innerHTML = '<div class="line muted"># Team lead ready for orchestration</div><div class="line"><span class="prompt">$</span> <span class="command">Waiting for commands...</span></div>';
+      document.getElementById('alpha-output').innerHTML = '<div class="line muted"># Worker awaiting task assignment</div>';
+      document.getElementById('beta-output').innerHTML = '<div class="line muted"># Worker awaiting task assignment</div>';
+      document.getElementById('gamma-output').innerHTML = '<div class="line muted"># Worker awaiting task assignment</div>';
+
+      document.getElementById('active-count').textContent = '0';
+      document.getElementById('task-count').textContent = '0';
+    }
+
+    // Swarm Planner
+    let draggedRole = null;
+    let draggedFromSidebar = false;
+
+    function handleDragStart(e) {
+      draggedRole = e.target;
+      draggedFromSidebar = false;
+      e.target.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', e.target.dataset.role);
+    }
+
+    function handleSidebarDragStart(e) {
+      draggedRole = e.target;
+      draggedFromSidebar = true;
+      e.target.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', e.target.dataset.role);
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+
+    function handleDrop(e, phase) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+
+      const role = e.dataTransfer.getData('text/plain');
+      const content = document.getElementById(`${phase}-content`);
+
+      // Remove placeholder
+      const placeholder = content.querySelector('.drop-placeholder');
+      if (placeholder) placeholder.remove();
+
+      if (draggedFromSidebar) {
+        const newCard = createRoleCard(role);
+        content.appendChild(newCard);
+      } else if (draggedRole) {
+        content.appendChild(draggedRole);
+        draggedRole.classList.remove('dragging');
+      }
+
+      updateCounts();
+    }
+
+    const roleNames = {
+      'architect': 'Architect',
+      'frontend': 'Frontend',
+      'backend': 'Backend',
+      'qa': 'QA Engineer',
+      'security': 'Security',
+      'devops': 'DevOps',
+      'docs': 'Tech Writer'
+    };
+
+    function createRoleCard(role) {
+      const card = document.createElement('div');
+      card.className = 'role-card';
+      card.draggable = true;
+      card.dataset.role = role;
+      card.setAttribute('ondragstart', 'handleDragStart(event)');
+      card.innerHTML = `
+        <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/></svg></span>
+        <span class="role-name">${roleNames[role] || role}</span>
+        <span class="role-remove" onclick="removeRole(this)">x</span>
+      `;
+      return card;
+    }
+
+    function removeRole(btn) {
+      const card = btn.parentElement;
+      const content = card.parentElement;
+      card.remove();
+
+      if (content.children.length === 0) {
+        content.innerHTML = '<div class="drop-placeholder">Drop roles here</div>';
+      }
+      updateCounts();
+    }
+
+    function updateCounts() {
+      ['discovery', 'implementation', 'testing', 'review'].forEach(phase => {
+        const content = document.getElementById(`${phase}-content`);
+        const count = content.querySelectorAll('.role-card').length;
+        document.getElementById(`${phase}-count`).textContent = count;
+      });
+
+      const total = document.querySelectorAll('.phases-grid .role-card').length;
+      document.getElementById('agentCount').textContent = `${total} agent${total !== 1 ? 's' : ''}`;
+    }
+
+    function clearSwarm() {
+      ['discovery', 'implementation', 'testing', 'review'].forEach(phase => {
+        const content = document.getElementById(`${phase}-content`);
+        content.innerHTML = '<div class="drop-placeholder">Drop roles here</div>';
+      });
+      updateCounts();
+    }
+
+    function runSwarm() {
+      const total = document.querySelectorAll('.phases-grid .role-card').length;
+      if (total === 0) {
+        alert('Add at least one agent to run');
+        return;
+      }
+      alert(`Swarm "${document.getElementById('swarmName').value}" would spawn ${total} workers in a real deployment.`);
+    }
+
+    // Handle drag end for cleanup
+    document.addEventListener('dragend', () => {
+      document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+      document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    });
+
+    // Initialize counts
+    updateCounts();
+  </script>
+</body>
+</html>
