@@ -1,0 +1,30 @@
+{
+  "name": "claude-fleet",
+  "version": "2.2.0",
+  "description": "Multi-agent orchestration for Claude Code with 82 MCP tools for team coordination, swarm intelligence, and workflow automation",
+  "author": {
+    "name": "Seth Ford",
+    "email": "seth@example.com"
+  },
+  "license": "MIT",
+  "homepage": "https://sethdford.github.io/claude-fleet",
+  "repository": "https://github.com/sethdford/claude-fleet",
+  "keywords": [
+    "multi-agent",
+    "orchestration",
+    "swarm",
+    "fleet",
+    "team-coordination",
+    "mcp"
+  ],
+  "category": "development",
+  "mcpServers": {
+    "claude-fleet": {
+      "command": "npx",
+      "args": ["-y", "claude-fleet", "mcp-server"],
+      "env": {
+        "CLAUDE_FLEET_URL": "${CLAUDE_FLEET_URL:-http://localhost:3847}"
+      }
+    }
+  }
+}

@@ -6,6 +6,7 @@
  */
 
 import { parseArgs } from 'node:util';
+import { execSync, spawn } from 'node:child_process';
 import {
   handleSchema,
   teamNameSchema,
@@ -239,6 +240,90 @@ async function request(
   }
 
   return data;
+}
+
+// ============================================================================
+// COMMANDS: MCP
+// ============================================================================
+
+async function cmdMcpInstall(options: CliOptions): Promise<void> {
+  console.log('Installing Claude Fleet MCP server...\n');
+
+  // Build the MCP config JSON
+  const mcpConfig = {
+    command: 'npx',
+    args: ['-y', 'claude-fleet', 'mcp-server'],
+    env: {
+      CLAUDE_FLEET_URL: options.url,
+    },
+  };
+
+  const configJson = JSON.stringify(mcpConfig);
+
+  try {
+    // Use claude CLI to add the MCP server
+    execSync(`claude mcp add-json "claude-fleet" '${configJson}'`, {
+      stdio: 'inherit',
+    });
+
+    console.log('\n✓ Claude Fleet MCP server installed successfully!');
+    console.log('\nThe MCP server provides 82 tools for fleet coordination:');
+    console.log('  • Team management (status, broadcast, spawn, dismiss)');
+    console.log('  • Task/work item management');
+    console.log('  • Mail and handoffs between agents');
+    console.log('  • Swarm intelligence (pheromones, beliefs, credits)');
+    console.log('  • Workflow orchestration');
+    console.log('  • And more...');
+    console.log('\nRestart Claude Code to activate the MCP tools.');
+  } catch (error) {
+    const err = error as Error;
+    if (err.message.includes('command not found') || err.message.includes('ENOENT')) {
+      console.error('Error: Claude CLI not found.');
+      console.error('\nManual installation:');
+      console.error('  1. Open Claude Code settings');
+      console.error('  2. Add to MCP servers:');
+      console.error(`     ${JSON.stringify({ 'claude-fleet': mcpConfig }, null, 2)}`);
+    } else {
+      throw err;
+    }
+  }
+}
+
+async function cmdMcpUninstall(_options: CliOptions): Promise<void> {
+  console.log('Removing Claude Fleet MCP server...');
+
+  try {
+    execSync('claude mcp remove claude-fleet', { stdio: 'inherit' });
+    console.log('\n✓ Claude Fleet MCP server removed.');
+  } catch (error) {
+    const err = error as Error;
+    if (err.message.includes('command not found') || err.message.includes('ENOENT')) {
+      console.error('Error: Claude CLI not found. Remove manually from settings.');
+    } else {
+      throw err;
+    }
+  }
+}
+
+async function cmdMcpServer(_options: CliOptions): Promise<void> {
+  // This runs the MCP server - imported and executed
+  console.error('[MCP] Starting Claude Fleet MCP server...');
+
+  // Dynamic import of the MCP server
+  const serverPath = new URL('./mcp/server.js', import.meta.url).pathname;
+  const child = spawn('node', [serverPath], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+
+  child.on('error', (err) => {
+    console.error('[MCP] Failed to start:', err.message);
+    process.exit(1);
+  });
+
+  child.on('exit', (code) => {
+    process.exit(code ?? 0);
+  });
 }
 
 // ============================================================================
@@ -1241,6 +1326,11 @@ WORKFLOW COMMANDS
   step-retry <id>                     Retry failed step [team-lead]
   step-complete <id> [output]         Manually complete step
 
+MCP SERVER COMMANDS
+  mcp-install                         Install MCP server in Claude Code
+  mcp-uninstall                       Remove MCP server from Claude Code
+  mcp-server                          Run MCP server (used by Claude Code)
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OPTIONS
@@ -1252,6 +1342,7 @@ OPTIONS
   --version         Show version
 
 EXAMPLES
+  fleet mcp-install                   # Add MCP server to Claude Code
   fleet health
   fleet auth my-agent my-team team-lead
   fleet --token "eyJ..." workers --table
@@ -1809,6 +1900,17 @@ async function main(): Promise<void> {
           process.exit(1);
         }
         await cmdStepComplete(options, args[0], args[1]);
+        break;
+
+      // MCP Server Commands
+      case 'mcp-install':
+        await cmdMcpInstall(options);
+        break;
+      case 'mcp-uninstall':
+        await cmdMcpUninstall(options);
+        break;
+      case 'mcp-server':
+        await cmdMcpServer(options);
         break;
 
       default:

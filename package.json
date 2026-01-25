@@ -1,6 +1,6 @@
 {
   "name": "claude-fleet",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "Multi-agent orchestration server for Claude Code with fleet coordination",
   "type": "module",
   "main": "dist/index.js",
@@ -12,6 +12,8 @@
   "files": [
     "dist",
     "public",
+    "scripts/postinstall.js",
+    ".claude-plugin",
     "README.md",
     "LICENSE"
   ],
@@ -61,6 +63,7 @@
     "audit": "./scripts/audit-loop.sh",
     "audit:dry": "./scripts/audit-loop.sh --dry-run",
     "verify": "npm run typecheck && npm run lint && npm test && npm run e2e:all",
+    "postinstall": "node scripts/postinstall.js || true",
     "prepublishOnly": "npm run build && npm run test",
     "images": "node scripts/generate-fleet-image.js --all",
     "images:logo": "node scripts/generate-fleet-image.js --type logo",
