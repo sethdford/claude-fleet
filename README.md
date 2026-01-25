@@ -9,9 +9,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/sethdford/claude-fleet/actions/workflows/ci.yml"><img src="https://github.com/sethdford/claude-fleet/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.npmjs.com/package/claude-fleet"><img src="https://img.shields.io/npm/v/claude-fleet" alt="NPM Version"></a>
+  <a href="https://www.npmjs.com/package/claude-fleet"><img src="https://img.shields.io/npm/dm/claude-fleet" alt="NPM Downloads"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen" alt="Node.js Version"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.3-blue" alt="TypeScript"></a>
 </p>
 
@@ -94,16 +95,27 @@ npm run build
 ### CLI Commands
 
 ```bash
+# Core Commands
 fleet health                      # Server health check
 fleet metrics                     # Prometheus metrics (JSON)
+fleet audit                       # Run codebase audit (typecheck, lint, tests, build)
+
+# Worker Management
 fleet workers                     # List active workers
 fleet spawn <handle> <prompt>     # Spawn a worker agent
 fleet dismiss <handle>            # Stop a worker
 fleet send <handle> <message>     # Send message to worker
+
+# Team & Task Management
 fleet swarms                      # List all swarms
 fleet swarm-create <name> <max>   # Create a swarm
 fleet teams <team>                # List team agents
 fleet tasks <team>                # List team tasks
+
+# Workflow Management
+fleet workflows                   # List workflows
+fleet workflow-start <id>         # Start workflow execution
+fleet executions                  # List executions
 ```
 
 ### MCP Integration
@@ -302,14 +314,46 @@ npm run dev
 npm test
 
 # Run E2E tests
-npm run e2e
+npm run e2e            # Core E2E tests
+npm run e2e:cli        # CLI E2E tests (64 commands)
+npm run e2e:all        # All E2E tests
 
 # Type checking
 npm run typecheck
 
 # Linting
 npm run lint
+
+# Full verification
+npm run verify         # typecheck + lint + test + e2e
 ```
+
+### Audit Objective
+
+Claude Fleet includes a goal-oriented audit system with wave-based task tracking:
+
+```bash
+# Quick codebase health check
+fleet audit
+
+# Full audit objective (loops through waves until complete)
+fleet audit-loop [--dry-run] [--max N]
+```
+
+Each **Loop** deploys **Waves** of work:
+- **Wave 1: Reconnaissance** - Run checks, discover issues, create tasks
+- **Wave 2: Fleet Deployment** - Work through fix tasks
+- **Wave 3: Verification** - Re-run checks, confirm fixes
+
+**Exit Criteria** (all must pass to complete):
+1. `fleet audit` passes (typecheck, lint, tests, build)
+2. `npm run e2e:all` passes
+3. No critical TODOs remain
+4. All tasks complete
+
+When everything passes: **"OBJECTIVE COMPLETE - Escaped the maze!"**
+
+See [CLAUDE.md](CLAUDE.md) for detailed development guidelines.
 
 ---
 
