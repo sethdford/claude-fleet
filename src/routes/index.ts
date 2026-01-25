@@ -51,6 +51,21 @@ export {
   createWorktreeStatusHandler,
 } from './orchestrate.js';
 
+// Wave & Multi-repo orchestration routes
+export {
+  createExecuteWavesHandler,
+  createGetWaveStatusHandler,
+  createCancelWaveHandler,
+  createListWaveExecutionsHandler,
+  createExecuteMultiRepoHandler,
+  createGetMultiRepoStatusHandler,
+  createListMultiRepoExecutionsHandler,
+  createUpdateDepsHandler,
+  createSecurityAuditHandler,
+  createFormatCodeHandler,
+  createRunTestsHandler,
+} from './wave-orchestrate.js';
+
 // Work item routes (work items, batches)
 export {
   createCreateWorkItemHandler,

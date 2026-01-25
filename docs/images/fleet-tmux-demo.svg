@@ -1,0 +1,488 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650">
+  <defs>
+    <style>
+      @keyframes blink {
+        0%, 49% { opacity: 1; }
+        50%, 100% { opacity: 0; }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+      }
+      @keyframes slideIn {
+        from { transform: translateX(-20px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      .terminal-bg { fill: #1a1b26; }
+      .terminal-border { fill: none; stroke: #3b4261; stroke-width: 2; }
+      .terminal-header { fill: #24283b; }
+      .pane-border { fill: none; stroke: #3b4261; stroke-width: 1; }
+      .pane-active { stroke: #7aa2f7; stroke-width: 2; }
+      .pane-success { stroke: #9ece6a; stroke-width: 2; }
+      .header-text { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; fill: #7aa2f7; }
+      .pane-title { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 9px; fill: #bb9af7; font-weight: bold; }
+      .output-text { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; fill: #a9b1d6; }
+      .success-text { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; fill: #9ece6a; }
+      .info-text { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; fill: #7dcfff; }
+      .warn-text { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; fill: #e0af68; }
+      .error-text { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; fill: #f7768e; }
+      .dim-text { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; fill: #565f89; }
+      .command-text { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; fill: #c0caf5; }
+      .cursor { fill: #c0caf5; animation: blink 1s infinite; }
+      .wave-badge { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; fill: #1a1b26; font-weight: bold; }
+      .role-scout { fill: #7dcfff; }
+      .role-oracle { fill: #bb9af7; }
+      .role-architect { fill: #ff9e64; }
+      .role-worker { fill: #9ece6a; }
+      .role-kraken { fill: #f7768e; }
+      .role-critic { fill: #e0af68; }
+      .role-lead { fill: #7aa2f7; }
+      .status-bar { fill: #1a1b26; }
+      .status-text { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 9px; fill: #565f89; }
+      .blackboard-bg { fill: #1e2030; }
+      .blackboard-msg { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 9px; }
+    </style>
+  </defs>
+
+  <!-- Main Terminal Background -->
+  <rect class="terminal-bg" width="1000" height="650" rx="8"/>
+  <rect class="terminal-border" x="2" y="2" width="996" height="646" rx="8"/>
+
+  <!-- Header bar -->
+  <rect class="terminal-header" x="2" y="2" width="996" height="28" rx="8"/>
+  <rect class="terminal-bg" x="2" y="22" width="996" height="10"/>
+
+  <!-- Window buttons -->
+  <circle cx="20" cy="16" r="6" fill="#f7768e"/>
+  <circle cx="40" cy="16" r="6" fill="#e0af68"/>
+  <circle cx="60" cy="16" r="6" fill="#9ece6a"/>
+
+  <!-- Title -->
+  <text x="500" y="20" text-anchor="middle" class="header-text">claude-fleet wave --objective "Add rate limiting" --repos api,frontend,shared</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- LEAD PANE (Top Left - Main Controller) -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <g id="lead-pane">
+    <rect class="pane-active" x="5" y="35" width="400" height="280" rx="4"/>
+    <rect fill="#24283b" x="5" y="35" width="400" height="18" rx="4"/>
+    <rect fill="#24283b" x="5" y="49" width="400" height="4"/>
+    <text x="15" y="48" class="pane-title">LEAD [fleet-lead] %0</text>
+    <circle cx="390" cy="44" r="4" class="role-lead"/>
+
+    <!-- Lead Output - Wave Orchestration -->
+    <text x="15" y="70" class="info-text">[Wave Orchestrator] Starting objective...</text>
+    <text x="15" y="85" class="output-text">Objective: "Add rate limiting across all services"</text>
+    <text x="15" y="100" class="dim-text">Repos: api, frontend, shared</text>
+
+    <text x="15" y="120" class="warn-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.02;0.05;1"/>
+      ━━━ Wave 1: Discovery ━━━
+    </text>
+    <text x="15" y="135" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.05;0.08;1"/>
+      Spawning: scout-api, scout-frontend, oracle-patterns
+    </text>
+    <text x="15" y="150" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.20;0.22;1"/>
+      Wave 1 complete: 3/3 succeeded
+    </text>
+
+    <text x="15" y="170" class="warn-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.25;0.27;1"/>
+      ━━━ Wave 2: Design ━━━
+    </text>
+    <text x="15" y="185" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.27;0.30;1"/>
+      Spawning: architect-1
+    </text>
+    <text x="15" y="200" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.42;0.44;1"/>
+      Wave 2 complete: 1/1 succeeded
+    </text>
+
+    <text x="15" y="220" class="warn-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.45;0.47;1"/>
+      ━━━ Wave 3: Implementation ━━━
+    </text>
+    <text x="15" y="235" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.47;0.50;1"/>
+      Spawning: worker-api, kraken-tests
+    </text>
+    <text x="15" y="250" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.70;0.72;1"/>
+      Wave 3 complete: 2/2 succeeded
+    </text>
+
+    <text x="15" y="270" class="warn-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.75;0.77;1"/>
+      ━━━ Wave 4: Review ━━━
+    </text>
+    <text x="15" y="285" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.90;0.92;1"/>
+      Critic approved. Creating PRs...
+    </text>
+    <text x="15" y="305" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;1;0" dur="18s" repeatCount="indefinite" keyTimes="0;0.92;0.95;0.98;0.99;1"/>
+      Objective achieved in 4 waves. 3 PRs created.
+    </text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- SCOUT PANE (Top Middle) -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <g id="scout-pane">
+    <rect class="pane-border" x="410" y="35" width="290" height="135" rx="4">
+      <animate attributeName="stroke" values="#3b4261;#3b4261;#7dcfff;#7dcfff;#9ece6a;#9ece6a;#3b4261"
+               dur="18s" repeatCount="indefinite" keyTimes="0;0.05;0.08;0.15;0.20;0.22;1"/>
+    </rect>
+    <rect fill="#24283b" x="410" y="35" width="290" height="18" rx="4"/>
+    <rect fill="#24283b" x="410" y="49" width="290" height="4"/>
+    <text x="420" y="48" class="pane-title">SCOUT [scout-api] %1</text>
+    <circle cx="685" cy="44" r="4" class="role-scout"/>
+
+    <text x="420" y="70" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.05;0.08;1"/>
+      $ Exploring api-service...
+    </text>
+    <text x="420" y="85" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.10;0.12;1"/>
+      Found 47 API endpoints
+    </text>
+    <text x="420" y="100" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.13;0.15;1"/>
+      Middleware: auth, logging, cors
+    </text>
+    <text x="420" y="115" class="info-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.16;0.18;1"/>
+      Best injection point: middleware/
+    </text>
+    <text x="420" y="130" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.18;0.20;1"/>
+      Posted to blackboard
+    </text>
+    <text x="420" y="145" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.20;0.22;1"/>
+      [complete]
+    </text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ORACLE PANE (Top Right) -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <g id="oracle-pane">
+    <rect class="pane-border" x="705" y="35" width="290" height="135" rx="4">
+      <animate attributeName="stroke" values="#3b4261;#3b4261;#bb9af7;#bb9af7;#9ece6a;#9ece6a;#3b4261"
+               dur="18s" repeatCount="indefinite" keyTimes="0;0.05;0.08;0.15;0.20;0.22;1"/>
+    </rect>
+    <rect fill="#24283b" x="705" y="35" width="290" height="18" rx="4"/>
+    <rect fill="#24283b" x="705" y="49" width="290" height="4"/>
+    <text x="715" y="48" class="pane-title">ORACLE [oracle-patterns] %2</text>
+    <circle cx="980" cy="44" r="4" class="role-oracle"/>
+
+    <text x="715" y="70" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.05;0.08;1"/>
+      $ Researching rate-limit patterns...
+    </text>
+    <text x="715" y="85" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.10;0.12;1"/>
+      Analyzing: token bucket, sliding window
+    </text>
+    <text x="715" y="100" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.14;0.16;1"/>
+      Recommends: Redis-backed sliding window
+    </text>
+    <text x="715" y="115" class="info-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.17;0.19;1"/>
+      Key insight: per-user + per-endpoint
+    </text>
+    <text x="715" y="130" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.18;0.20;1"/>
+      Posted research to blackboard
+    </text>
+    <text x="715" y="145" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.20;0.22;1"/>
+      [complete]
+    </text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ARCHITECT PANE (Middle Right) -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <g id="architect-pane">
+    <rect class="pane-border" x="410" y="175" width="585" height="140" rx="4">
+      <animate attributeName="stroke" values="#3b4261;#3b4261;#3b4261;#ff9e64;#ff9e64;#9ece6a;#9ece6a;#3b4261"
+               dur="18s" repeatCount="indefinite" keyTimes="0;0.25;0.27;0.30;0.38;0.42;0.44;1"/>
+    </rect>
+    <rect fill="#24283b" x="410" y="175" width="585" height="18" rx="4"/>
+    <rect fill="#24283b" x="410" y="189" width="585" height="4"/>
+    <text x="420" y="188" class="pane-title">ARCHITECT [architect-1] %3</text>
+    <circle cx="980" cy="184" r="4" class="role-architect"/>
+
+    <text x="420" y="210" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.27;0.30;1"/>
+      $ Reading blackboard discoveries...
+    </text>
+    <text x="420" y="225" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.32;0.34;1"/>
+      Designing rate-limit middleware architecture:
+    </text>
+    <text x="420" y="240" class="info-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.35;0.37;1"/>
+      1. Create RateLimiter class in shared/
+    </text>
+    <text x="420" y="255" class="info-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.37;0.39;1"/>
+      2. Add middleware to api-service
+    </text>
+    <text x="420" y="270" class="info-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.39;0.41;1"/>
+      3. Add rate-limit headers to frontend
+    </text>
+    <text x="420" y="285" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.40;0.42;1"/>
+      Architecture plan posted to blackboard
+    </text>
+    <text x="420" y="300" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.42;0.44;1"/>
+      [complete]
+    </text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- WORKER PANE (Bottom Left) -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <g id="worker-pane">
+    <rect class="pane-border" x="5" y="320" width="330" height="180" rx="4">
+      <animate attributeName="stroke" values="#3b4261;#3b4261;#3b4261;#9ece6a;#9ece6a;#9ece6a;#9ece6a;#3b4261"
+               dur="18s" repeatCount="indefinite" keyTimes="0;0.45;0.47;0.50;0.65;0.70;0.72;1"/>
+    </rect>
+    <rect fill="#24283b" x="5" y="320" width="330" height="18" rx="4"/>
+    <rect fill="#24283b" x="5" y="334" width="330" height="4"/>
+    <text x="15" y="333" class="pane-title">WORKER [worker-api] %4</text>
+    <circle cx="320" cy="329" r="4" class="role-worker"/>
+
+    <text x="15" y="355" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.47;0.50;1"/>
+      $ Implementing rate-limit middleware...
+    </text>
+    <text x="15" y="370" class="command-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.52;0.54;1"/>
+      Creating src/middleware/rate-limit.ts
+    </text>
+    <text x="15" y="385" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.56;0.58;1"/>
+      Added Redis connection config
+    </text>
+    <text x="15" y="400" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.60;0.62;1"/>
+      Integrated into Express middleware chain
+    </text>
+    <text x="15" y="415" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.64;0.66;1"/>
+      git commit -m "feat: add rate limiting"
+    </text>
+    <text x="15" y="430" class="info-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.66;0.68;1"/>
+      Pushed to branch: feat/rate-limiting
+    </text>
+    <text x="15" y="445" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.68;0.70;1"/>
+      [complete]
+    </text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- KRAKEN PANE (Bottom Middle) -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <g id="kraken-pane">
+    <rect class="pane-border" x="340" y="320" width="330" height="180" rx="4">
+      <animate attributeName="stroke" values="#3b4261;#3b4261;#3b4261;#f7768e;#f7768e;#9ece6a;#9ece6a;#3b4261"
+               dur="18s" repeatCount="indefinite" keyTimes="0;0.45;0.47;0.50;0.65;0.70;0.72;1"/>
+    </rect>
+    <rect fill="#24283b" x="340" y="320" width="330" height="18" rx="4"/>
+    <rect fill="#24283b" x="340" y="334" width="330" height="4"/>
+    <text x="350" y="333" class="pane-title">KRAKEN [kraken-tests] %5</text>
+    <circle cx="655" cy="329" r="4" class="role-kraken"/>
+
+    <text x="350" y="355" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.47;0.50;1"/>
+      $ TDD: Writing tests first...
+    </text>
+    <text x="350" y="370" class="error-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.52;0.54;1"/>
+      RED: 0/12 tests passing
+    </text>
+    <text x="350" y="385" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.56;0.58;1"/>
+      Writing rate-limit.test.ts
+    </text>
+    <text x="350" y="400" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.62;0.64;1"/>
+      GREEN: 12/12 tests passing
+    </text>
+    <text x="350" y="415" class="info-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.65;0.67;1"/>
+      REFACTOR: Improved test coverage
+    </text>
+    <text x="350" y="430" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.67;0.69;1"/>
+      Coverage: 94%
+    </text>
+    <text x="350" y="445" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.69;0.71;1"/>
+      [complete]
+    </text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- CRITIC PANE (Bottom Right) -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <g id="critic-pane">
+    <rect class="pane-border" x="675" y="320" width="320" height="180" rx="4">
+      <animate attributeName="stroke" values="#3b4261;#3b4261;#3b4261;#e0af68;#e0af68;#9ece6a;#9ece6a;#3b4261"
+               dur="18s" repeatCount="indefinite" keyTimes="0;0.75;0.77;0.80;0.85;0.90;0.92;1"/>
+    </rect>
+    <rect fill="#24283b" x="675" y="320" width="320" height="18" rx="4"/>
+    <rect fill="#24283b" x="675" y="334" width="320" height="4"/>
+    <text x="685" y="333" class="pane-title">CRITIC [critic-1] %6</text>
+    <circle cx="980" cy="329" r="4" class="role-critic"/>
+
+    <text x="685" y="355" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.77;0.80;1"/>
+      $ Reviewing implementation...
+    </text>
+    <text x="685" y="370" class="output-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.80;0.82;1"/>
+      Checking code quality...
+    </text>
+    <text x="685" y="385" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.82;0.84;1"/>
+      No lint errors
+    </text>
+    <text x="685" y="400" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.84;0.86;1"/>
+      TypeScript: No errors
+    </text>
+    <text x="685" y="415" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.86;0.88;1"/>
+      Security scan: Clean
+    </text>
+    <text x="685" y="430" class="success-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.88;0.90;1"/>
+      APPROVED for merge
+    </text>
+    <text x="685" y="445" class="dim-text" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.90;0.92;1"/>
+      [complete]
+    </text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- BLACKBOARD (Bottom strip) -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <g id="blackboard">
+    <rect class="blackboard-bg" x="5" y="505" width="990" height="95" rx="4"/>
+    <rect fill="#24283b" x="5" y="505" width="990" height="18" rx="4"/>
+    <rect fill="#1e2030" x="5" y="519" width="990" height="4"/>
+    <text x="15" y="518" class="pane-title" fill="#7aa2f7">BLACKBOARD [swarm-coordination]</text>
+
+    <!-- Blackboard messages appear over time -->
+    <text x="15" y="540" class="blackboard-msg" fill="#7dcfff" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.15;0.18;1"/>
+      [scout-api] DISCOVERY: 47 endpoints mapped, middleware/ is injection point
+    </text>
+    <text x="15" y="555" class="blackboard-msg" fill="#bb9af7" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.18;0.21;1"/>
+      [oracle-patterns] RESEARCH: Sliding window w/ Redis recommended, per-user+endpoint
+    </text>
+    <text x="15" y="570" class="blackboard-msg" fill="#ff9e64" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.40;0.43;1"/>
+      [architect-1] DESIGN: 3-step plan posted, awaiting implementation
+    </text>
+    <text x="15" y="585" class="blackboard-msg" fill="#9ece6a" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" dur="18s" repeatCount="indefinite" keyTimes="0;0.68;0.71;1"/>
+      [worker-api] COMMIT: feat/rate-limiting pushed, ready for review
+    </text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- STATUS BAR -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <g id="status-bar">
+    <rect class="status-bar" x="5" y="605" width="990" height="20" rx="4"/>
+    <text x="15" y="618" class="status-text">[claude-fleet] 7 panes</text>
+    <text x="150" y="618" class="status-text">|</text>
+
+    <!-- Wave indicator -->
+    <text x="165" y="618" class="status-text" fill="#565f89">Wave:</text>
+    <text x="200" y="618" class="status-text" fill="#e0af68">
+      <animate attributeName="fill" values="#e0af68;#e0af68;#9ece6a;#9ece6a" dur="18s" repeatCount="indefinite" keyTimes="0;0.92;0.95;1"/>
+      <animate id="wave-text" attributeName="textContent" values="1/4;1/4;2/4;2/4;3/4;3/4;4/4;4/4" dur="18s" repeatCount="indefinite" keyTimes="0;0.22;0.25;0.44;0.45;0.72;0.75;1"/>
+      1/4
+    </text>
+
+    <text x="240" y="618" class="status-text">|</text>
+    <text x="255" y="618" class="status-text" fill="#565f89">Agents:</text>
+    <text x="305" y="618" class="status-text" fill="#9ece6a">
+      <animate id="agent-count" attributeName="textContent" values="0;3;3;4;4;6;6;7" dur="18s" repeatCount="indefinite" keyTimes="0;0.08;0.22;0.30;0.44;0.50;0.72;0.80"/>
+      0
+    </text>
+    <text x="320" y="618" class="status-text" fill="#565f89">/7</text>
+
+    <text x="360" y="618" class="status-text">|</text>
+    <text x="375" y="618" class="status-text" fill="#565f89">Repos:</text>
+    <text x="420" y="618" class="status-text" fill="#7dcfff">api, frontend, shared</text>
+
+    <text x="560" y="618" class="status-text">|</text>
+    <text x="575" y="618" class="status-text" fill="#565f89">Objective:</text>
+    <text x="640" y="618" class="status-text" fill="#c0caf5">Add rate limiting</text>
+
+    <!-- Time indicator -->
+    <text x="900" y="618" class="status-text" fill="#565f89">
+      <animate attributeName="textContent" dur="18s" repeatCount="indefinite"
+               values="00:00;00:02;00:04;00:06;00:08;00:10;00:12;00:14;00:16;00:18"/>
+      00:00
+    </text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- WAVE BADGES (floating indicators) -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Wave 1 badge on Scout/Oracle panes -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" dur="18s" repeatCount="indefinite" keyTimes="0;0.05;0.08;0.20;0.22;1"/>
+    <rect x="550" y="40" width="50" height="16" rx="8" fill="#7dcfff"/>
+    <text x="575" y="52" text-anchor="middle" class="wave-badge">Wave 1</text>
+  </g>
+
+  <!-- Wave 2 badge on Architect pane -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" dur="18s" repeatCount="indefinite" keyTimes="0;0.27;0.30;0.42;0.44;1"/>
+    <rect x="680" y="180" width="50" height="16" rx="8" fill="#ff9e64"/>
+    <text x="705" y="192" text-anchor="middle" class="wave-badge">Wave 2</text>
+  </g>
+
+  <!-- Wave 3 badge on Worker/Kraken panes -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" dur="18s" repeatCount="indefinite" keyTimes="0;0.47;0.50;0.70;0.72;1"/>
+    <rect x="420" y="325" width="50" height="16" rx="8" fill="#9ece6a"/>
+    <text x="445" y="337" text-anchor="middle" class="wave-badge">Wave 3</text>
+  </g>
+
+  <!-- Wave 4 badge on Critic pane -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" dur="18s" repeatCount="indefinite" keyTimes="0;0.77;0.80;0.90;0.92;1"/>
+    <rect x="780" y="325" width="50" height="16" rx="8" fill="#e0af68"/>
+    <text x="805" y="337" text-anchor="middle" class="wave-badge">Wave 4</text>
+  </g>
+
+  <!-- Success celebration at end -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0" dur="18s" repeatCount="indefinite" keyTimes="0;0.92;0.95;0.98;1"/>
+    <rect x="350" y="280" width="300" height="80" rx="8" fill="#1a1b26" stroke="#9ece6a" stroke-width="2"/>
+    <text x="500" y="310" text-anchor="middle" class="success-text" font-size="14">Objective Achieved!</text>
+    <text x="500" y="335" text-anchor="middle" class="info-text">4 waves | 7 agents | 3 PRs created</text>
+  </g>
+</svg>

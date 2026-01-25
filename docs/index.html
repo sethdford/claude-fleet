@@ -299,6 +299,161 @@
       font-size: var(--text-xs);
       color: var(--accent-cyan);
     }
+
+    /* TMUX Demo Section */
+    .tmux-demo-section {
+      padding: var(--space-4xl) 0;
+      background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    }
+
+    .tmux-demo-container {
+      margin-top: var(--space-2xl);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: 0 25px 80px -20px rgba(0,102,255,0.15);
+    }
+
+    .tmux-demo-svg {
+      width: 100%;
+      display: block;
+    }
+
+    .tmux-demo-caption {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-md);
+      padding: var(--space-lg);
+      background: rgba(255,255,255,0.02);
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 768px) {
+      .tmux-demo-caption { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 480px) {
+      .tmux-demo-caption { grid-template-columns: 1fr; }
+    }
+
+    .tmux-demo-stat {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .tmux-demo-stat .stat-icon {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-md);
+      flex-shrink: 0;
+    }
+
+    .tmux-demo-stat strong {
+      display: block;
+      font-size: var(--text-sm);
+      color: var(--text-primary);
+    }
+
+    .tmux-demo-stat span {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+
+    /* Agents Section */
+    .agents-section {
+      padding: var(--space-4xl) 0;
+    }
+
+    .agents-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: var(--space-lg);
+      margin-top: var(--space-2xl);
+    }
+
+    .agent-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-xl);
+      position: relative;
+      overflow: hidden;
+      transition: all var(--transition-normal);
+    }
+
+    .agent-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--agent-color, var(--accent-blue));
+    }
+
+    .agent-card:hover {
+      border-color: var(--agent-color, var(--accent-blue));
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px -15px rgba(0,0,0,0.3);
+    }
+
+    .agent-icon {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.05);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-md);
+    }
+
+    .agent-icon svg {
+      width: 24px;
+      height: 24px;
+      stroke: var(--agent-color, var(--accent-blue));
+    }
+
+    .agent-card h3 {
+      font-size: var(--text-lg);
+      margin-bottom: var(--space-sm);
+      color: var(--agent-color, var(--text-primary));
+    }
+
+    .agent-card p {
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: var(--space-md);
+    }
+
+    .agent-capabilities {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+
+    .agent-capabilities span {
+      font-size: var(--text-xs);
+      padding: 4px 8px;
+      background: rgba(255,255,255,0.05);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+    }
+
+    /* Agent colors */
+    .agent-lead { --agent-color: #7aa2f7; }
+    .agent-scout { --agent-color: #7dcfff; }
+    .agent-oracle { --agent-color: #bb9af7; }
+    .agent-architect { --agent-color: #ff9e64; }
+    .agent-worker { --agent-color: #9ece6a; }
+    .agent-kraken { --agent-color: #f7768e; }
+    .agent-critic { --agent-color: #e0af68; }
   </style>
 </head>
 <body>
@@ -424,6 +579,203 @@
           <span class="terminal-line terminal-output">Wave 4: Review...</span>
           <span class="terminal-line terminal-success">  ✓ Critic          Approved. Creating PRs...</span>
           <span class="terminal-line" style="color: var(--accent-green);">✓ Objective achieved in 4 waves. 3 PRs created.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Watch it Work - TMUX Demo -->
+    <section class="tmux-demo-section" id="watch">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Watch it Work
+          </span>
+          <h2>See agents <span class="gradient-text">collaborate in real-time</span></h2>
+          <p>7 specialized agents working together across 4 waves. Blackboard coordination. Automatic iteration until objectives are met.</p>
+        </div>
+
+        <div class="tmux-demo-container">
+          <img src="images/fleet-tmux-demo.svg" alt="Claude Fleet TMUX Demo - Agents spawning and collaborating in waves" class="tmux-demo-svg">
+          <div class="tmux-demo-caption">
+            <div class="tmux-demo-stat">
+              <span class="stat-icon" style="background: rgba(124, 207, 255, 0.2);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7dcfff" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+              </span>
+              <div>
+                <strong>Wave 1</strong>
+                <span>Scout + Oracle discover</span>
+              </div>
+            </div>
+            <div class="tmux-demo-stat">
+              <span class="stat-icon" style="background: rgba(255, 158, 100, 0.2);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff9e64" stroke-width="2">
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                </svg>
+              </span>
+              <div>
+                <strong>Wave 2</strong>
+                <span>Architect designs</span>
+              </div>
+            </div>
+            <div class="tmux-demo-stat">
+              <span class="stat-icon" style="background: rgba(158, 206, 106, 0.2);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ece6a" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                </svg>
+              </span>
+              <div>
+                <strong>Wave 3</strong>
+                <span>Worker + Kraken implement</span>
+              </div>
+            </div>
+            <div class="tmux-demo-stat">
+              <span class="stat-icon" style="background: rgba(224, 175, 104, 0.2);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0af68" stroke-width="2">
+                  <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+                </svg>
+              </span>
+              <div>
+                <strong>Wave 4</strong>
+                <span>Critic reviews & approves</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Meet the Agents -->
+    <section class="agents-section" id="agents">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="8" r="5"/>
+              <path d="M20 21a8 8 0 0 0-16 0"/>
+            </svg>
+            Specialized Roles
+          </span>
+          <h2>Meet the <span class="gradient-text">Agents</span></h2>
+          <p>7 specialized AI agents, each with distinct capabilities and responsibilities.</p>
+        </div>
+
+        <div class="agents-grid">
+          <div class="agent-card agent-lead">
+            <div class="agent-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7l3-7z"/>
+              </svg>
+            </div>
+            <h3>Lead</h3>
+            <p>Orchestrates the fleet, delegates tasks, spawns workers, monitors progress.</p>
+            <div class="agent-capabilities">
+              <span>Spawn agents</span>
+              <span>Coordinate</span>
+              <span>Monitor</span>
+            </div>
+          </div>
+
+          <div class="agent-card agent-scout">
+            <div class="agent-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+            </div>
+            <h3>Scout</h3>
+            <p>Explores codebases, maps dependencies, gathers intelligence. Read-only reconnaissance.</p>
+            <div class="agent-capabilities">
+              <span>Explore</span>
+              <span>Map deps</span>
+              <span>Read-only</span>
+            </div>
+          </div>
+
+          <div class="agent-card agent-oracle">
+            <div class="agent-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+              </svg>
+            </div>
+            <h3>Oracle</h3>
+            <p>Deep research and analysis. Investigates patterns, provides insights and recommendations.</p>
+            <div class="agent-capabilities">
+              <span>Research</span>
+              <span>Analyze</span>
+              <span>Recommend</span>
+            </div>
+          </div>
+
+          <div class="agent-card agent-architect">
+            <div class="agent-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M2 20h20"/>
+                <path d="M5 20V8l7-5 7 5v12"/>
+                <path d="M9 20v-6h6v6"/>
+              </svg>
+            </div>
+            <h3>Architect</h3>
+            <p>System design, API contracts, architecture decisions. Can spawn implementation workers.</p>
+            <div class="agent-capabilities">
+              <span>Design</span>
+              <span>Plan</span>
+              <span>Spawn</span>
+            </div>
+          </div>
+
+          <div class="agent-card agent-worker">
+            <div class="agent-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+              </svg>
+            </div>
+            <h3>Worker</h3>
+            <p>General-purpose implementation. Executes tasks, writes code, creates commits.</p>
+            <div class="agent-capabilities">
+              <span>Code</span>
+              <span>Commit</span>
+              <span>Execute</span>
+            </div>
+          </div>
+
+          <div class="agent-card agent-kraken">
+            <div class="agent-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+            <h3>Kraken</h3>
+            <p>TDD specialist. Red-green-refactor cycle. Tests first, implementation second.</p>
+            <div class="agent-capabilities">
+              <span>TDD</span>
+              <span>Test first</span>
+              <span>Refactor</span>
+            </div>
+          </div>
+
+          <div class="agent-card agent-critic">
+            <div class="agent-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M9 12l2 2 4-4"/>
+              </svg>
+            </div>
+            <h3>Critic</h3>
+            <p>Code review, quality gates, security checks. Approve or request changes.</p>
+            <div class="agent-capabilities">
+              <span>Review</span>
+              <span>Security</span>
+              <span>Approve</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>

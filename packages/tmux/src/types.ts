@@ -43,7 +43,7 @@ export interface CreatePaneOptions {
 }
 
 export interface SendKeysOptions {
-  /** Delay in ms before sending Enter (default: 100ms) */
+  /** Delay in ms before sending Enter (default: 1500ms for reliability) */
   delay?: number;
   /** Don't send Enter after text */
   noEnter?: boolean;
@@ -51,11 +51,15 @@ export interface SendKeysOptions {
   literal?: boolean;
   /** Send immediately without any delay (overrides delay) */
   instant?: boolean;
+  /** Verify Enter was received by checking if pane content changed */
+  verifyEnter?: boolean;
+  /** Maximum number of Enter key retries (default: 3) */
+  maxRetries?: number;
 }
 
 export interface CaptureOptions {
-  /** Number of lines to capture (default: all) */
-  lines?: number;
+  /** Number of lines to capture (default: all). Use undefined for all lines. */
+  lines?: number | undefined;
   /** Start line (negative for scrollback) */
   start?: number;
   /** End line */

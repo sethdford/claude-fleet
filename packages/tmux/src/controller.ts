@@ -19,7 +19,8 @@ import type {
 } from './types.js';
 
 export class TmuxController {
-  private defaultDelay = 100; // ms between text and Enter
+  // Default delay between text and Enter (1.5s for reliability, per claude-code-tools)
+  private defaultDelay = 1500;
 
   /**
    * Check if we're running inside tmux
@@ -93,6 +94,39 @@ export class TmuxController {
     if (!this.isInsideTmux()) return undefined;
     try {
       return this.runTmux(['display-message', '-p', '#{pane_id}']);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Get the active pane ID (works even when not inside tmux)
+   * Queries tmux directly to find the currently active pane in the active window
+   */
+  getActivePaneId(): string | undefined {
+    try {
+      // Get the active pane from ALL windows, preferring the first window
+      // This ensures we target the main window where the user is working
+      const output = this.runTmux([
+        'list-panes', '-a', '-F', '#{pane_id}|#{pane_active}|#{window_index}'
+      ]);
+      // Sort by window_index to prefer earlier windows
+      const panes = output.split('\n')
+        .filter(Boolean)
+        .map(line => {
+          const [paneId, active, windowIndex] = line.split('|');
+          return { paneId, active: active === '1', windowIndex: parseInt(windowIndex ?? '0', 10) };
+        })
+        .sort((a, b) => a.windowIndex - b.windowIndex);
+
+      // Find the first active pane in the lowest-indexed window
+      for (const pane of panes) {
+        if (pane.active && pane.paneId) {
+          return pane.paneId;
+        }
+      }
+      // Fallback: return the first pane
+      return panes[0]?.paneId;
     } catch {
       return undefined;
     }
@@ -247,11 +281,17 @@ export class TmuxController {
 
   /**
    * Create a new window
+   * Supports creating in a specific session (for remote mode)
    */
-  createWindow(options: { name?: string; command?: string; cwd?: string } = {}): TmuxWindow | undefined {
-    const { name, command, cwd } = options;
+  createWindow(options: { session?: string; name?: string; command?: string; cwd?: string } = {}): string | undefined {
+    const { session, name, command, cwd } = options;
 
     const args = ['new-window', '-P', '-F', '#{window_id}'];
+
+    // Target a specific session (important for remote/detached mode)
+    if (session) {
+      args.push('-t', session);
+    }
 
     if (name) {
       args.push('-n', name);
@@ -266,9 +306,7 @@ export class TmuxController {
     }
 
     try {
-      const windowId = this.runTmux(args);
-      const windows = this.listWindows();
-      return windows.find((w) => w.id === windowId);
+      return this.runTmux(args);
     } catch {
       return undefined;
     }
@@ -276,14 +314,24 @@ export class TmuxController {
 
   /**
    * Kill a pane
+   *
+   * Safety (learned from claude-code-tools):
+   * - Never kill the current pane (would terminate session)
+   * - Never kill the active pane (even when running outside tmux)
    */
   killPane(target: string): boolean {
     const resolved = this.resolveTarget(target);
-    const currentPane = this.getCurrentPane();
 
-    // Safety: don't kill current pane
-    if (resolved === currentPane) {
+    // Safety check 1: don't kill current pane (when inside tmux)
+    const currentPane = this.getCurrentPane();
+    if (currentPane && resolved === currentPane) {
       throw new Error('Cannot kill current pane');
+    }
+
+    // Safety check 2: don't kill active pane (works even outside tmux)
+    const activePane = this.getActivePaneId();
+    if (activePane && resolved === activePane) {
+      throw new Error('Cannot kill active pane');
     }
 
     try {
@@ -371,14 +419,26 @@ export class TmuxController {
   // ============ Input/Output ============
 
   /**
-   * Send keys to a pane
+   * Send keys to a pane with optional Enter key verification
+   *
+   * Pattern from claude-code-tools:
+   * - Delay between text and Enter prevents race conditions
+   * - Verify Enter was received by checking if content changed
+   * - Retry with exponential backoff if verification fails
    */
   async sendKeys(
     target: string,
     text: string,
     options: SendKeysOptions = {}
   ): Promise<void> {
-    const { delay = this.defaultDelay, noEnter = false, literal = false, instant = false } = options;
+    const {
+      delay = this.defaultDelay,
+      noEnter = false,
+      literal = false,
+      instant = false,
+      verifyEnter = true,
+      maxRetries = 3,
+    } = options;
     const resolved = this.resolveTarget(target);
 
     const args = ['send-keys', '-t', resolved];
@@ -389,15 +449,62 @@ export class TmuxController {
 
     args.push(text);
 
+    // Send the text (without Enter)
     this.runTmux(args);
 
-    // Add delay before Enter to prevent race conditions
-    // Unless instant mode is enabled (--delay-enter=False equivalent)
-    if (!noEnter) {
-      if (!instant && delay > 0) {
-        await this.sleep(delay);
+    if (noEnter) {
+      return;
+    }
+
+    // Apply delay before Enter to prevent race conditions
+    // Unless instant mode is enabled
+    if (!instant && delay > 0) {
+      await this.sleep(delay);
+    }
+
+    // Capture pane state BEFORE sending Enter (for verification)
+    const contentBeforeEnter = verifyEnter ? this.capture(resolved, { lines: 20 }) : null;
+
+    // Send Enter with verification and retry logic
+    await this.sendEnterWithRetry(resolved, contentBeforeEnter, verifyEnter, maxRetries);
+  }
+
+  /**
+   * Send Enter key with optional verification and retry
+   *
+   * Verifies that Enter was received by checking if pane content changed
+   * (indicating command was submitted). Retries if content hasn't changed.
+   */
+  private async sendEnterWithRetry(
+    target: string,
+    contentBeforeEnter: string | null,
+    verify: boolean,
+    maxRetries: number
+  ): Promise<void> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      // Send Enter
+      this.runTmux(['send-keys', '-t', target, 'Enter']);
+
+      if (!verify || contentBeforeEnter === null) {
+        return; // No verification needed
       }
-      this.runTmux(['send-keys', '-t', resolved, 'Enter']);
+
+      // Wait a bit for the command to process
+      await this.sleep(300);
+
+      // Check if pane content changed (indicating Enter was received)
+      const contentAfter = this.capture(target, { lines: 20 });
+
+      if (contentAfter !== contentBeforeEnter) {
+        // Content changed - Enter was successful
+        return;
+      }
+
+      // Content unchanged - Enter may not have been received
+      if (attempt < maxRetries - 1) {
+        // Wait before retry (exponential backoff)
+        await this.sleep(500 * (attempt + 1));
+      }
     }
   }
 
@@ -415,6 +522,34 @@ export class TmuxController {
   sendEscape(target: string): void {
     const resolved = this.resolveTarget(target);
     this.runTmux(['send-keys', '-t', resolved, 'Escape']);
+  }
+
+  /**
+   * Clear the pane screen (Ctrl+L)
+   */
+  clearPane(target: string): void {
+    const resolved = this.resolveTarget(target);
+    this.runTmux(['send-keys', '-t', resolved, 'C-l']);
+  }
+
+  /**
+   * Format pane ID to session:window.pane format
+   *
+   * Pattern from claude-code-tools: Provides human-readable pane identifiers
+   */
+  formatPaneId(paneId: string): string {
+    try {
+      const session = this.runTmux(['display-message', '-t', paneId, '-p', '#{session_name}']);
+      const windowIndex = this.runTmux(['display-message', '-t', paneId, '-p', '#{window_index}']);
+      const paneIndex = this.runTmux(['display-message', '-t', paneId, '-p', '#{pane_index}']);
+
+      if (session && windowIndex && paneIndex) {
+        return `${session}:${windowIndex}.${paneIndex}`;
+      }
+      return paneId;
+    } catch {
+      return paneId;
+    }
   }
 
   /**
@@ -450,64 +585,137 @@ export class TmuxController {
 
   // ============ Execution ============
 
+  // Progressive expansion levels for capture (pattern from claude-code-tools)
+  // Start small, expand if end marker found but start marker scrolled off
+  private static EXPANSION_LEVELS: (number | undefined)[] = [100, 500, 2000, undefined];
+
   /**
    * Execute a command and capture output with exit code
+   *
+   * Pattern from claude-code-tools:
+   * - Uses unique markers with PID + nanoseconds for concurrency safety
+   * - Progressive expansion: tries small capture first, expands if needed
+   * - Distinguishes echoed markers from typed command text
    */
   async execute(
     target: string,
     command: string,
     options: WaitOptions = {}
   ): Promise<ExecuteResult> {
-    const { timeout = 30000, interval = 100 } = options;
+    const { timeout = 30000, interval = 500 } = options;
     const resolved = this.resolveTarget(target);
 
-    // Generate unique markers
+    // Generate unique markers (PID + nanoseconds for uniqueness)
     const marker = this.generateMarker();
     const startMarker = `__CCT_START_${marker}__`;
     const endMarker = `__CCT_END_${marker}__`;
 
-    // Wrap command with markers
-    const wrappedCommand = `echo '${startMarker}'; ${command}; echo '${endMarker}'$?`;
+    // Wrap command with markers (captures both stdout and stderr)
+    const wrappedCommand = `echo ${startMarker}; { ${command}; } 2>&1; echo ${endMarker}:$?`;
 
     const startTime = Date.now();
 
-    // Send the command
+    // Send the command (with Enter verification for reliability)
     await this.sendKeys(resolved, wrappedCommand);
 
-    // Poll for completion
+    // Poll for completion with progressive expansion
     const deadline = Date.now() + timeout;
 
     while (Date.now() < deadline) {
       await this.sleep(interval);
 
-      const captured = this.capture(resolved, { lines: 500 });
+      // Try progressive expansion to find both markers
+      for (const lines of TmuxController.EXPANSION_LEVELS) {
+        const captured = this.capture(resolved, { lines });
+        const result = this.parseMarkedOutput(captured, startMarker, endMarker);
 
-      // Look for markers
-      const startIdx = captured.indexOf(startMarker);
-      const endMatch = captured.match(new RegExp(`${endMarker}(\\d+)`));
-
-      if (startIdx !== -1 && endMatch) {
-        const endIdx = captured.indexOf(endMatch[0]);
-        const output = captured
-          .slice(startIdx + startMarker.length, endIdx)
-          .trim();
-
-        return {
-          output,
-          exitCode: parseInt(endMatch[1] ?? '-1', 10),
-          completed: true,
-          duration: Date.now() - startTime,
-        };
+        if (result.hasEnd) {
+          if (result.hasStart) {
+            // Both markers found - return result
+            return {
+              output: result.output,
+              exitCode: result.exitCode,
+              completed: true,
+              duration: Date.now() - startTime,
+            };
+          }
+          // End found but start missing - try more lines
+          continue;
+        } else {
+          // End marker not found yet - command still running
+          break;
+        }
       }
     }
 
-    // Timeout
+    // Timeout - capture with full expansion and return what we have
+    let captured = '';
+    for (const lines of TmuxController.EXPANSION_LEVELS) {
+      captured = this.capture(resolved, { lines });
+      if (captured.includes(startMarker) || lines === undefined) {
+        break;
+      }
+    }
+
+    const result = this.parseMarkedOutput(captured, startMarker, endMarker);
     return {
-      output: this.capture(resolved, { lines: 100 }),
-      exitCode: -1,
-      completed: false,
+      output: result.output,
+      exitCode: result.exitCode,
+      completed: result.hasStart && result.hasEnd,
       duration: Date.now() - startTime,
     };
+  }
+
+  /**
+   * Parse marked output to extract command output and exit code
+   *
+   * Pattern from claude-code-tools:
+   * - Look for ECHOED marker (after newline) not the typed command
+   * - Distinguish __END__:$? (typed) from __END__:0 (echoed)
+   */
+  private parseMarkedOutput(
+    captured: string,
+    startMarker: string,
+    endMarker: string
+  ): { output: string; exitCode: number; hasStart: boolean; hasEnd: boolean } {
+    const hasStart = captured.includes(startMarker);
+    const hasEnd = captured.includes(`${endMarker}:`);
+
+    if (!hasStart || !hasEnd) {
+      return { output: captured, exitCode: -1, hasStart, hasEnd };
+    }
+
+    // Find the ECHOED start marker (on its own line, not in the typed command)
+    const newlineStartMarker = '\n' + startMarker;
+    let startIdx = captured.indexOf(newlineStartMarker);
+    if (startIdx !== -1) {
+      startIdx += 1; // Skip the newline
+    } else if (captured.startsWith(startMarker)) {
+      startIdx = 0;
+    } else {
+      startIdx = captured.indexOf(startMarker);
+    }
+
+    // Find the ECHOED end marker with numeric exit code (e.g., "__END__:0")
+    const endPattern = new RegExp(endMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':(\\d+)');
+    const endMatch = captured.match(endPattern);
+
+    if (startIdx === -1 || !endMatch) {
+      return { output: captured, exitCode: -1, hasStart, hasEnd };
+    }
+
+    const endIdx = captured.indexOf(endMatch[0]);
+    const exitCode = parseInt(endMatch[1] ?? '-1', 10);
+
+    // Extract output between markers
+    let outputStart = startIdx + startMarker.length;
+    if (outputStart < captured.length && captured[outputStart] === '\n') {
+      outputStart += 1;
+    }
+
+    const output = captured.slice(outputStart, endIdx).replace(/\n+$/, '');
+
+    return { output, exitCode, hasStart, hasEnd };
   }
 
   // ============ Wait Operations ============

@@ -51,6 +51,12 @@ Wave 4: Review...
 ✓ Objective achieved in 4 waves. 3 PRs created.
 ```
 
+<p align="center">
+  <img src="docs/images/fleet-tmux-demo.svg" alt="Claude Fleet TMUX Demo" width="900">
+</p>
+
+<p align="center"><em>Watch agents spawn, collaborate, and complete objectives in real-time</em></p>
+
 ---
 
 ## Key Features

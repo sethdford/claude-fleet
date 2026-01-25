@@ -5,47 +5,50 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FleetTmuxManager } from './fleet-manager.js';
 
-// Mock the controller
-vi.mock('./controller.js', () => ({
-  TmuxController: vi.fn().mockImplementation(() => ({
-    isInsideTmux: vi.fn().mockReturnValue(true),
-    isTmuxInstalled: vi.fn().mockReturnValue(true),
-    getCurrentSession: vi.fn().mockReturnValue('main'),
-    getCurrentWindow: vi.fn().mockReturnValue('0'),
-    getCurrentPane: vi.fn().mockReturnValue('%0'),
-    listPanes: vi.fn().mockReturnValue([
-      { id: '%0', index: 0, title: 'main', active: true, width: 80, height: 24, command: 'zsh', pid: 1234 },
-    ]),
-    listWindows: vi.fn().mockReturnValue([
-      { id: '@0', index: 0, name: 'main', active: true, paneCount: 1 },
-    ]),
-    listSessions: vi.fn().mockReturnValue([
-      { id: '$0', name: 'main', created: Date.now(), attached: true, windowCount: 1 },
-    ]),
-    createPane: vi.fn().mockReturnValue({
-      id: '%1', index: 1, title: 'new', active: false, width: 80, height: 24, command: 'zsh', pid: 5678,
-    }),
-    createSession: vi.fn().mockReturnValue('$1'),
-    setPaneTitle: vi.fn(),
-    sendKeys: vi.fn().mockResolvedValue(undefined),
-    sendInterrupt: vi.fn(),
-    sendEscape: vi.fn(),
-    capture: vi.fn().mockReturnValue('output text'),
-    execute: vi.fn().mockResolvedValue({
-      output: 'command output',
-      exitCode: 0,
-      completed: true,
-      duration: 100,
-    }),
-    waitForIdle: vi.fn().mockResolvedValue(true),
-    waitForPattern: vi.fn().mockResolvedValue(true),
-    killPane: vi.fn().mockReturnValue(true),
-    killSession: vi.fn().mockReturnValue(true),
-    focusPane: vi.fn(),
-    getAttachCommand: vi.fn().mockReturnValue('tmux attach-session -t main'),
-    sessionExists: vi.fn().mockReturnValue(true),
-  })),
-}));
+// Mock the controller using a class
+vi.mock('./controller.js', () => {
+  return {
+    TmuxController: class MockTmuxController {
+      isInsideTmux = vi.fn().mockReturnValue(true);
+      isTmuxInstalled = vi.fn().mockReturnValue(true);
+      getCurrentSession = vi.fn().mockReturnValue('main');
+      getCurrentWindow = vi.fn().mockReturnValue('0');
+      getCurrentPane = vi.fn().mockReturnValue('%0');
+      getActivePaneId = vi.fn().mockReturnValue('%0');
+      listPanes = vi.fn().mockReturnValue([
+        { id: '%0', index: 0, title: 'main', active: true, width: 80, height: 24, command: 'zsh', pid: 1234 },
+      ]);
+      listWindows = vi.fn().mockReturnValue([
+        { id: '@0', index: 0, name: 'main', active: true, paneCount: 1 },
+      ]);
+      listSessions = vi.fn().mockReturnValue([
+        { id: '$0', name: 'main', created: Date.now(), attached: true, windowCount: 1 },
+      ]);
+      createPane = vi.fn().mockReturnValue({
+        id: '%1', index: 1, title: 'new', active: false, width: 80, height: 24, command: 'zsh', pid: 5678,
+      });
+      createSession = vi.fn().mockReturnValue('$1');
+      setPaneTitle = vi.fn();
+      sendKeys = vi.fn().mockResolvedValue(undefined);
+      sendInterrupt = vi.fn();
+      sendEscape = vi.fn();
+      capture = vi.fn().mockReturnValue('output text');
+      execute = vi.fn().mockResolvedValue({
+        output: 'command output',
+        exitCode: 0,
+        completed: true,
+        duration: 100,
+      });
+      waitForIdle = vi.fn().mockResolvedValue(true);
+      waitForPattern = vi.fn().mockResolvedValue(true);
+      killPane = vi.fn().mockReturnValue(true);
+      killSession = vi.fn().mockReturnValue(true);
+      focusPane = vi.fn();
+      getAttachCommand = vi.fn().mockReturnValue('tmux attach-session -t main');
+      sessionExists = vi.fn().mockReturnValue(true);
+    },
+  };
+});
 
 describe('FleetTmuxManager', () => {
   let manager: FleetTmuxManager;
@@ -117,10 +120,21 @@ describe('FleetTmuxManager', () => {
         prompt: 'You are a helpful assistant',
       });
 
+      // Shell-first pattern: pane is created with 'zsh', then command is sent via sendKeys
       expect(controller.createPane).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: expect.stringContaining('claude --print'),
+          command: 'zsh',
         })
+      );
+
+      // Claude command is sent via sendKeys after pane creation
+      expect(controller.sendKeys).toHaveBeenCalledWith(
+        '%1',
+        expect.stringContaining('--print')
+      );
+      expect(controller.sendKeys).toHaveBeenCalledWith(
+        '%1',
+        expect.stringContaining('You are a helpful assistant')
       );
     });
 

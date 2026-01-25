@@ -24,6 +24,11 @@ import { createStorage, getStorageConfigFromEnv } from './storage/factory.js';
 import type { IStorage } from './storage/interfaces.js';
 import { createAuthMiddleware, requireRole, requireTeamMembership } from './middleware/auth.js';
 import { metricsMiddleware, metricsHandler } from './metrics/prometheus.js';
+import { AutoScheduler } from './scheduler/auto-scheduler.js';
+import { TaskExecutor } from './scheduler/executor.js';
+import { loadDefaultConfig } from './scheduler/config-loader.js';
+import webhooksRouter from './routes/webhooks.js';
+import schedulerRouter from './routes/scheduler.js';
 import type {
   ServerConfig,
   ExtendedWebSocket,
@@ -202,6 +207,16 @@ export class CollabServer {
       credentials: true,
     }));
 
+    // Capture raw body for webhook signature verification
+    this.app.use('/webhooks', express.json({
+      limit: '1mb',
+      verify: (req: Request, _res, buf) => {
+        // Store raw body for signature verification
+        (req as Request & { rawBody?: Buffer }).rawBody = buf;
+      }
+    }));
+
+    // Regular JSON parsing for other routes
     this.app.use(express.json({ limit: '1mb' }));
     this.app.use(metricsMiddleware);
     this.app.use(this.rateLimitMiddleware.bind(this));
@@ -288,6 +303,23 @@ export class CollabServer {
     this.app.post('/orchestrate/worktree/:handle/push', requireRole('team-lead'), routes.createWorktreePushHandler(this.deps));
     this.app.post('/orchestrate/worktree/:handle/pr', requireRole('team-lead'), routes.createWorktreePRHandler(this.deps));
     this.app.get('/orchestrate/worktree/:handle/status', routes.createWorktreeStatusHandler(this.deps));
+
+    // Wave orchestration routes
+    this.app.post('/orchestrate/waves', requireRole('team-lead'), routes.createExecuteWavesHandler(this.deps, broadcastToAll));
+    this.app.get('/orchestrate/waves', requireRole('team-lead', 'worker'), routes.createListWaveExecutionsHandler(this.deps));
+    this.app.get('/orchestrate/waves/:id', requireRole('team-lead', 'worker'), routes.createGetWaveStatusHandler(this.deps));
+    this.app.post('/orchestrate/waves/:id/cancel', requireRole('team-lead'), routes.createCancelWaveHandler(this.deps));
+
+    // Multi-repo orchestration routes
+    this.app.post('/orchestrate/multi-repo', requireRole('team-lead'), routes.createExecuteMultiRepoHandler(this.deps, broadcastToAll));
+    this.app.get('/orchestrate/multi-repo', requireRole('team-lead', 'worker'), routes.createListMultiRepoExecutionsHandler(this.deps));
+    this.app.get('/orchestrate/multi-repo/:id', requireRole('team-lead', 'worker'), routes.createGetMultiRepoStatusHandler(this.deps));
+
+    // Multi-repo common task shortcuts
+    this.app.post('/orchestrate/multi-repo/update-deps', requireRole('team-lead'), routes.createUpdateDepsHandler(this.deps, broadcastToAll));
+    this.app.post('/orchestrate/multi-repo/security-audit', requireRole('team-lead'), routes.createSecurityAuditHandler(this.deps, broadcastToAll));
+    this.app.post('/orchestrate/multi-repo/format-code', requireRole('team-lead'), routes.createFormatCodeHandler(this.deps, broadcastToAll));
+    this.app.post('/orchestrate/multi-repo/run-tests', requireRole('team-lead'), routes.createRunTestsHandler(this.deps, broadcastToAll));
 
     // Work item routes (require authentication)
     this.app.post('/workitems', requireRole('team-lead', 'worker'), routes.createCreateWorkItemHandler(this.deps));
@@ -395,6 +427,10 @@ export class CollabServer {
     this.app.post('/audit/stop', requireRole('team-lead'), routes.createAuditStopHandler(this.deps));
     this.app.post('/audit/quick', requireRole('team-lead'), routes.createQuickAuditHandler(this.deps));
 
+    // Autonomous Operations routes (webhooks, scheduler, templates)
+    this.app.use('/webhooks', webhooksRouter);
+    this.app.use('/scheduler', schedulerRouter);
+
     // Swarm Intelligence routes (stigmergic coordination, beliefs, credits, consensus, bidding)
     // Pheromone trails
     this.app.post('/pheromones', requireRole('team-lead', 'worker'), routes.createDepositPheromoneHandler(this.deps));
@@ -405,20 +441,22 @@ export class CollabServer {
     this.app.get('/pheromones/:swarmId/stats', requireRole('team-lead', 'worker'), routes.createPheromoneStatsHandler(this.deps));
 
     // Agent beliefs (Theory of Mind)
+    // IMPORTANT: Specific routes must come before generic /:swarmId/:handle pattern
     this.app.post('/beliefs', requireRole('team-lead', 'worker'), routes.createUpsertBeliefHandler(this.deps));
-    this.app.get('/beliefs/:swarmId/:handle', requireRole('team-lead', 'worker'), routes.createGetBeliefsHandler(this.deps));
     this.app.post('/beliefs/meta', requireRole('team-lead', 'worker'), routes.createUpsertMetaBeliefHandler(this.deps));
-    this.app.get('/beliefs/:swarmId/consensus/:subject', requireRole('team-lead', 'worker'), routes.createGetSwarmConsensusHandler(this.deps));
     this.app.get('/beliefs/:swarmId/stats', requireRole('team-lead', 'worker'), routes.createBeliefStatsHandler(this.deps));
+    this.app.get('/beliefs/:swarmId/consensus/:subject', requireRole('team-lead', 'worker'), routes.createGetSwarmConsensusHandler(this.deps));
+    this.app.get('/beliefs/:swarmId/:handle', requireRole('team-lead', 'worker'), routes.createGetBeliefsHandler(this.deps));
 
     // Credits & reputation
-    this.app.get('/credits/:swarmId/:handle', requireRole('team-lead', 'worker'), routes.createGetCreditsHandler(this.deps));
-    this.app.get('/credits/:swarmId/leaderboard', requireRole('team-lead', 'worker'), routes.createGetLeaderboardHandler(this.deps));
+    // IMPORTANT: Specific routes (stats, leaderboard) must come before generic /:handle pattern
     this.app.post('/credits/transfer', requireRole('team-lead', 'worker'), routes.createTransferCreditsHandler(this.deps));
     this.app.post('/credits/transaction', requireRole('team-lead'), routes.createRecordTransactionHandler(this.deps));
-    this.app.get('/credits/:swarmId/:handle/history', requireRole('team-lead', 'worker'), routes.createGetCreditHistoryHandler(this.deps));
-    this.app.get('/credits/:swarmId/stats', requireRole('team-lead', 'worker'), routes.createCreditStatsHandler(this.deps));
     this.app.post('/credits/reputation', requireRole('team-lead'), routes.createUpdateReputationHandler(this.deps));
+    this.app.get('/credits/:swarmId/stats', requireRole('team-lead', 'worker'), routes.createCreditStatsHandler(this.deps));
+    this.app.get('/credits/:swarmId/leaderboard', requireRole('team-lead', 'worker'), routes.createGetLeaderboardHandler(this.deps));
+    this.app.get('/credits/:swarmId/:handle/history', requireRole('team-lead', 'worker'), routes.createGetCreditHistoryHandler(this.deps));
+    this.app.get('/credits/:swarmId/:handle', requireRole('team-lead', 'worker'), routes.createGetCreditsHandler(this.deps));
 
     // Consensus voting
     this.app.post('/consensus/proposals', requireRole('team-lead', 'worker'), routes.createCreateProposalHandler(this.deps));
@@ -429,14 +467,15 @@ export class CollabServer {
     this.app.get('/consensus/:swarmId/stats', requireRole('team-lead', 'worker'), routes.createConsensusStatsHandler(this.deps));
 
     // Task bidding
+    // IMPORTANT: Specific routes (task/:taskId/*, stats) must come before generic /:id pattern
     this.app.post('/bids', requireRole('team-lead', 'worker'), routes.createSubmitBidHandler(this.deps));
     this.app.get('/bids/task/:taskId', requireRole('team-lead', 'worker'), routes.createGetTaskBidsHandler(this.deps));
-    this.app.get('/bids/:id', requireRole('team-lead', 'worker'), routes.createGetBidHandler(this.deps));
-    this.app.post('/bids/:id/accept', requireRole('team-lead'), routes.createAcceptBidHandler(this.deps));
-    this.app.delete('/bids/:id', requireRole('team-lead', 'worker'), routes.createWithdrawBidHandler(this.deps));
     this.app.post('/bids/task/:taskId/evaluate', requireRole('team-lead'), routes.createEvaluateBidsHandler(this.deps));
     this.app.post('/bids/task/:taskId/auction', requireRole('team-lead'), routes.createRunAuctionHandler(this.deps));
     this.app.get('/bids/:swarmId/stats', requireRole('team-lead', 'worker'), routes.createBiddingStatsHandler(this.deps));
+    this.app.get('/bids/:id', requireRole('team-lead', 'worker'), routes.createGetBidHandler(this.deps));
+    this.app.post('/bids/:id/accept', requireRole('team-lead'), routes.createAcceptBidHandler(this.deps));
+    this.app.delete('/bids/:id', requireRole('team-lead', 'worker'), routes.createWithdrawBidHandler(this.deps));
 
     // Game-theoretic payoffs
     this.app.post('/payoffs', requireRole('team-lead'), routes.createDefinePayoffHandler(this.deps));
@@ -596,6 +635,31 @@ export class CollabServer {
     // Start workflow engine processing
     this.workflowEngine.start();
 
+    // Start autonomous scheduler (cron jobs and task queue)
+    const scheduler = AutoScheduler.getInstance();
+    scheduler.start();
+
+    // Configure task executor with WorkerManager
+    const executor = TaskExecutor.getInstance();
+    executor.configure({
+      workerManager: this.workerManager,
+      defaultWorkingDir: process.cwd()
+    });
+
+    // Connect scheduler to executor
+    scheduler.on('executeTask', async (task) => {
+      try {
+        await executor.execute(task);
+      } catch (error) {
+        console.error('[SERVER] Task execution error:', error);
+      }
+    });
+
+    // Load configuration from file (if exists)
+    loadDefaultConfig();
+
+    console.log('[SERVER] Autonomous scheduler started');
+
     this.server.listen(this.config.port, () => {
       const storageInfo = this.config.storageBackend === 'sqlite'
         ? `SQLite: ${this.config.dbPath}`
@@ -621,6 +685,7 @@ export class CollabServer {
   async stop(): Promise<void> {
     console.log('[SERVER] Stopping...');
     this.workflowEngine.stop();
+    AutoScheduler.getInstance().stop();
     await this.workerManager.dismissAll();
     this.wss.close();
     this.server.close();

@@ -15,6 +15,7 @@ import type {
   SpawnWorkerResponse,
   PersistentWorker,
   AgentRole,
+  SpawnMode,
 } from '../types.js';
 import type { SQLiteStorage } from '../storage/sqlite.js';
 import { WorktreeManager } from './worktree.js';
@@ -22,6 +23,7 @@ import { MailStorage } from '../storage/mail.js';
 import type { SpawnController } from './spawn-controller.js';
 import type { FleetAgentRole } from './agent-roles.js';
 import { getSystemPromptForRole } from './agent-roles.js';
+import { TmuxWorkerAdapter, ContextManager } from '@claude-fleet/tmux';
 
 const MAX_OUTPUT_LINES = 100;
 
@@ -50,6 +52,7 @@ export interface WorkerManagerOptions {
   worktreeBaseDir?: string;
   injectMail?: boolean;
   spawnController?: SpawnController;
+  defaultSpawnMode?: SpawnMode;
 }
 
 export class WorkerManager extends EventEmitter {
@@ -66,9 +69,14 @@ export class WorkerManager extends EventEmitter {
   private useWorktrees: boolean;
   private injectMail: boolean;
   private spawnController: SpawnController | null = null;
+  private tmuxAdapter: TmuxWorkerAdapter | null = null;
+  private contextManager: ContextManager | null = null;
+  private defaultSpawnMode: SpawnMode;
+  private contextRolloverThreshold: number;
 
   constructor(options: WorkerManagerOptions = {}) {
     super();
+    this.contextRolloverThreshold = 0.7;
     this.maxWorkers = options.maxWorkers ?? 5;
     this.defaultTeamName = options.defaultTeamName ?? 'default';
     this.serverUrl = options.serverUrl ?? 'http://localhost:3847';
@@ -77,6 +85,7 @@ export class WorkerManager extends EventEmitter {
     this.useWorktrees = options.useWorktrees ?? false;
     this.injectMail = options.injectMail ?? true;
     this.spawnController = options.spawnController ?? null;
+    this.defaultSpawnMode = options.defaultSpawnMode ?? 'process';
 
     if (this.useWorktrees) {
       this.worktreeManager = new WorktreeManager({
@@ -89,7 +98,78 @@ export class WorkerManager extends EventEmitter {
       this.mailStorage = new MailStorage(this.storage);
     }
 
+    // Initialize tmux adapter if available
+    this.tmuxAdapter = new TmuxWorkerAdapter();
+    if (this.tmuxAdapter.isAvailable()) {
+      console.log('[WORKER] Tmux spawning available');
+      this.setupTmuxEventForwarding();
+      // Initialize context manager for tmux workers
+      this.contextManager = new ContextManager();
+    } else {
+      console.log('[WORKER] Tmux not available, using process spawning only');
+      this.tmuxAdapter = null;
+    }
+
+    // Context rollover threshold (default 70%)
+    this.contextRolloverThreshold = 0.7;
+
     this.startHealthCheck();
+  }
+
+  /**
+   * Set up event forwarding from TmuxWorkerAdapter
+   * Maps tmux adapter events to WorkerManager events for compatibility
+   */
+  private setupTmuxEventForwarding(): void {
+    if (!this.tmuxAdapter) return;
+
+    this.tmuxAdapter.on('worker:ready', (data: { workerId: string; handle: string; sessionId: string | null; paneId: string }) => {
+      this.emit('worker:ready', {
+        workerId: data.workerId,
+        handle: data.handle,
+        sessionId: data.sessionId,
+      });
+    });
+
+    this.tmuxAdapter.on('worker:output', (data: { workerId: string; handle: string; text: string }) => {
+      // Convert text output to ClaudeEvent format
+      const event: ClaudeEvent = {
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: data.text }],
+        },
+      };
+      this.emit('worker:output', {
+        workerId: data.workerId,
+        handle: data.handle,
+        event,
+      });
+    });
+
+    this.tmuxAdapter.on('worker:result', (data: { workerId: string; handle: string; result: string }) => {
+      this.emit('worker:result', {
+        workerId: data.workerId,
+        handle: data.handle,
+        result: data.result,
+      });
+    });
+
+    this.tmuxAdapter.on('worker:error', (data: { workerId: string; handle: string; error: string }) => {
+      this.emit('worker:error', {
+        workerId: data.workerId,
+        handle: data.handle,
+        error: data.error,
+      });
+    });
+
+    this.tmuxAdapter.on('worker:exit', (data: { workerId: string; handle: string }) => {
+      this.emit('worker:exit', {
+        workerId: data.workerId,
+        handle: data.handle,
+        code: null,
+      });
+    });
   }
 
   /**
@@ -231,6 +311,54 @@ export class WorkerManager extends EventEmitter {
       } else {
         worker.health = 'healthy';
       }
+
+      // Check context usage for tmux workers
+      if (worker.spawnMode === 'tmux' && worker.paneId && this.contextManager) {
+        this.checkWorkerContext(worker);
+      }
+    }
+  }
+
+  /**
+   * Check and handle context rollover for a tmux worker
+   */
+  private checkWorkerContext(worker: WorkerProcess): void {
+    if (!this.contextManager || !worker.paneId) return;
+
+    try {
+      if (this.contextManager.needsTrim(worker.paneId, this.contextRolloverThreshold)) {
+        const metrics = this.contextManager.analyzeContext(worker.paneId);
+        console.log(`[CONTEXT] ${worker.handle} context at ${Math.round(metrics.usageRatio * 100)}% - initiating rollover`);
+
+        // Emit event for monitoring
+        this.emit('worker:context-high', {
+          workerId: worker.id,
+          handle: worker.handle,
+          usageRatio: metrics.usageRatio,
+          estimatedTokens: metrics.estimatedTokens,
+        });
+
+        // Perform context rollover - generate summary and start fresh session
+        const summary = this.contextManager.generateContinueSummary(worker.paneId);
+        this.contextManager.rolloverToNewPane(worker.paneId, {
+          initialPrompt: `Continue from previous session. Summary:\n${summary.summary}`,
+        }).then(({ paneId: newPaneId, summary: rolloverSummary }) => {
+          console.log(`[CONTEXT] ${worker.handle} rolled over to pane ${newPaneId}`);
+          worker.paneId = newPaneId;
+
+          this.emit('worker:context-rollover', {
+            workerId: worker.id,
+            handle: worker.handle,
+            newPaneId,
+            summary: rolloverSummary,
+          });
+        }).catch((error: Error) => {
+          console.error(`[CONTEXT] Failed to rollover ${worker.handle}:`, error.message);
+        });
+      }
+    } catch (error) {
+      // Context analysis failed, skip this check
+      console.warn(`[CONTEXT] Failed to analyze context for ${worker.handle}:`, (error as Error).message);
     }
   }
 
@@ -374,6 +502,13 @@ export class WorkerManager extends EventEmitter {
     depthLevel = 1
   ): Promise<SpawnWorkerResponse> {
     const teamName = request.teamName ?? this.defaultTeamName;
+    const spawnMode: SpawnMode = request.spawnMode ?? this.defaultSpawnMode;
+
+    // Delegate to tmux adapter if spawn mode is 'tmux' and adapter is available
+    if (spawnMode === 'tmux' && this.tmuxAdapter) {
+      return this.spawnTmuxWorker(workerId, request, role, teamName);
+    }
+
     let workingDir = request.workingDir ?? process.cwd();
     let worktreePath: string | null = null;
     let worktreeBranch: string | null = null;
@@ -460,6 +595,7 @@ export class WorkerManager extends EventEmitter {
     });
 
     const now = Date.now();
+    // spawnMode already determined above, defaults to 'process' for this code path
     const worker: WorkerProcess = {
       id: workerId,
       handle: request.handle,
@@ -476,6 +612,7 @@ export class WorkerManager extends EventEmitter {
       health: 'healthy',
       swarmId,
       depthLevel,
+      spawnMode,
     };
 
     this.workers.set(workerId, worker);
@@ -497,6 +634,8 @@ export class WorkerManager extends EventEmitter {
         role,
         swarmId: swarmId ?? null,
         depthLevel,
+        spawnMode,
+        paneId: null, // Only set for tmux spawn mode
         createdAt: Math.floor(now / 1000),
         dismissedAt: null,
       };
@@ -521,6 +660,97 @@ export class WorkerManager extends EventEmitter {
       workingDir: worker.workingDir,
       state: worker.state,
       spawnedAt: worker.spawnedAt,
+      spawnMode,
+    };
+  }
+
+  /**
+   * Spawn a worker using the tmux adapter
+   * Creates a visible tmux pane with Claude Code running
+   */
+  private async spawnTmuxWorker(
+    workerId: string,
+    request: SpawnWorkerRequest,
+    role: AgentRole,
+    teamName: string
+  ): Promise<SpawnWorkerResponse> {
+    if (!this.tmuxAdapter) {
+      throw new Error('Tmux adapter not available');
+    }
+
+    const workingDir = request.workingDir ?? process.cwd();
+
+    // Spawn via tmux adapter
+    const tmuxResult = await this.tmuxAdapter.spawnWorker({
+      handle: request.handle,
+      teamName,
+      workingDir,
+      initialPrompt: request.initialPrompt,
+      role,
+      model: request.model,
+    });
+
+    const now = Date.now();
+
+    // Create a minimal WorkerProcess for tracking (no actual process since it's in tmux)
+    // We use a dummy process that's immediately "stopped" since the real process is in tmux
+    const dummyProcess = spawn('echo', ['tmux-worker'], { stdio: 'ignore' });
+
+    const worker: WorkerProcess = {
+      id: tmuxResult.id,
+      handle: request.handle,
+      teamName,
+      process: dummyProcess,
+      sessionId: null, // Will be updated when tmux worker reports ready
+      workingDir,
+      state: 'starting',
+      recentOutput: [],
+      spawnedAt: now,
+      currentTaskId: null,
+      lastHeartbeat: now,
+      restartCount: 0,
+      health: 'healthy',
+      spawnMode: 'tmux',
+      paneId: tmuxResult.paneId,
+    };
+
+    this.workers.set(tmuxResult.id, worker);
+
+    // Persist to storage
+    if (this.storage) {
+      const persistentWorker: PersistentWorker = {
+        id: tmuxResult.id,
+        handle: request.handle,
+        status: 'pending',
+        worktreePath: null,
+        worktreeBranch: null,
+        pid: null,
+        sessionId: null,
+        initialPrompt: request.initialPrompt ?? null,
+        lastHeartbeat: now,
+        restartCount: 0,
+        role,
+        swarmId: null,
+        depthLevel: 1,
+        spawnMode: 'tmux',
+        paneId: tmuxResult.paneId,
+        createdAt: Math.floor(now / 1000),
+        dismissedAt: null,
+      };
+      this.storage.insertWorker(persistentWorker);
+    }
+
+    console.log(`[WORKER] Spawned tmux worker ${request.handle} (pane: ${tmuxResult.paneId})`);
+
+    return {
+      id: tmuxResult.id,
+      handle: request.handle,
+      teamName,
+      workingDir,
+      state: 'starting',
+      spawnedAt: now,
+      spawnMode: 'tmux',
+      paneId: tmuxResult.paneId,
     };
   }
 
@@ -696,10 +926,20 @@ export class WorkerManager extends EventEmitter {
   /**
    * Send a message to a worker
    */
-  sendToWorker(workerId: string, message: string): boolean {
+  async sendToWorker(workerId: string, message: string): Promise<boolean> {
     const worker = this.workers.get(workerId);
     if (!worker || worker.state === 'stopped') {
       return false;
+    }
+
+    // Handle tmux workers via adapter
+    if (worker.spawnMode === 'tmux' && this.tmuxAdapter) {
+      const success = await this.tmuxAdapter.sendToWorker(worker.handle, message);
+      if (success) {
+        worker.state = 'working';
+        this.addOutput(worker, `[user] ${message}`);
+      }
+      return success;
     }
 
     // Send plain text - Claude accepts plain text input with --print mode
@@ -710,9 +950,48 @@ export class WorkerManager extends EventEmitter {
   }
 
   /**
+   * Deliver a task to a tmux worker
+   * Formats and sends the task as a prompt to the worker
+   */
+  async deliverTaskToWorker(workerId: string, task: { id: string; title: string; description?: string }): Promise<boolean> {
+    const worker = this.workers.get(workerId);
+    if (!worker || worker.state === 'stopped') {
+      return false;
+    }
+
+    // Format task as a prompt
+    const taskPrompt = `# Task Assignment
+
+**Task ID:** ${task.id}
+**Title:** ${task.title}
+${task.description ? `\n**Description:**\n${task.description}` : ''}
+
+Please work on this task. When complete, include "TASK COMPLETE" in your response.`;
+
+    // Handle tmux workers via adapter
+    if (worker.spawnMode === 'tmux' && this.tmuxAdapter) {
+      const success = await this.tmuxAdapter.deliverTask(worker.handle, {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+      });
+      if (success) {
+        worker.currentTaskId = task.id;
+        worker.state = 'working';
+        this.addOutput(worker, `[task] Assigned: ${task.title}`);
+      }
+      return success;
+    }
+
+    // For process workers, send via stdin
+    worker.currentTaskId = task.id;
+    return this.sendToWorker(workerId, taskPrompt);
+  }
+
+  /**
    * Send a message to a worker by handle
    */
-  sendToWorkerByHandle(handle: string, message: string): boolean {
+  async sendToWorkerByHandle(handle: string, message: string): Promise<boolean> {
     const worker = this.getWorkerByHandle(handle);
     if (!worker) return false;
     return this.sendToWorker(worker.id, message);
@@ -856,6 +1135,20 @@ export class WorkerManager extends EventEmitter {
    */
   getWorktreeManager(): WorktreeManager | null {
     return this.worktreeManager;
+  }
+
+  /**
+   * Get the tmux adapter for external operations (wave orchestration, etc.)
+   */
+  getTmuxAdapter(): TmuxWorkerAdapter | null {
+    return this.tmuxAdapter;
+  }
+
+  /**
+   * Check if tmux spawning is available
+   */
+  isTmuxAvailable(): boolean {
+    return this.tmuxAdapter?.isAvailable() ?? false;
   }
 
   /**

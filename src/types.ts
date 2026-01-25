@@ -147,6 +147,9 @@ export interface BroadcastRequest {
 
 export type WorkerState = 'starting' | 'ready' | 'working' | 'stopping' | 'stopped';
 
+/** How the worker process was spawned */
+export type SpawnMode = 'process' | 'tmux';
+
 export interface WorkerProcess {
   /** Unique worker ID */
   id: string;
@@ -178,6 +181,10 @@ export interface WorkerProcess {
   swarmId?: string;
   /** Depth level in agent hierarchy (1 = spawned by lead) */
   depthLevel?: number;
+  /** How this worker was spawned */
+  spawnMode: SpawnMode;
+  /** Tmux pane ID (only for tmux spawn mode) */
+  paneId?: string;
 }
 
 // ============================================================================
@@ -212,6 +219,10 @@ export interface SpawnWorkerRequest {
   workingDir?: string;
   initialPrompt?: string;
   sessionId?: string;
+  /** Spawn mode: 'process' (default) or 'tmux' for visible terminal */
+  spawnMode?: SpawnMode;
+  /** Model to use (e.g., 'opus', 'sonnet') - only for tmux mode */
+  model?: string;
 }
 
 export interface SpawnWorkerResponse {
@@ -221,6 +232,10 @@ export interface SpawnWorkerResponse {
   workingDir: string;
   state: WorkerState;
   spawnedAt: number;
+  /** How this worker was spawned */
+  spawnMode: SpawnMode;
+  /** Tmux pane ID (only for tmux spawn mode) */
+  paneId?: string;
 }
 
 export interface SendToWorkerRequest {
@@ -386,7 +401,7 @@ export interface MCPToolResult {
 // AGENT ROLES (Phase 3)
 // ============================================================================
 
-export type AgentRole = 'coordinator' | 'worker' | 'monitor' | 'notifier' | 'merger';
+export type AgentRole = 'coordinator' | 'worker' | 'monitor' | 'notifier' | 'merger' | 'team-lead';
 
 export interface RolePermissions {
   spawn: boolean;
@@ -431,6 +446,11 @@ export const ROLE_PERMISSIONS: Record<AgentRole, RolePermissions> = {
     claim: false, complete: false, send: false, readAll: false, alert: false,
     notify: false, readStatus: false, resolve: true, push: true,
   },
+  'team-lead': {
+    spawn: true, dismiss: true, assign: true, broadcast: true, merge: true,
+    claim: true, complete: true, send: true, readAll: true, alert: false,
+    notify: false, readStatus: true, resolve: true, push: true,
+  },
 };
 
 // ============================================================================
@@ -455,6 +475,10 @@ export interface PersistentWorker {
   depthLevel: number;
   createdAt: number;
   dismissedAt: number | null;
+  /** How this worker was spawned */
+  spawnMode: SpawnMode;
+  /** Tmux pane ID (only for tmux spawn mode) */
+  paneId: string | null;
 }
 
 // ============================================================================

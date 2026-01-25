@@ -58,7 +58,7 @@ export function createDismissWorkerHandler(deps: RouteDependencies, broadcastToA
 }
 
 export function createSendToWorkerHandler(deps: RouteDependencies) {
-  return (req: Request, res: Response): void => {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { handle } = req.params;
 
     const validation = validateBody(sendToWorkerSchema, req.body);
@@ -67,14 +67,14 @@ export function createSendToWorkerHandler(deps: RouteDependencies) {
       return;
     }
 
-    const success = deps.workerManager.sendToWorkerByHandle(handle, validation.data.message);
+    const success = await deps.workerManager.sendToWorkerByHandle(handle, validation.data.message);
     if (!success) {
       res.status(404).json({ error: `Worker '${handle}' not found or stopped` } as ErrorResponse);
       return;
     }
 
     res.json({ success: true, handle });
-  };
+  });
 }
 
 export function createGetWorkersHandler(deps: RouteDependencies) {
