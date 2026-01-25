@@ -16,11 +16,33 @@
   <!-- Outfit for modern display headings -->
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="images/logo.svg">
+  <link rel="apple-touch-icon" href="images/logo.svg">
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://sethdford.github.io/claude-fleet/">
+
+  <!-- Theme Color -->
+  <meta name="theme-color" content="#0066FF">
+
   <!-- Open Graph -->
   <meta property="og:title" content="Claude Fleet - Multi-Agent Orchestration">
   <meta property="og:description" content="The infrastructure for coordinating AI agent fleets.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sethdford.github.io/claude-fleet/">
+  <meta property="og:image" content="https://sethdford.github.io/claude-fleet/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Cards -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Claude Fleet - Multi-Agent Orchestration">
+  <meta name="twitter:description" content="The infrastructure for coordinating AI agent fleets.">
+  <meta name="twitter:image" content="https://sethdford.github.io/claude-fleet/images/og-image.png">
+
+  <!-- Keywords -->
+  <meta name="keywords" content="claude code, multi-agent, AI orchestration, fleet management, MCP, typescript">
 
   <style>
     :root {
@@ -45,6 +67,22 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     html { scroll-behavior: smooth; }
+
+    /* Skip Link (A11y) */
+    .skip-link {
+      position: absolute;
+      top: -40px;
+      left: 0;
+      background: var(--accent-blue);
+      color: white;
+      padding: 8px 16px;
+      z-index: 9999;
+      border-radius: 0 0 8px 0;
+      transition: top 0.3s;
+    }
+    .skip-link:focus {
+      top: 0;
+    }
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -703,6 +741,97 @@
       overflow-x: auto;
     }
 
+    /* Use Cases */
+    .use-cases {
+      padding: 120px 0;
+      background: var(--bg-secondary);
+    }
+
+    .use-cases-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .use-cases-grid { grid-template-columns: 1fr; }
+    }
+
+    .use-case-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      transition: all 0.3s;
+    }
+
+    .use-case-card:hover {
+      border-color: var(--accent-blue);
+      transform: translateY(-4px);
+    }
+
+    .use-case-icon {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,102,255,0.1);
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+
+    .use-case-icon svg {
+      width: 24px;
+      height: 24px;
+      stroke: var(--accent-cyan);
+    }
+
+    .use-case-card h3 {
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+
+    .use-case-card p {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    /* FAQ */
+    .faq {
+      padding: 120px 0;
+    }
+
+    .faq-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 32px;
+    }
+
+    @media (max-width: 768px) {
+      .faq-grid { grid-template-columns: 1fr; }
+    }
+
+    .faq-item {
+      padding: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .faq-item h3 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+
+    .faq-item p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
     /* CTA */
     .cta {
       padding: 160px 0;
@@ -784,6 +913,9 @@
   </style>
 </head>
 <body>
+  <!-- Skip to main content (A11y) -->
+  <a href="#main" class="skip-link">Skip to main content</a>
+
   <!-- Navigation -->
   <nav>
     <div class="container">
@@ -821,6 +953,7 @@
   </nav>
 
   <!-- Hero -->
+  <main id="main">
   <section class="hero">
     <div class="hero-bg">
       <div class="hero-gradient hero-gradient-1"></div>
@@ -1149,6 +1282,105 @@
     </div>
   </section>
 
+  <!-- Use Cases -->
+  <section class="use-cases" id="use-cases">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="8.5" cy="7" r="4"/>
+            <polyline points="17 11 19 13 23 9"/>
+          </svg>
+          Use Cases
+        </div>
+        <h2>Built for ambitious teams</h2>
+        <p>From solo developers to enterprise teams, Claude Fleet scales with your needs.</p>
+      </div>
+
+      <div class="use-cases-grid">
+        <div class="use-case-card">
+          <div class="use-case-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <h3>Large Codebase Refactoring</h3>
+          <p>Parallelize massive refactoring tasks across multiple workers, each handling different modules while staying coordinated through the blackboard.</p>
+        </div>
+
+        <div class="use-case-card">
+          <div class="use-case-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+            </svg>
+          </div>
+          <h3>Multi-Feature Development</h3>
+          <p>Develop multiple features simultaneously with isolated git worktrees. Each worker handles a feature branch without conflicts.</p>
+        </div>
+
+        <div class="use-case-card">
+          <div class="use-case-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+          </div>
+          <h3>Automated Code Review</h3>
+          <p>Deploy reviewer agents that analyze PRs in parallel, checking for different concerns: security, performance, style, and tests.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq" id="faq">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          FAQ
+        </div>
+        <h2>Frequently asked questions</h2>
+      </div>
+
+      <div class="faq-grid">
+        <div class="faq-item">
+          <h3>What is Claude Fleet?</h3>
+          <p>Claude Fleet is an orchestration layer for running multiple Claude Code CLI instances in parallel. It provides coordination, task management, and real-time monitoring for multi-agent workflows.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>Do I need an Anthropic API key?</h3>
+          <p>Yes, each Claude Code worker requires access to the Anthropic API through your existing Claude Code CLI setup. Claude Fleet orchestrates the workers but doesn't handle API authentication directly.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>How does git worktree isolation work?</h3>
+          <p>Each worker operates in its own git worktree, allowing them to work on different branches simultaneously without conflicts. Changes are merged back through standard git workflows.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>Can I use this in production?</h3>
+          <p>Claude Fleet is designed for production use with SQLite persistence, automatic crash recovery, health monitoring, and Prometheus metrics. It's MIT licensed for any use case.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>How many workers can I run?</h3>
+          <p>The default limit is 5 concurrent workers, configurable via MAX_WORKERS. Actual limits depend on your system resources and Anthropic API rate limits.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>What's the MCP integration for?</h3>
+          <p>The Model Context Protocol server lets any MCP-compatible client (including Claude Code itself) control the fleet, enabling agents to spawn and coordinate other agents.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- CTA -->
   <section class="cta">
     <div class="cta-bg"></div>
@@ -1173,6 +1405,8 @@
       </div>
     </div>
   </section>
+
+  </main>
 
   <!-- Footer -->
   <footer>

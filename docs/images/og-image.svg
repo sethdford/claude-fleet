@@ -1,0 +1,89 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#000000"/>
+      <stop offset="100%" stop-color="#0a0a0a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0066FF"/>
+      <stop offset="50%" stop-color="#00D4FF"/>
+      <stop offset="100%" stop-color="#00FF94"/>
+    </linearGradient>
+    <linearGradient id="logoGrad" x1="0" y1="0" x2="60" y2="60">
+      <stop offset="0%" stop-color="#0066FF"/>
+      <stop offset="100%" stop-color="#00D4FF"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="20" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Grid pattern -->
+  <g opacity="0.05">
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="white" stroke-width="1"/>
+    </pattern>
+    <rect width="1200" height="630" fill="url(#grid)"/>
+  </g>
+
+  <!-- Gradient orbs -->
+  <circle cx="200" cy="100" r="300" fill="#0066FF" opacity="0.15" filter="url(#glow)"/>
+  <circle cx="1000" cy="530" r="250" fill="#7C3AED" opacity="0.1" filter="url(#glow)"/>
+
+  <!-- Logo -->
+  <g transform="translate(100, 200)">
+    <rect width="60" height="60" rx="12" fill="url(#logoGrad)"/>
+    <path d="M30 12L48 22V42L30 52L12 42V22L30 12Z" stroke="white" stroke-width="2" fill="none"/>
+    <circle cx="30" cy="28" r="5" fill="white"/>
+    <circle cx="22" cy="40" r="3.5" fill="white" opacity="0.8"/>
+    <circle cx="38" cy="40" r="3.5" fill="white" opacity="0.8"/>
+    <line x1="30" y1="28" x2="22" y2="40" stroke="white" stroke-width="1.5" opacity="0.5"/>
+    <line x1="30" y1="28" x2="38" y2="40" stroke="white" stroke-width="1.5" opacity="0.5"/>
+  </g>
+
+  <!-- Text -->
+  <text x="180" y="235" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="700" fill="white">Claude Fleet</text>
+
+  <text x="100" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="800" fill="white">The infrastructure for</text>
+  <text x="100" y="430" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="800" fill="url(#accent)">AI agent fleets</text>
+
+  <text x="100" y="510" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="rgba(255,255,255,0.6)">Orchestrate multiple Claude Code instances with intelligent coordination</text>
+
+  <!-- Stats -->
+  <g transform="translate(100, 560)">
+    <text font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="url(#accent)">100% TypeScript</text>
+    <text x="200" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="rgba(255,255,255,0.4)">•</text>
+    <text x="220" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="url(#accent)">MIT Licensed</text>
+    <text x="380" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="rgba(255,255,255,0.4)">•</text>
+    <text x="400" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="url(#accent)">Production Ready</text>
+  </g>
+
+  <!-- Agent visualization on right -->
+  <g transform="translate(850, 250)">
+    <!-- Central node -->
+    <circle cx="100" cy="80" r="35" fill="#0066FF" filter="url(#glow)" opacity="0.8"/>
+    <text x="100" y="85" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="white">LEAD</text>
+
+    <!-- Worker nodes -->
+    <circle cx="30" cy="180" r="25" fill="#00D4FF" opacity="0.8"/>
+    <text x="30" y="185" text-anchor="middle" font-family="system-ui" font-size="10" fill="black">W1</text>
+
+    <circle cx="100" cy="200" r="25" fill="#7C3AED" opacity="0.8"/>
+    <text x="100" y="205" text-anchor="middle" font-family="system-ui" font-size="10" fill="white">W2</text>
+
+    <circle cx="170" cy="180" r="25" fill="#00FF94" opacity="0.8"/>
+    <text x="170" y="185" text-anchor="middle" font-family="system-ui" font-size="10" fill="black">W3</text>
+
+    <!-- Connection lines -->
+    <line x1="100" y1="115" x2="30" y2="155" stroke="#0066FF" stroke-width="2" opacity="0.5" stroke-dasharray="4,4"/>
+    <line x1="100" y1="115" x2="100" y2="175" stroke="#0066FF" stroke-width="2" opacity="0.5" stroke-dasharray="4,4"/>
+    <line x1="100" y1="115" x2="170" y2="155" stroke="#0066FF" stroke-width="2" opacity="0.5" stroke-dasharray="4,4"/>
+  </g>
+</svg>
