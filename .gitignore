@@ -1,13 +1,16 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Build output
 dist/
+*.tsbuildinfo
 
 # Database files
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
 
 # Firebase
 .firebase/
@@ -23,12 +26,15 @@ ui-debug.log
 # OS
 .DS_Store
 Thumbs.db
+
+# Worktrees
 .worktrees/
 
 # Logs
 logs/
 *.log
 npm-debug.log*
+pnpm-debug.log*
 
 # IDE
 .idea/
@@ -46,6 +52,9 @@ coverage/
 # Temp files
 *.tmp
 *.temp
+tmp/
+temp/
+.tmp/
 
 # NPM package
 *.tgz
@@ -53,3 +62,7 @@ coverage/
 # Local config
 .mcp.json
 .claude/
+
+# Rust/Cargo
+target/
+crates/target/

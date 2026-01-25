@@ -1,0 +1,40 @@
+{
+  "name": "claude-fleet",
+  "version": "1.0.0",
+  "description": "CLI for Claude Code Tools",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "cf": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@claude-fleet/common": "workspace:*",
+    "@claude-fleet/storage": "workspace:*",
+    "@claude-fleet/session": "workspace:*",
+    "@claude-fleet/fleet": "workspace:*",
+    "@claude-fleet/safety": "workspace:*",
+    "@claude-fleet/tmux": "workspace:*",
+    "@claude-fleet/mcp": "workspace:*",
+    "commander": "^12.0.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.0"
+  },
+  "optionalDependencies": {
+    "@claude-fleet/search": "workspace:*",
+    "@claude-fleet/lmsh": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.2.0"
+  }
+}

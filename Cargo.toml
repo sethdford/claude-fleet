@@ -1,0 +1,59 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "3.0.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/sethdford/claude-code-tools"
+authors = ["Seth Ford"]
+
+[workspace.dependencies]
+# NAPI-RS for Node.js bindings
+napi = { version = "2.16", features = ["async", "napi9"] }
+napi-derive = "2.16"
+napi-build = "2.1"
+
+# Search engine
+tantivy = "0.22"
+
+# TUI
+ratatui = "0.26"
+crossterm = "0.27"
+
+# CLI
+rustyline = "14"
+
+# PTY
+portable-pty = "0.8"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Clipboard
+arboard = "3.3"
+
+# Directories
+dirs = "5.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Async
+tokio = { version = "1.36", features = ["full"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

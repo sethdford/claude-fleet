@@ -1,0 +1,29 @@
+[package]
+name = "cct-search"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Fast full-text search for Claude Code sessions using Tantivy"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi.workspace = true
+napi-derive.workspace = true
+tantivy.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+arboard.workspace = true
+dirs.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[build-dependencies]
+napi-build.workspace = true

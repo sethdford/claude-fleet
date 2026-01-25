@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": false,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "paths": {
+      "@cct/common": ["../packages/common/src/index.ts"],
+      "@cct/storage": ["../packages/storage/src/index.ts"],
+      "@cct/session": ["../packages/session/src/index.ts"],
+      "@cct/fleet": ["../packages/fleet/src/index.ts"],
+      "@cct/safety": ["../packages/safety/src/index.ts"],
+      "@cct/mcp": ["../packages/mcp/src/index.ts"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "references": [
+    { "path": "../packages/common" },
+    { "path": "../packages/storage" },
+    { "path": "../packages/session" },
+    { "path": "../packages/fleet" },
+    { "path": "../packages/safety" },
+    { "path": "../packages/mcp" }
+  ]
+}

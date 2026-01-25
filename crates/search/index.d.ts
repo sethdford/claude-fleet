@@ -1,0 +1,72 @@
+/**
+ * @cct/search - TypeScript type definitions
+ */
+
+/**
+ * Search result from queries
+ */
+export interface SearchResult {
+  sessionId: string;
+  score: number;
+  snippet: string;
+  timestamp: number;
+  model?: string;
+}
+
+/**
+ * Session metadata for indexing
+ */
+export interface SessionMetadata {
+  sessionId: string;
+  content: string;
+  timestamp: number;
+  model?: string;
+  projectPath?: string;
+}
+
+/**
+ * Index statistics
+ */
+export interface IndexStats {
+  documentCount: number;
+}
+
+/**
+ * Main search index for Claude Code sessions
+ */
+export declare class SearchIndex {
+  /**
+   * Create or open an index at the specified path
+   */
+  constructor(indexPath: string);
+
+  /**
+   * Index a session
+   */
+  indexSession(metadata: SessionMetadata): void;
+
+  /**
+   * Commit pending changes
+   */
+  commit(): void;
+
+  /**
+   * Search for sessions matching the query
+   */
+  search(query: string, limit?: number): SearchResult[];
+
+  /**
+   * Delete a session from the index
+   */
+  deleteSession(sessionId: string): void;
+
+  /**
+   * Get index statistics
+   */
+  stats(): IndexStats;
+
+  /**
+   * Launch the interactive TUI for searching
+   */
+  launchTui(): void;
+}
