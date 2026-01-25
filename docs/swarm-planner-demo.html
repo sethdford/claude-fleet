@@ -225,9 +225,15 @@
     }
 
     .role-icon {
-      font-size: 18px;
-      width: 28px;
-      text-align: center;
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .role-icon svg {
+      width: 100%;
+      height: 100%;
+      stroke: var(--accent-cyan);
     }
 
     .role-name {
@@ -319,7 +325,19 @@
     }
 
     .sidebar-role-icon {
-      font-size: 16px;
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-role-icon svg {
+      width: 100%;
+      height: 100%;
+      stroke: var(--text-secondary);
+    }
+
+    .sidebar-role:hover .sidebar-role-icon svg {
+      stroke: var(--accent-cyan);
     }
 
     .sidebar-role-name {
@@ -473,17 +491,17 @@
           </div>
           <div class="phase-content" id="discovery-content">
             <div class="role-card" draggable="true" data-role="architect">
-              <span class="role-icon">🏛️</span>
+              <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><path d="M9 20v-6h6v6"/><path d="M9 12h6"/></svg></span>
               <span class="role-name">Architect</span>
               <span class="role-remove" onclick="removeRole(this)">×</span>
             </div>
             <div class="role-card" draggable="true" data-role="product-analyst">
-              <span class="role-icon">📋</span>
+              <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg></span>
               <span class="role-name">Product Analyst</span>
               <span class="role-remove" onclick="removeRole(this)">×</span>
             </div>
             <div class="role-card" draggable="true" data-role="release-manager">
-              <span class="role-icon">📦</span>
+              <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.29 7 12 12l8.71-5"/><path d="M12 22V12"/></svg></span>
               <span class="role-name">Release Manager</span>
               <span class="role-remove" onclick="removeRole(this)">×</span>
             </div>
@@ -497,12 +515,12 @@
           </div>
           <div class="phase-content" id="development-content">
             <div class="role-card" draggable="true" data-role="frontend-dev">
-              <span class="role-icon">🎨</span>
+              <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>
               <span class="role-name">Frontend Dev</span>
               <span class="role-remove" onclick="removeRole(this)">×</span>
             </div>
             <div class="role-card" draggable="true" data-role="fullstack-dev">
-              <span class="role-icon">🍞</span>
+              <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>
               <span class="role-name">Full-Stack Dev</span>
               <span class="role-remove" onclick="removeRole(this)">×</span>
             </div>
@@ -516,12 +534,12 @@
           </div>
           <div class="phase-content" id="quality-content">
             <div class="role-card" draggable="true" data-role="security-engineer">
-              <span class="role-icon">🛡️</span>
+              <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
               <span class="role-name">Security Engineer</span>
               <span class="role-remove" onclick="removeRole(this)">×</span>
             </div>
             <div class="role-card" draggable="true" data-role="devops-engineer">
-              <span class="role-icon">☁️</span>
+              <span class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg></span>
               <span class="role-name">DevOps Engineer</span>
               <span class="role-remove" onclick="removeRole(this)">×</span>
             </div>
@@ -545,11 +563,11 @@
         <div class="sidebar-section">
           <div class="sidebar-section-title discovery">Discovery</div>
           <div class="sidebar-role" draggable="true" data-role="product-analyst">
-            <span class="sidebar-role-icon">📋</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg></span>
             <span class="sidebar-role-name">Product Analyst</span>
           </div>
           <div class="sidebar-role" draggable="true" data-role="architect">
-            <span class="sidebar-role-icon">🏛️</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><path d="M9 20v-6h6v6"/><path d="M9 12h6"/></svg></span>
             <span class="sidebar-role-name">Architect</span>
           </div>
         </div>
@@ -557,19 +575,19 @@
         <div class="sidebar-section">
           <div class="sidebar-section-title development">Development</div>
           <div class="sidebar-role" draggable="true" data-role="frontend-dev">
-            <span class="sidebar-role-icon">🎨</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>
             <span class="sidebar-role-name">Frontend Dev</span>
           </div>
           <div class="sidebar-role" draggable="true" data-role="backend-dev">
-            <span class="sidebar-role-icon">⚙️</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span>
             <span class="sidebar-role-name">Backend Dev</span>
           </div>
           <div class="sidebar-role" draggable="true" data-role="fullstack-dev">
-            <span class="sidebar-role-icon">🍞</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>
             <span class="sidebar-role-name">Full-Stack Dev</span>
           </div>
           <div class="sidebar-role" draggable="true" data-role="data-engineer">
-            <span class="sidebar-role-icon">🗄️</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
             <span class="sidebar-role-name">Data Engineer</span>
           </div>
         </div>
@@ -577,15 +595,15 @@
         <div class="sidebar-section">
           <div class="sidebar-section-title quality">Quality</div>
           <div class="sidebar-role" draggable="true" data-role="qa-engineer">
-            <span class="sidebar-role-icon">✅</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
             <span class="sidebar-role-name">QA Engineer</span>
           </div>
           <div class="sidebar-role" draggable="true" data-role="security-engineer">
-            <span class="sidebar-role-icon">🛡️</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
             <span class="sidebar-role-name">Security Engineer</span>
           </div>
           <div class="sidebar-role" draggable="true" data-role="performance-eng">
-            <span class="sidebar-role-icon">⚡</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
             <span class="sidebar-role-name">Performance Eng</span>
           </div>
         </div>
@@ -593,15 +611,15 @@
         <div class="sidebar-section">
           <div class="sidebar-section-title delivery">Delivery</div>
           <div class="sidebar-role" draggable="true" data-role="devops-engineer">
-            <span class="sidebar-role-icon">☁️</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg></span>
             <span class="sidebar-role-name">DevOps Engineer</span>
           </div>
           <div class="sidebar-role" draggable="true" data-role="tech-writer">
-            <span class="sidebar-role-icon">📝</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span>
             <span class="sidebar-role-name">Tech Writer</span>
           </div>
           <div class="sidebar-role" draggable="true" data-role="release-manager">
-            <span class="sidebar-role-icon">📦</span>
+            <span class="sidebar-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.29 7 12 12l8.71-5"/><path d="M12 22V12"/></svg></span>
             <span class="sidebar-role-name">Release Manager</span>
           </div>
         </div>
@@ -615,19 +633,35 @@
   </div>
 
   <script>
+    // Professional SVG icons (Lucide-style)
+    const icons = {
+      architect: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><path d="M9 20v-6h6v6"/><path d="M9 12h6"/></svg>',
+      'product-analyst': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>',
+      'release-manager': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.29 7 12 12l8.71-5"/><path d="M12 22V12"/></svg>',
+      'frontend-dev': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>',
+      'backend-dev': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>',
+      'fullstack-dev': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>',
+      'data-engineer': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>',
+      'qa-engineer': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+      'security-engineer': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>',
+      'performance-eng': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+      'devops-engineer': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>',
+      'tech-writer': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>'
+    };
+
     const roleData = {
-      'architect': { icon: '🏛️', name: 'Architect' },
-      'product-analyst': { icon: '📋', name: 'Product Analyst' },
-      'release-manager': { icon: '📦', name: 'Release Manager' },
-      'frontend-dev': { icon: '🎨', name: 'Frontend Dev' },
-      'backend-dev': { icon: '⚙️', name: 'Backend Dev' },
-      'fullstack-dev': { icon: '🍞', name: 'Full-Stack Dev' },
-      'data-engineer': { icon: '🗄️', name: 'Data Engineer' },
-      'qa-engineer': { icon: '✅', name: 'QA Engineer' },
-      'security-engineer': { icon: '🛡️', name: 'Security Engineer' },
-      'performance-eng': { icon: '⚡', name: 'Performance Eng' },
-      'devops-engineer': { icon: '☁️', name: 'DevOps Engineer' },
-      'tech-writer': { icon: '📝', name: 'Tech Writer' }
+      'architect': { icon: icons.architect, name: 'Architect' },
+      'product-analyst': { icon: icons['product-analyst'], name: 'Product Analyst' },
+      'release-manager': { icon: icons['release-manager'], name: 'Release Manager' },
+      'frontend-dev': { icon: icons['frontend-dev'], name: 'Frontend Dev' },
+      'backend-dev': { icon: icons['backend-dev'], name: 'Backend Dev' },
+      'fullstack-dev': { icon: icons['fullstack-dev'], name: 'Full-Stack Dev' },
+      'data-engineer': { icon: icons['data-engineer'], name: 'Data Engineer' },
+      'qa-engineer': { icon: icons['qa-engineer'], name: 'QA Engineer' },
+      'security-engineer': { icon: icons['security-engineer'], name: 'Security Engineer' },
+      'performance-eng': { icon: icons['performance-eng'], name: 'Performance Eng' },
+      'devops-engineer': { icon: icons['devops-engineer'], name: 'DevOps Engineer' },
+      'tech-writer': { icon: icons['tech-writer'], name: 'Tech Writer' }
     };
 
     let draggedElement = null;
