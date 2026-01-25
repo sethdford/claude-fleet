@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Swarm Planner Demo - Claude Fleet</title>
+  <link rel="icon" type="image/svg+xml" href="images/logo.svg">
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a24;
+      --bg-hover: #252532;
+      --border: rgba(255,255,255,0.08);
+      --border-hover: rgba(255,255,255,0.15);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.7);
+      --text-muted: rgba(255,255,255,0.5);
+      --accent-blue: #3b82f6;
+      --accent-purple: #8b5cf6;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-orange: #f59e0b;
+      --accent-red: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .demo-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .demo-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px 12px 0 0;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .demo-title {
+      font-size: 18px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .demo-title svg {
+      width: 24px;
+      height: 24px;
+      stroke: var(--accent-cyan);
+    }
+
+    .demo-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .swarm-input {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--text-primary);
+      font-size: 14px;
+      width: 200px;
+    }
+
+    .swarm-input:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+    }
+
+    .agent-count {
+      background: var(--accent-blue);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-hover);
+    }
+
+    .btn-primary {
+      background: var(--accent-green);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #0d9669;
+    }
+
+    .planner-body {
+      display: flex;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      min-height: 500px;
+    }
+
+    .planner-main {
+      flex: 1;
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      padding: 20px;
+    }
+
+    .phase-column {
+      flex: 1;
+      min-width: 200px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .phase-header {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid;
+    }
+
+    .phase-header.discovery { border-color: var(--accent-purple); }
+    .phase-header.development { border-color: var(--accent-blue); }
+    .phase-header.quality { border-color: var(--accent-green); }
+    .phase-header.delivery { border-color: var(--accent-orange); }
+
+    .phase-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .phase-header.discovery .phase-title { color: var(--accent-purple); }
+    .phase-header.development .phase-title { color: var(--accent-blue); }
+    .phase-header.quality .phase-title { color: var(--accent-green); }
+    .phase-header.delivery .phase-title { color: var(--accent-orange); }
+
+    .phase-count {
+      background: rgba(255,255,255,0.1);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .phase-content {
+      flex: 1;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 300px;
+      transition: background 0.2s;
+    }
+
+    .phase-content.drag-over {
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    .role-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: grab;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .role-card:hover {
+      border-color: var(--border-hover);
+      background: var(--bg-hover);
+    }
+
+    .role-card.dragging {
+      opacity: 0.5;
+      cursor: grabbing;
+    }
+
+    .role-icon {
+      font-size: 18px;
+      width: 28px;
+      text-align: center;
+    }
+
+    .role-name {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .role-remove {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.2s;
+    }
+
+    .role-card:hover .role-remove {
+      opacity: 1;
+    }
+
+    .role-remove:hover {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--accent-red);
+    }
+
+    .drop-placeholder {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .roles-sidebar {
+      width: 280px;
+      border-left: 1px solid var(--border);
+      background: var(--bg-card);
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .sidebar-section {
+      padding: 12px 16px;
+    }
+
+    .sidebar-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .sidebar-section-title.discovery { color: var(--accent-purple); }
+    .sidebar-section-title.development { color: var(--accent-blue); }
+    .sidebar-section-title.quality { color: var(--accent-green); }
+    .sidebar-section-title.delivery { color: var(--accent-orange); }
+
+    .sidebar-role {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      cursor: grab;
+      transition: all 0.2s;
+      margin-bottom: 4px;
+    }
+
+    .sidebar-role:hover {
+      background: var(--bg-hover);
+    }
+
+    .sidebar-role.dragging {
+      opacity: 0.5;
+    }
+
+    .sidebar-role-icon {
+      font-size: 16px;
+    }
+
+    .sidebar-role-name {
+      font-size: 13px;
+    }
+
+    .add-role-btn {
+      width: 100%;
+      padding: 8px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s;
+      margin-top: 4px;
+    }
+
+    .add-role-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-secondary);
+    }
+
+    /* Animation for new cards */
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .role-card.new {
+      animation: slideIn 0.3s ease;
+    }
+
+    /* Success animation */
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .btn-primary.running {
+      animation: pulse 1s infinite;
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--accent-green);
+      border-radius: 8px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast-icon {
+      width: 24px;
+      height: 24px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+    }
+
+    .toast-message {
+      font-size: 14px;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      margin-bottom: 20px;
+      transition: color 0.2s;
+    }
+
+    .back-link:hover {
+      color: var(--text-primary);
+    }
+
+    .back-link svg {
+      width: 16px;
+      height: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <a href="index.html" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+      Back to Claude Fleet
+    </a>
+
+    <div class="demo-header">
+      <div class="demo-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>
+          <path d="M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+        </svg>
+        Swarm Planner
+      </div>
+
+      <div class="demo-controls">
+        <input type="text" class="swarm-input" placeholder="Swarm name (e.g., feature-auth)" value="feature-auth" id="swarmName">
+        <span class="agent-count" id="agentCount">7 agents</span>
+        <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+        <button class="btn btn-secondary" onclick="saveTemplate()">Save Template</button>
+        <button class="btn btn-primary" id="runBtn" onclick="runSwarm()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Run Swarm
+        </button>
+      </div>
+    </div>
+
+    <div class="planner-body">
+      <div class="planner-main">
+        <div class="phase-column" data-phase="discovery">
+          <div class="phase-header discovery">
+            <span class="phase-title">Discovery</span>
+            <span class="phase-count" id="discovery-count">3</span>
+          </div>
+          <div class="phase-content" id="discovery-content">
+            <div class="role-card" draggable="true" data-role="architect">
+              <span class="role-icon">🏛️</span>
+              <span class="role-name">Architect</span>
+              <span class="role-remove" onclick="removeRole(this)">×</span>
+            </div>
+            <div class="role-card" draggable="true" data-role="product-analyst">
+              <span class="role-icon">📋</span>
+              <span class="role-name">Product Analyst</span>
+              <span class="role-remove" onclick="removeRole(this)">×</span>
+            </div>
+            <div class="role-card" draggable="true" data-role="release-manager">
+              <span class="role-icon">📦</span>
+              <span class="role-name">Release Manager</span>
+              <span class="role-remove" onclick="removeRole(this)">×</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase-column" data-phase="development">
+          <div class="phase-header development">
+            <span class="phase-title">Development</span>
+            <span class="phase-count" id="development-count">2</span>
+          </div>
+          <div class="phase-content" id="development-content">
+            <div class="role-card" draggable="true" data-role="frontend-dev">
+              <span class="role-icon">🎨</span>
+              <span class="role-name">Frontend Dev</span>
+              <span class="role-remove" onclick="removeRole(this)">×</span>
+            </div>
+            <div class="role-card" draggable="true" data-role="fullstack-dev">
+              <span class="role-icon">🍞</span>
+              <span class="role-name">Full-Stack Dev</span>
+              <span class="role-remove" onclick="removeRole(this)">×</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase-column" data-phase="quality">
+          <div class="phase-header quality">
+            <span class="phase-title">Quality</span>
+            <span class="phase-count" id="quality-count">2</span>
+          </div>
+          <div class="phase-content" id="quality-content">
+            <div class="role-card" draggable="true" data-role="security-engineer">
+              <span class="role-icon">🛡️</span>
+              <span class="role-name">Security Engineer</span>
+              <span class="role-remove" onclick="removeRole(this)">×</span>
+            </div>
+            <div class="role-card" draggable="true" data-role="devops-engineer">
+              <span class="role-icon">☁️</span>
+              <span class="role-name">DevOps Engineer</span>
+              <span class="role-remove" onclick="removeRole(this)">×</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase-column" data-phase="delivery">
+          <div class="phase-header delivery">
+            <span class="phase-title">Delivery</span>
+            <span class="phase-count" id="delivery-count">0</span>
+          </div>
+          <div class="phase-content" id="delivery-content">
+            <div class="drop-placeholder">Drop roles here</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="roles-sidebar">
+        <div class="sidebar-header">Available Roles</div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-title discovery">Discovery</div>
+          <div class="sidebar-role" draggable="true" data-role="product-analyst">
+            <span class="sidebar-role-icon">📋</span>
+            <span class="sidebar-role-name">Product Analyst</span>
+          </div>
+          <div class="sidebar-role" draggable="true" data-role="architect">
+            <span class="sidebar-role-icon">🏛️</span>
+            <span class="sidebar-role-name">Architect</span>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-title development">Development</div>
+          <div class="sidebar-role" draggable="true" data-role="frontend-dev">
+            <span class="sidebar-role-icon">🎨</span>
+            <span class="sidebar-role-name">Frontend Dev</span>
+          </div>
+          <div class="sidebar-role" draggable="true" data-role="backend-dev">
+            <span class="sidebar-role-icon">⚙️</span>
+            <span class="sidebar-role-name">Backend Dev</span>
+          </div>
+          <div class="sidebar-role" draggable="true" data-role="fullstack-dev">
+            <span class="sidebar-role-icon">🍞</span>
+            <span class="sidebar-role-name">Full-Stack Dev</span>
+          </div>
+          <div class="sidebar-role" draggable="true" data-role="data-engineer">
+            <span class="sidebar-role-icon">🗄️</span>
+            <span class="sidebar-role-name">Data Engineer</span>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-title quality">Quality</div>
+          <div class="sidebar-role" draggable="true" data-role="qa-engineer">
+            <span class="sidebar-role-icon">✅</span>
+            <span class="sidebar-role-name">QA Engineer</span>
+          </div>
+          <div class="sidebar-role" draggable="true" data-role="security-engineer">
+            <span class="sidebar-role-icon">🛡️</span>
+            <span class="sidebar-role-name">Security Engineer</span>
+          </div>
+          <div class="sidebar-role" draggable="true" data-role="performance-eng">
+            <span class="sidebar-role-icon">⚡</span>
+            <span class="sidebar-role-name">Performance Eng</span>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-title delivery">Delivery</div>
+          <div class="sidebar-role" draggable="true" data-role="devops-engineer">
+            <span class="sidebar-role-icon">☁️</span>
+            <span class="sidebar-role-name">DevOps Engineer</span>
+          </div>
+          <div class="sidebar-role" draggable="true" data-role="tech-writer">
+            <span class="sidebar-role-icon">📝</span>
+            <span class="sidebar-role-name">Tech Writer</span>
+          </div>
+          <div class="sidebar-role" draggable="true" data-role="release-manager">
+            <span class="sidebar-role-icon">📦</span>
+            <span class="sidebar-role-name">Release Manager</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">
+    <div class="toast-icon">✓</div>
+    <div class="toast-message" id="toastMessage">Swarm started successfully!</div>
+  </div>
+
+  <script>
+    const roleData = {
+      'architect': { icon: '🏛️', name: 'Architect' },
+      'product-analyst': { icon: '📋', name: 'Product Analyst' },
+      'release-manager': { icon: '📦', name: 'Release Manager' },
+      'frontend-dev': { icon: '🎨', name: 'Frontend Dev' },
+      'backend-dev': { icon: '⚙️', name: 'Backend Dev' },
+      'fullstack-dev': { icon: '🍞', name: 'Full-Stack Dev' },
+      'data-engineer': { icon: '🗄️', name: 'Data Engineer' },
+      'qa-engineer': { icon: '✅', name: 'QA Engineer' },
+      'security-engineer': { icon: '🛡️', name: 'Security Engineer' },
+      'performance-eng': { icon: '⚡', name: 'Performance Eng' },
+      'devops-engineer': { icon: '☁️', name: 'DevOps Engineer' },
+      'tech-writer': { icon: '📝', name: 'Tech Writer' }
+    };
+
+    let draggedElement = null;
+    let draggedFromSidebar = false;
+
+    // Setup drag and drop
+    document.querySelectorAll('.role-card, .sidebar-role').forEach(el => {
+      el.addEventListener('dragstart', handleDragStart);
+      el.addEventListener('dragend', handleDragEnd);
+    });
+
+    document.querySelectorAll('.phase-content').forEach(el => {
+      el.addEventListener('dragover', handleDragOver);
+      el.addEventListener('dragleave', handleDragLeave);
+      el.addEventListener('drop', handleDrop);
+    });
+
+    function handleDragStart(e) {
+      draggedElement = e.target;
+      draggedFromSidebar = e.target.classList.contains('sidebar-role');
+      e.target.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', e.target.dataset.role);
+    }
+
+    function handleDragEnd(e) {
+      e.target.classList.remove('dragging');
+      document.querySelectorAll('.phase-content').forEach(el => {
+        el.classList.remove('drag-over');
+      });
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+
+      const role = e.dataTransfer.getData('text/plain');
+      const targetContent = e.currentTarget;
+
+      // Remove placeholder if exists
+      const placeholder = targetContent.querySelector('.drop-placeholder');
+      if (placeholder) {
+        placeholder.remove();
+      }
+
+      if (draggedFromSidebar) {
+        // Create new card from sidebar
+        const newCard = createRoleCard(role);
+        targetContent.appendChild(newCard);
+
+        // Setup drag on new card
+        newCard.addEventListener('dragstart', handleDragStart);
+        newCard.addEventListener('dragend', handleDragEnd);
+      } else if (draggedElement) {
+        // Move existing card
+        targetContent.appendChild(draggedElement);
+      }
+
+      updateCounts();
+    }
+
+    function createRoleCard(role) {
+      const data = roleData[role];
+      const card = document.createElement('div');
+      card.className = 'role-card new';
+      card.draggable = true;
+      card.dataset.role = role;
+      card.innerHTML = `
+        <span class="role-icon">${data.icon}</span>
+        <span class="role-name">${data.name}</span>
+        <span class="role-remove" onclick="removeRole(this)">×</span>
+      `;
+
+      setTimeout(() => card.classList.remove('new'), 300);
+      return card;
+    }
+
+    function removeRole(btn) {
+      const card = btn.parentElement;
+      const content = card.parentElement;
+      card.remove();
+
+      // Add placeholder if empty
+      if (content.children.length === 0) {
+        content.innerHTML = '<div class="drop-placeholder">Drop roles here</div>';
+      }
+
+      updateCounts();
+    }
+
+    function updateCounts() {
+      ['discovery', 'development', 'quality', 'delivery'].forEach(phase => {
+        const content = document.getElementById(`${phase}-content`);
+        const count = content.querySelectorAll('.role-card').length;
+        document.getElementById(`${phase}-count`).textContent = count;
+      });
+
+      // Update total agent count
+      const total = document.querySelectorAll('.phase-content .role-card').length;
+      document.getElementById('agentCount').textContent = `${total} agent${total !== 1 ? 's' : ''}`;
+    }
+
+    function clearAll() {
+      document.querySelectorAll('.phase-content').forEach(content => {
+        content.innerHTML = '<div class="drop-placeholder">Drop roles here</div>';
+      });
+      updateCounts();
+      showToast('Swarm cleared');
+    }
+
+    function saveTemplate() {
+      const name = document.getElementById('swarmName').value || 'untitled';
+      showToast(`Template "${name}" saved`);
+    }
+
+    function runSwarm() {
+      const btn = document.getElementById('runBtn');
+      const name = document.getElementById('swarmName').value || 'untitled';
+      const agentCount = document.querySelectorAll('.phase-content .role-card').length;
+
+      if (agentCount === 0) {
+        showToast('Add at least one agent to run');
+        return;
+      }
+
+      btn.classList.add('running');
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Starting...';
+
+      setTimeout(() => {
+        btn.classList.remove('running');
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Swarm';
+        showToast(`Swarm "${name}" started with ${agentCount} agents!`);
+      }, 2000);
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMessage = document.getElementById('toastMessage');
+      toastMessage.textContent = message;
+      toast.classList.add('show');
+
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+    // Initial count
+    updateCounts();
+  </script>
+</body>
+</html>
