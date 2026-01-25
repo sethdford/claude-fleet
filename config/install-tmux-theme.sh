@@ -116,3 +116,32 @@ if [ "$FLEET_MODE" = true ]; then
     echo "  export FLEET_PORT=3000       # Custom port (optional)"
     echo ""
 fi
+
+# Install Terminal.app profile on macOS
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    TERMINAL_PROFILE="${SCRIPT_DIR}/ClaudeFleet.terminal"
+    if [ ! -f "$TERMINAL_PROFILE" ]; then
+        echo -e "${BLUE}Downloading Terminal.app profile...${NC}"
+        TERMINAL_PROFILE="/tmp/ClaudeFleet.terminal"
+        curl -fsSL "https://raw.githubusercontent.com/sethdford/claude-fleet/main/config/ClaudeFleet.terminal" -o "$TERMINAL_PROFILE"
+    fi
+
+    if [ -f "$TERMINAL_PROFILE" ]; then
+        echo -e "${BLUE}Installing Terminal.app profile...${NC}"
+        open "$TERMINAL_PROFILE"
+
+        # Set as default after a short delay
+        sleep 1
+        defaults write com.apple.Terminal "Default Window Settings" -string "Claude Fleet"
+        defaults write com.apple.Terminal "Startup Window Settings" -string "Claude Fleet"
+
+        echo -e "${GREEN}✓ Terminal.app 'Claude Fleet' profile installed and set as default${NC}"
+        echo ""
+        echo -e "${CYAN}Terminal Color Palette:${NC}"
+        echo "  Background:  #1a1a2e (ghostly dark blue-gray)"
+        echo "  Foreground:  #e4e4e7 (soft white)"
+        echo "  Cursor:      #00d4ff (cyan)"
+        echo "  ANSI Black:  #2d2d44 (soft charcoal)"
+        echo ""
+    fi
+fi
