@@ -134,6 +134,7 @@ export function getRoleDescription(role: AgentRole): string {
     monitor: 'Can read all activity and send alerts',
     notifier: 'Can send notifications and read status',
     merger: 'Can merge branches, resolve conflicts, and push changes',
+    'team-lead': 'Full permissions - can spawn, dismiss, assign, broadcast, merge, and coordinate the team',
   };
   return descriptions[role];
 }

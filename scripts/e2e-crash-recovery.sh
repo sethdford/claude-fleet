@@ -2,8 +2,34 @@
 
 # E2E Crash Recovery Test
 # Tests: Worker persistence and recovery after server crash
+#
+# REQUIREMENTS:
+# - Must be run inside a tmux session (worker spawning uses tmux)
+# - Requires 'claude' CLI to be installed and available
 
 set -euo pipefail
+
+# Check for required commands
+if ! command -v tmux &> /dev/null; then
+  echo "[E2E] SKIP: tmux is not installed (required for worker spawning)"
+  exit 0
+fi
+
+if ! command -v claude &> /dev/null; then
+  echo "[E2E] SKIP: claude CLI is not installed (required for workers)"
+  exit 0
+fi
+
+# Check if running inside tmux session
+if [[ -z "${TMUX:-}" ]]; then
+  echo "[E2E] SKIP: Not running inside a tmux session"
+  echo "       Worker spawning requires tmux. Run this test inside tmux:"
+  echo "         tmux new-session './scripts/e2e-crash-recovery.sh'"
+  echo ""
+  echo "       Or run the non-tmux tests with:"
+  echo "         npm run e2e:all"
+  exit 0
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"

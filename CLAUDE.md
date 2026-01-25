@@ -25,7 +25,10 @@ src/
 ├── workers/           # Worker process management
 ├── routes/            # HTTP route handlers
 ├── validation/        # Zod schemas
-└── metrics/           # Prometheus metrics
+├── metrics/           # Prometheus metrics
+├── scheduler/         # Autonomous task scheduling
+├── mcp/               # MCP server for Claude Code integration
+└── middleware/        # Auth, validation middleware
 ```
 
 ## Layer Rules
@@ -82,7 +85,7 @@ The loop continues until ALL criteria are met:
 |-----------|---------------|----------------|
 | Code compiles | `npm run typecheck` | No errors |
 | Code is clean | `npm run lint` | No warnings |
-| Tests pass | `npm test` | 148/148 pass |
+| Tests pass | `npm test` | 311/311 pass |
 | Build works | `npm run build` | Compiles |
 | E2E works | `npm run e2e:all` | All pass |
 | No unsafe types | `grep ": any" src/` | No matches |
@@ -121,10 +124,12 @@ The loop continues until ALL criteria are met:
 
 | Suite | Command | Coverage |
 |-------|---------|----------|
-| Unit | `npm test` | 148 tests |
+| Unit | `npm test` | 311 tests |
 | E2E Core | `npm run e2e` | Auth, tasks, chat |
 | E2E Phase 2-3 | `npm run e2e:phase2-3` | Work items, mail |
-| E2E CLI | `npm run e2e:cli` | 64 CLI commands |
+| E2E Security | `./scripts/e2e-security.sh` | Auth, RBAC |
+| E2E Swarm | `./scripts/e2e-swarm-intelligence.sh` | 35 endpoints |
+| E2E WebSocket | `./scripts/e2e-websocket.sh` | Real-time events |
 | All E2E | `npm run e2e:all` | Everything |
 
 ## CLI Audit Command
@@ -150,7 +155,7 @@ Example output:
 
   Checking TypeScript... ✓ pass
   Checking ESLint...     ✓ pass
-  Running unit tests...  ✓ pass (148 tests)
+  Running unit tests...  ✓ pass (311 tests)
   Checking build...      ✓ pass
 
 ────────────────────────────────────────────────────

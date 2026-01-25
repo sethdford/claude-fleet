@@ -1,0 +1,193 @@
+# ═══════════════════════════════════════════════════════════════
+# Claude Fleet - Autonomous Operations Configuration
+# ═══════════════════════════════════════════════════════════════
+#
+# This file configures 24/7 autonomous operations including:
+# - GitHub webhook event handling
+# - Scheduled task execution (cron)
+# - Notification channels
+# - Custom task templates
+#
+# Copy this file to config/autonomous-ops.yaml and customize.
+# ═══════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────
+# NOTIFICATION CHANNELS
+# ─────────────────────────────────────────────────────────────────
+notifications:
+  # Slack integration
+  slack:
+    webhookUrl: ${SLACK_WEBHOOK_URL}
+    channel: "#claude-fleet"
+    username: "Claude Fleet"
+    iconEmoji: ":robot_face:"
+
+  # Microsoft Teams integration
+  teams:
+    webhookUrl: ${TEAMS_WEBHOOK_URL}
+
+  # Discord integration
+  discord:
+    webhookUrl: ${DISCORD_WEBHOOK_URL}
+
+# ─────────────────────────────────────────────────────────────────
+# SCHEDULED TASKS (Cron)
+# ─────────────────────────────────────────────────────────────────
+schedules:
+  # Nightly maintenance - runs at 2 AM daily
+  - name: nightly-maintenance
+    cron: "0 2 * * *"
+    enabled: true
+    repository: owner/repo
+    tasks:
+      - auto-fix-lint-errors
+      - optimize-imports
+      - update-dependencies
+
+  # Weekly security audit - runs at 9 AM every Monday
+  - name: weekly-security-audit
+    cron: "0 9 * * 1"
+    enabled: true
+    tasks:
+      - security-scan
+      - urgent-security-fix
+
+  # Daily documentation sync - runs at 6 AM daily
+  - name: daily-documentation-sync
+    cron: "0 6 * * *"
+    enabled: true
+    tasks:
+      - update-documentation
+      - generate-api-docs
+
+  # Weekly coverage report - runs at 10 AM every Friday
+  - name: weekly-coverage-report
+    cron: "0 10 * * 5"
+    enabled: true
+    tasks:
+      - generate-tests
+
+  # Hourly health check
+  - name: hourly-health-check
+    cron: "0 * * * *"
+    enabled: false  # Enable when ready
+    tasks:
+      - health-check
+
+# ─────────────────────────────────────────────────────────────────
+# WEBHOOK CONFIGURATION
+# ─────────────────────────────────────────────────────────────────
+webhooks:
+  # GitHub webhook settings
+  github:
+    # Secret for signature verification (required in production)
+    # Set via GITHUB_WEBHOOK_SECRET environment variable
+    secret: ${GITHUB_WEBHOOK_SECRET}
+
+    # Events to handle
+    events:
+      - push
+      - pull_request
+      - issues
+      - check_run
+      - dependabot_alert
+      - security_advisory
+
+    # Event-to-task mappings (customizable)
+    mappings:
+      push:
+        defaultBranch:
+          - update-documentation
+          - analyze-code-quality
+
+      pull_request:
+        opened:
+          - generate-pr-tests
+          - security-scan
+          - code-review
+        synchronize:
+          - generate-pr-tests
+          - security-scan
+        labeled:
+          needs-docs:
+            - update-documentation
+          needs-tests:
+            - generate-tests
+          auto-fix:
+            - auto-fix-lint-errors
+
+      check_run:
+        failure:
+          lint:
+            - auto-fix-lint-errors
+          test:
+            - investigate-test-failure
+
+      security:
+        critical:
+          - urgent-security-fix
+        high:
+          - urgent-security-fix
+        medium:
+          - scheduled-security-fix
+
+# ─────────────────────────────────────────────────────────────────
+# CUSTOM TASK TEMPLATES
+# ─────────────────────────────────────────────────────────────────
+templates:
+  # Add your custom templates here
+  - id: my-custom-task
+    name: "My Custom Task"
+    description: "A custom autonomous task"
+    category: maintenance
+    role: fullstack-dev
+    estimatedMinutes: 10
+    outputFormat: commit
+    notifyOn:
+      - complete
+      - error
+    prompt: |
+      Perform the following custom task:
+
+      1. First step
+      2. Second step
+      3. Third step
+
+      Guidelines:
+      - Follow project conventions
+      - Write clear commit messages
+      - Test changes before committing
+
+# ─────────────────────────────────────────────────────────────────
+# SCHEDULER SETTINGS
+# ─────────────────────────────────────────────────────────────────
+scheduler:
+  # Maximum concurrent tasks
+  maxConcurrentTasks: 3
+
+  # Default number of retries for failed tasks
+  defaultRetries: 3
+
+  # Delay between retries (ms)
+  retryDelayMs: 5000
+
+# ─────────────────────────────────────────────────────────────────
+# MULTI-REPOSITORY SUPPORT
+# ─────────────────────────────────────────────────────────────────
+repositories:
+  # Repository-specific overrides
+  - name: owner/frontend-repo
+    schedules:
+      - name: frontend-nightly
+        cron: "0 3 * * *"
+        tasks:
+          - auto-fix-lint-errors
+          - class-to-hooks  # React-specific
+
+  - name: owner/backend-repo
+    schedules:
+      - name: backend-security
+        cron: "0 4 * * *"
+        tasks:
+          - security-scan
+          - generate-api-docs

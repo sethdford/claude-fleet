@@ -720,6 +720,309 @@ async function cmdBlackboardPost(
 }
 
 // ============================================================================
+// SWARM INTELLIGENCE COMMANDS
+// ============================================================================
+
+// --- Pheromones ---
+
+async function cmdPheromones(options: CliOptions, swarmId: string): Promise<void> {
+  const data = await request('GET', `/pheromones/${swarmId}`, options);
+  const trails = (data as { trails: Array<Record<string, unknown>> }).trails ?? data;
+  if (Array.isArray(trails)) {
+    outputList(trails, [
+      { header: 'RESOURCE', key: 'resourceId', width: 30 },
+      { header: 'TYPE', key: 'trailType' },
+      { header: 'DEPOSITOR', key: 'depositorHandle' },
+      { header: 'STRENGTH', key: 'strength' },
+    ], options);
+  } else {
+    outputResult(data, options);
+  }
+}
+
+async function cmdPheromoneDeposit(
+  options: CliOptions,
+  swarmId: string,
+  resourceId: string,
+  trailType: string
+): Promise<void> {
+  if (!options.token) {
+    console.error('Error: Authentication required (FLEET_TOKEN or --token)');
+    process.exit(1);
+  }
+  const payload = decodeJwtPayload(options.token);
+  if (!payload) {
+    console.error('Error: Invalid token format');
+    process.exit(1);
+  }
+  const data = await request('POST', '/pheromones', options, {
+    swarmId,
+    depositorHandle: payload.handle,
+    resourceId,
+    resourceType: 'file',
+    trailType,
+  });
+  outputResult(data, options);
+}
+
+async function cmdPheromoneHot(options: CliOptions, swarmId: string): Promise<void> {
+  const data = await request('GET', `/pheromones/${swarmId}/activity`, options);
+  outputResult(data, options);
+}
+
+// --- Beliefs ---
+
+async function cmdBeliefs(options: CliOptions, swarmId: string, handle: string): Promise<void> {
+  const data = await request('GET', `/beliefs/${swarmId}/${handle}`, options);
+  const beliefs = (data as { beliefs: Array<Record<string, unknown>> }).beliefs ?? data;
+  if (Array.isArray(beliefs)) {
+    outputList(beliefs, [
+      { header: 'SUBJECT', key: 'subject', width: 25 },
+      { header: 'TYPE', key: 'beliefType' },
+      { header: 'VALUE', key: 'beliefValue', width: 30 },
+      { header: 'CONFIDENCE', key: 'confidence' },
+    ], options);
+  } else {
+    outputResult(data, options);
+  }
+}
+
+async function cmdBeliefSet(
+  options: CliOptions,
+  swarmId: string,
+  subject: string,
+  beliefType: string,
+  beliefValue: string,
+  confidence?: string
+): Promise<void> {
+  if (!options.token) {
+    console.error('Error: Authentication required (FLEET_TOKEN or --token)');
+    process.exit(1);
+  }
+  const payload = decodeJwtPayload(options.token);
+  if (!payload) {
+    console.error('Error: Invalid token format');
+    process.exit(1);
+  }
+  const data = await request('POST', '/beliefs', options, {
+    swarmId,
+    agentHandle: payload.handle,
+    subject,
+    beliefType,
+    beliefValue,
+    confidence: confidence ? parseFloat(confidence) : 0.5,
+  });
+  outputResult(data, options);
+}
+
+async function cmdBeliefConsensus(options: CliOptions, swarmId: string, subject: string): Promise<void> {
+  const data = await request('GET', `/beliefs/${swarmId}/consensus/${encodeURIComponent(subject)}`, options);
+  outputResult(data, options);
+}
+
+// --- Credits ---
+
+async function cmdCredits(options: CliOptions, swarmId: string, handle: string): Promise<void> {
+  const data = await request('GET', `/credits/${swarmId}/${handle}`, options);
+  outputResult(data, options);
+}
+
+async function cmdCreditsLeaderboard(options: CliOptions, swarmId: string): Promise<void> {
+  const data = await request('GET', `/credits/${swarmId}/leaderboard`, options);
+  const agents = (data as { leaderboard: Array<Record<string, unknown>> }).leaderboard ?? data;
+  if (Array.isArray(agents)) {
+    outputList(agents, [
+      { header: 'RANK', key: 'rank' },
+      { header: 'HANDLE', key: 'agentHandle' },
+      { header: 'BALANCE', key: 'balance' },
+      { header: 'REPUTATION', key: 'reputationScore' },
+    ], options);
+  } else {
+    outputResult(data, options);
+  }
+}
+
+async function cmdCreditsTransfer(
+  options: CliOptions,
+  swarmId: string,
+  toHandle: string,
+  amount: string,
+  description?: string
+): Promise<void> {
+  if (!options.token) {
+    console.error('Error: Authentication required (FLEET_TOKEN or --token)');
+    process.exit(1);
+  }
+  const payload = decodeJwtPayload(options.token);
+  if (!payload) {
+    console.error('Error: Invalid token format');
+    process.exit(1);
+  }
+  validateHandle(toHandle, 'toHandle');
+  const data = await request('POST', '/credits/transfer', options, {
+    swarmId,
+    fromHandle: payload.handle,
+    toHandle,
+    amount: parseFloat(amount),
+    description,
+  });
+  outputResult(data, options);
+}
+
+// --- Proposals/Consensus ---
+
+async function cmdProposals(options: CliOptions, swarmId: string): Promise<void> {
+  const data = await request('GET', `/consensus/${swarmId}/proposals`, options);
+  const proposals = (data as { proposals: Array<Record<string, unknown>> }).proposals ?? data;
+  if (Array.isArray(proposals)) {
+    outputList(proposals, [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'SUBJECT', key: 'subject', width: 25 },
+      { header: 'STATUS', key: 'status' },
+      { header: 'PROPOSER', key: 'proposerHandle' },
+    ], options);
+  } else {
+    outputResult(data, options);
+  }
+}
+
+async function cmdProposalCreate(
+  options: CliOptions,
+  swarmId: string,
+  subject: string,
+  description: string,
+  optionsStr: string
+): Promise<void> {
+  if (!options.token) {
+    console.error('Error: Authentication required (FLEET_TOKEN or --token)');
+    process.exit(1);
+  }
+  const payload = decodeJwtPayload(options.token);
+  if (!payload) {
+    console.error('Error: Invalid token format');
+    process.exit(1);
+  }
+  const proposalOptions = optionsStr.split(',').map(s => s.trim());
+  if (proposalOptions.length < 2) {
+    console.error('Error: At least 2 options required (comma-separated)');
+    process.exit(1);
+  }
+  const data = await request('POST', '/consensus/proposals', options, {
+    swarmId,
+    proposerHandle: payload.handle,
+    subject,
+    description,
+    options: proposalOptions,
+  });
+  outputResult(data, options);
+}
+
+async function cmdProposalVote(
+  options: CliOptions,
+  proposalId: string,
+  voteValue: string
+): Promise<void> {
+  if (!options.token) {
+    console.error('Error: Authentication required (FLEET_TOKEN or --token)');
+    process.exit(1);
+  }
+  const payload = decodeJwtPayload(options.token);
+  if (!payload) {
+    console.error('Error: Invalid token format');
+    process.exit(1);
+  }
+  const data = await request('POST', `/consensus/proposals/${proposalId}/vote`, options, {
+    voterHandle: payload.handle,
+    voteValue,
+  });
+  outputResult(data, options);
+}
+
+async function cmdProposalClose(options: CliOptions, proposalId: string): Promise<void> {
+  const data = await request('POST', `/consensus/proposals/${proposalId}/close`, options);
+  outputResult(data, options);
+}
+
+// --- Bidding ---
+
+async function cmdBids(options: CliOptions, taskId: string): Promise<void> {
+  const data = await request('GET', `/bids/task/${taskId}`, options);
+  const bids = (data as { bids: Array<Record<string, unknown>> }).bids ?? data;
+  if (Array.isArray(bids)) {
+    outputList(bids, [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'BIDDER', key: 'bidderHandle' },
+      { header: 'AMOUNT', key: 'bidAmount' },
+      { header: 'STATUS', key: 'status' },
+    ], options);
+  } else {
+    outputResult(data, options);
+  }
+}
+
+async function cmdBidSubmit(
+  options: CliOptions,
+  swarmId: string,
+  taskId: string,
+  amount: string,
+  rationale?: string
+): Promise<void> {
+  if (!options.token) {
+    console.error('Error: Authentication required (FLEET_TOKEN or --token)');
+    process.exit(1);
+  }
+  const payload = decodeJwtPayload(options.token);
+  if (!payload) {
+    console.error('Error: Invalid token format');
+    process.exit(1);
+  }
+  const data = await request('POST', '/bids', options, {
+    swarmId,
+    taskId,
+    bidderHandle: payload.handle,
+    bidAmount: parseFloat(amount),
+    rationale,
+  });
+  outputResult(data, options);
+}
+
+async function cmdBidAccept(options: CliOptions, bidId: string): Promise<void> {
+  const data = await request('POST', `/bids/${bidId}/accept`, options);
+  outputResult(data, options);
+}
+
+async function cmdAuction(options: CliOptions, taskId: string): Promise<void> {
+  const data = await request('POST', `/bids/task/${taskId}/auction`, options);
+  outputResult(data, options);
+}
+
+// --- Payoffs ---
+
+async function cmdPayoffs(options: CliOptions, taskId: string): Promise<void> {
+  const data = await request('GET', `/payoffs/${taskId}`, options);
+  outputResult(data, options);
+}
+
+async function cmdPayoffDefine(
+  options: CliOptions,
+  taskId: string,
+  payoffType: string,
+  baseValue: string
+): Promise<void> {
+  const data = await request('POST', '/payoffs', options, {
+    taskId,
+    payoffType,
+    baseValue: parseFloat(baseValue),
+  });
+  outputResult(data, options);
+}
+
+async function cmdPayoffCalculate(options: CliOptions, taskId: string): Promise<void> {
+  const data = await request('GET', `/payoffs/${taskId}/calculate`, options);
+  outputResult(data, options);
+}
+
+// ============================================================================
 // WORKFLOW COMMANDS
 // ============================================================================
 
@@ -887,6 +1190,38 @@ FLEET COMMANDS
   blackboard <swarmId>                Read blackboard messages
   blackboard-post <swarm> <sender> <type> <payload>
                                       Post to blackboard
+
+SWARM INTELLIGENCE COMMANDS
+  pheromones <swarmId>                List pheromone trails
+  pheromone-deposit <swarm> <resource> <type>
+                                      Deposit trail (type: touch,modify,complete,error)
+  pheromone-hot <swarmId>             Get most active resources
+
+  beliefs <swarmId> <handle>          List agent beliefs
+  belief-set <swarm> <subject> <type> <value> [confidence]
+                                      Set a belief (type: knowledge,assumption,inference)
+  belief-consensus <swarm> <subject>  Get swarm consensus on subject
+
+  credits <swarmId> <handle>          Get agent credits/reputation
+  credits-leaderboard <swarmId>       Get credits leaderboard
+  credits-transfer <swarm> <to> <amount> [desc]
+                                      Transfer credits to another agent
+
+  proposals <swarmId>                 List proposals
+  proposal-create <swarm> <subject> <desc> <options>
+                                      Create proposal (options: comma-separated)
+  proposal-vote <proposalId> <vote>   Cast vote on proposal
+  proposal-close <proposalId>         Close voting [team-lead]
+
+  bids <taskId>                       List bids for task
+  bid-submit <swarm> <task> <amount> [rationale]
+                                      Submit bid for task
+  bid-accept <bidId>                  Accept bid [team-lead]
+  auction <taskId>                    Run auction [team-lead]
+
+  payoffs <taskId>                    Get task payoffs
+  payoff-define <task> <type> <value> Define payoff (type: completion,quality,speed)
+  payoff-calculate <taskId>           Calculate current payoff value
 
 WORKFLOW COMMANDS
   workflows [--template]              List workflows (--template for templates only)
@@ -1247,6 +1582,157 @@ async function main(): Promise<void> {
           process.exit(1);
         }
         await cmdBlackboardPost(options, args[0], args[1], args[2], args[3]);
+        break;
+
+      // Swarm Intelligence Commands
+      case 'pheromones':
+        if (args.length < 1) {
+          console.error('Usage: fleet pheromones <swarmId>');
+          process.exit(1);
+        }
+        await cmdPheromones(options, args[0]);
+        break;
+      case 'pheromone-deposit':
+        if (args.length < 3) {
+          console.error('Usage: fleet pheromone-deposit <swarmId> <resourceId> <trailType>');
+          console.error('  Trail types: touch, modify, complete, error, warning, success');
+          process.exit(1);
+        }
+        await cmdPheromoneDeposit(options, args[0], args[1], args[2]);
+        break;
+      case 'pheromone-hot':
+        if (args.length < 1) {
+          console.error('Usage: fleet pheromone-hot <swarmId>');
+          process.exit(1);
+        }
+        await cmdPheromoneHot(options, args[0]);
+        break;
+
+      case 'beliefs':
+        if (args.length < 2) {
+          console.error('Usage: fleet beliefs <swarmId> <handle>');
+          process.exit(1);
+        }
+        await cmdBeliefs(options, args[0], args[1]);
+        break;
+      case 'belief-set':
+        if (args.length < 4) {
+          console.error('Usage: fleet belief-set <swarmId> <subject> <beliefType> <beliefValue> [confidence]');
+          console.error('  Belief types: knowledge, assumption, inference, observation');
+          process.exit(1);
+        }
+        await cmdBeliefSet(options, args[0], args[1], args[2], args[3], args[4]);
+        break;
+      case 'belief-consensus':
+        if (args.length < 2) {
+          console.error('Usage: fleet belief-consensus <swarmId> <subject>');
+          process.exit(1);
+        }
+        await cmdBeliefConsensus(options, args[0], args[1]);
+        break;
+
+      case 'credits':
+        if (args.length < 2) {
+          console.error('Usage: fleet credits <swarmId> <handle>');
+          process.exit(1);
+        }
+        await cmdCredits(options, args[0], args[1]);
+        break;
+      case 'credits-leaderboard':
+        if (args.length < 1) {
+          console.error('Usage: fleet credits-leaderboard <swarmId>');
+          process.exit(1);
+        }
+        await cmdCreditsLeaderboard(options, args[0]);
+        break;
+      case 'credits-transfer':
+        if (args.length < 3) {
+          console.error('Usage: fleet credits-transfer <swarmId> <toHandle> <amount> [description]');
+          process.exit(1);
+        }
+        await cmdCreditsTransfer(options, args[0], args[1], args[2], args[3]);
+        break;
+
+      case 'proposals':
+        if (args.length < 1) {
+          console.error('Usage: fleet proposals <swarmId>');
+          process.exit(1);
+        }
+        await cmdProposals(options, args[0]);
+        break;
+      case 'proposal-create':
+        if (args.length < 4) {
+          console.error('Usage: fleet proposal-create <swarmId> <subject> <description> <options>');
+          console.error('  Options: comma-separated list of choices, e.g. "option1,option2,option3"');
+          process.exit(1);
+        }
+        await cmdProposalCreate(options, args[0], args[1], args[2], args[3]);
+        break;
+      case 'proposal-vote':
+        if (args.length < 2) {
+          console.error('Usage: fleet proposal-vote <proposalId> <voteValue>');
+          process.exit(1);
+        }
+        await cmdProposalVote(options, args[0], args[1]);
+        break;
+      case 'proposal-close':
+        if (args.length < 1) {
+          console.error('Usage: fleet proposal-close <proposalId>');
+          process.exit(1);
+        }
+        await cmdProposalClose(options, args[0]);
+        break;
+
+      case 'bids':
+        if (args.length < 1) {
+          console.error('Usage: fleet bids <taskId>');
+          process.exit(1);
+        }
+        await cmdBids(options, args[0]);
+        break;
+      case 'bid-submit':
+        if (args.length < 3) {
+          console.error('Usage: fleet bid-submit <swarmId> <taskId> <amount> [rationale]');
+          process.exit(1);
+        }
+        await cmdBidSubmit(options, args[0], args[1], args[2], args[3]);
+        break;
+      case 'bid-accept':
+        if (args.length < 1) {
+          console.error('Usage: fleet bid-accept <bidId>');
+          process.exit(1);
+        }
+        await cmdBidAccept(options, args[0]);
+        break;
+      case 'auction':
+        if (args.length < 1) {
+          console.error('Usage: fleet auction <taskId>');
+          process.exit(1);
+        }
+        await cmdAuction(options, args[0]);
+        break;
+
+      case 'payoffs':
+        if (args.length < 1) {
+          console.error('Usage: fleet payoffs <taskId>');
+          process.exit(1);
+        }
+        await cmdPayoffs(options, args[0]);
+        break;
+      case 'payoff-define':
+        if (args.length < 3) {
+          console.error('Usage: fleet payoff-define <taskId> <payoffType> <baseValue>');
+          console.error('  Payoff types: completion, quality, speed, cooperation, penalty, bonus');
+          process.exit(1);
+        }
+        await cmdPayoffDefine(options, args[0], args[1], args[2]);
+        break;
+      case 'payoff-calculate':
+        if (args.length < 1) {
+          console.error('Usage: fleet payoff-calculate <taskId>');
+          process.exit(1);
+        }
+        await cmdPayoffCalculate(options, args[0]);
         break;
 
       // Workflow commands

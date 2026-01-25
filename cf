@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Claude Fleet CLI runner
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec node "$SCRIPT_DIR/apps/cli/dist/index.js" "$@"

@@ -321,6 +321,216 @@ components:
         createdAt:
           type: integer
 
+    # Swarm Intelligence schemas
+    PheromoneTrail:
+      type: object
+      properties:
+        id:
+          type: integer
+        swarmId:
+          type: string
+        depositorHandle:
+          type: string
+        resourceId:
+          type: string
+        resourceType:
+          type: string
+          enum: [file, function, module, endpoint, test, config]
+        trailType:
+          type: string
+          enum: [touch, modify, complete, error, warning, success]
+        strength:
+          type: number
+        metadata:
+          type: object
+        createdAt:
+          type: integer
+        expiresAt:
+          type: integer
+
+    AgentBelief:
+      type: object
+      properties:
+        id:
+          type: integer
+        swarmId:
+          type: string
+        agentHandle:
+          type: string
+        subject:
+          type: string
+        beliefType:
+          type: string
+          enum: [knowledge, assumption, inference, observation]
+        beliefValue:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        evidence:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: integer
+        updatedAt:
+          type: integer
+
+    MetaBelief:
+      type: object
+      properties:
+        id:
+          type: integer
+        swarmId:
+          type: string
+        holderHandle:
+          type: string
+        aboutHandle:
+          type: string
+        metaType:
+          type: string
+          enum: [capability, reliability, knowledge, uncertainty]
+        beliefContent:
+          type: string
+        confidence:
+          type: number
+        createdAt:
+          type: integer
+
+    AgentCredits:
+      type: object
+      properties:
+        swarmId:
+          type: string
+        agentHandle:
+          type: string
+        balance:
+          type: number
+        reputationScore:
+          type: number
+        totalEarned:
+          type: number
+        totalSpent:
+          type: number
+        updatedAt:
+          type: integer
+
+    CreditTransaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        swarmId:
+          type: string
+        agentHandle:
+          type: string
+        transactionType:
+          type: string
+          enum: [earn, spend, transfer_in, transfer_out, bonus, penalty]
+        amount:
+          type: number
+        description:
+          type: string
+        relatedTaskId:
+          type: string
+        createdAt:
+          type: integer
+
+    Proposal:
+      type: object
+      properties:
+        id:
+          type: string
+        swarmId:
+          type: string
+        proposerHandle:
+          type: string
+        subject:
+          type: string
+        description:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        votingDeadline:
+          type: integer
+        status:
+          type: string
+          enum: [open, closed, cancelled]
+        result:
+          type: string
+          nullable: true
+        createdAt:
+          type: integer
+
+    Vote:
+      type: object
+      properties:
+        id:
+          type: integer
+        proposalId:
+          type: string
+        voterHandle:
+          type: string
+        voteValue:
+          type: string
+        weight:
+          type: number
+        createdAt:
+          type: integer
+
+    Bid:
+      type: object
+      properties:
+        id:
+          type: string
+        swarmId:
+          type: string
+        taskId:
+          type: string
+        bidderHandle:
+          type: string
+        bidAmount:
+          type: number
+        estimatedDuration:
+          type: integer
+        rationale:
+          type: string
+        status:
+          type: string
+          enum: [pending, accepted, rejected, withdrawn]
+        createdAt:
+          type: integer
+
+    TaskPayoff:
+      type: object
+      properties:
+        id:
+          type: integer
+        taskId:
+          type: string
+        swarmId:
+          type: string
+        payoffType:
+          type: string
+          enum: [completion, quality, speed, cooperation, penalty, bonus]
+        baseValue:
+          type: number
+        multiplier:
+          type: number
+        deadline:
+          type: integer
+        decayRate:
+          type: number
+        dependencies:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: integer
+
     Swarm:
       type: object
       properties:
@@ -1584,6 +1794,821 @@ paths:
         '200':
           description: Swarm killed
 
+  # ============================================================================
+  # PHEROMONES (Stigmergic Coordination)
+  # ============================================================================
+  /pheromones:
+    post:
+      summary: Deposit pheromone trail
+      tags: [Pheromones]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [swarmId, depositorHandle, resourceId, resourceType, trailType]
+              properties:
+                swarmId:
+                  type: string
+                depositorHandle:
+                  type: string
+                resourceId:
+                  type: string
+                resourceType:
+                  type: string
+                  enum: [file, function, module, endpoint, test, config]
+                trailType:
+                  type: string
+                  enum: [touch, modify, complete, error, warning, success]
+                strength:
+                  type: number
+                  default: 1.0
+                metadata:
+                  type: object
+                ttlMs:
+                  type: integer
+                  description: Time-to-live in milliseconds
+      responses:
+        '200':
+          description: Pheromone deposited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PheromoneTrail'
+
+  /pheromones/{swarmId}:
+    get:
+      summary: Query pheromone trails
+      tags: [Pheromones]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: resourceType
+          in: query
+          schema:
+            type: string
+        - name: trailType
+          in: query
+          schema:
+            type: string
+        - name: minStrength
+          in: query
+          schema:
+            type: number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: List of pheromone trails
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trails:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PheromoneTrail'
+                  count:
+                    type: integer
+
+  /pheromones/{swarmId}/resource/{resourceId}:
+    get:
+      summary: Get trails for specific resource
+      tags: [Pheromones]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trails for the resource
+
+  /pheromones/{swarmId}/activity:
+    get:
+      summary: Get resource activity (hot resources)
+      tags: [Pheromones]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Most active resources
+
+  /pheromones/decay:
+    post:
+      summary: Trigger pheromone decay
+      tags: [Pheromones]
+      description: Requires team-lead role. Decays old pheromone trails.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                swarmId:
+                  type: string
+                decayFactor:
+                  type: number
+                  default: 0.9
+      responses:
+        '200':
+          description: Decay applied
+
+  /pheromones/{swarmId}/stats:
+    get:
+      summary: Get pheromone statistics
+      tags: [Pheromones]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pheromone statistics
+
+  # ============================================================================
+  # BELIEFS (Theory of Mind)
+  # ============================================================================
+  /beliefs:
+    post:
+      summary: Create or update agent belief
+      tags: [Beliefs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [swarmId, agentHandle, subject, beliefType, beliefValue]
+              properties:
+                swarmId:
+                  type: string
+                agentHandle:
+                  type: string
+                subject:
+                  type: string
+                beliefType:
+                  type: string
+                  enum: [knowledge, assumption, inference, observation]
+                beliefValue:
+                  type: string
+                confidence:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                  default: 0.5
+                evidence:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Belief created/updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentBelief'
+
+  /beliefs/meta:
+    post:
+      summary: Create meta-belief (belief about another agent)
+      tags: [Beliefs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [swarmId, holderHandle, aboutHandle, metaType, beliefContent]
+              properties:
+                swarmId:
+                  type: string
+                holderHandle:
+                  type: string
+                aboutHandle:
+                  type: string
+                metaType:
+                  type: string
+                  enum: [capability, reliability, knowledge, uncertainty]
+                beliefContent:
+                  type: string
+                confidence:
+                  type: number
+      responses:
+        '200':
+          description: Meta-belief created
+
+  /beliefs/{swarmId}/{handle}:
+    get:
+      summary: Get beliefs for an agent
+      tags: [Beliefs]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: subject
+          in: query
+          schema:
+            type: string
+        - name: beliefType
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent beliefs
+
+  /beliefs/{swarmId}/consensus/{subject}:
+    get:
+      summary: Get swarm consensus on a subject
+      tags: [Beliefs]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: subject
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Consensus data with confidence
+
+  /beliefs/{swarmId}/stats:
+    get:
+      summary: Get belief statistics
+      tags: [Beliefs]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Belief statistics
+
+  # ============================================================================
+  # CREDITS & REPUTATION
+  # ============================================================================
+  /credits/{swarmId}/{handle}:
+    get:
+      summary: Get agent credits and reputation
+      tags: [Credits]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Credits and reputation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentCredits'
+
+  /credits/{swarmId}/{handle}/history:
+    get:
+      summary: Get credit transaction history
+      tags: [Credits]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Transaction history
+
+  /credits/{swarmId}/leaderboard:
+    get:
+      summary: Get credits leaderboard
+      tags: [Credits]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Top agents by credits
+
+  /credits/{swarmId}/stats:
+    get:
+      summary: Get credit statistics
+      tags: [Credits]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Credit statistics
+
+  /credits/transfer:
+    post:
+      summary: Transfer credits between agents
+      tags: [Credits]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [swarmId, fromHandle, toHandle, amount]
+              properties:
+                swarmId:
+                  type: string
+                fromHandle:
+                  type: string
+                toHandle:
+                  type: string
+                amount:
+                  type: number
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Transfer completed
+        '400':
+          description: Insufficient balance
+
+  /credits/transaction:
+    post:
+      summary: Record a credit transaction
+      tags: [Credits]
+      description: Requires team-lead role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [swarmId, agentHandle, transactionType, amount]
+              properties:
+                swarmId:
+                  type: string
+                agentHandle:
+                  type: string
+                transactionType:
+                  type: string
+                  enum: [earn, spend, transfer_in, transfer_out, bonus, penalty]
+                amount:
+                  type: number
+                description:
+                  type: string
+                relatedTaskId:
+                  type: string
+      responses:
+        '200':
+          description: Transaction recorded
+
+  /credits/reputation:
+    post:
+      summary: Update agent reputation
+      tags: [Credits]
+      description: Requires team-lead role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [swarmId, agentHandle, reputationScore]
+              properties:
+                swarmId:
+                  type: string
+                agentHandle:
+                  type: string
+                reputationScore:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+      responses:
+        '200':
+          description: Reputation updated
+
+  # ============================================================================
+  # CONSENSUS (Proposals & Voting)
+  # ============================================================================
+  /consensus/proposals:
+    post:
+      summary: Create a proposal
+      tags: [Consensus]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [swarmId, proposerHandle, subject, description, options]
+              properties:
+                swarmId:
+                  type: string
+                proposerHandle:
+                  type: string
+                subject:
+                  type: string
+                description:
+                  type: string
+                options:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 2
+                votingDeadline:
+                  type: integer
+                  description: Unix timestamp
+      responses:
+        '200':
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+
+  /consensus/{swarmId}/proposals:
+    get:
+      summary: List proposals in swarm
+      tags: [Consensus]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, closed, cancelled]
+      responses:
+        '200':
+          description: List of proposals
+
+  /consensus/proposals/{id}:
+    get:
+      summary: Get proposal details
+      tags: [Consensus]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Proposal with votes
+        '404':
+          description: Not found
+
+  /consensus/proposals/{id}/vote:
+    post:
+      summary: Cast a vote
+      tags: [Consensus]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [voterHandle, voteValue]
+              properties:
+                voterHandle:
+                  type: string
+                voteValue:
+                  type: string
+                  description: Must be one of the proposal options
+                weight:
+                  type: number
+                  default: 1.0
+      responses:
+        '200':
+          description: Vote cast
+        '400':
+          description: Invalid vote or proposal closed
+
+  /consensus/proposals/{id}/close:
+    post:
+      summary: Close voting and determine result
+      tags: [Consensus]
+      description: Requires team-lead role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Proposal closed with result
+
+  /consensus/{swarmId}/stats:
+    get:
+      summary: Get consensus statistics
+      tags: [Consensus]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Consensus statistics
+
+  # ============================================================================
+  # BIDDING (Task Allocation)
+  # ============================================================================
+  /bids:
+    post:
+      summary: Submit a bid for a task
+      tags: [Bidding]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [swarmId, taskId, bidderHandle, bidAmount]
+              properties:
+                swarmId:
+                  type: string
+                taskId:
+                  type: string
+                bidderHandle:
+                  type: string
+                bidAmount:
+                  type: number
+                estimatedDuration:
+                  type: integer
+                  description: Estimated duration in minutes
+                rationale:
+                  type: string
+      responses:
+        '200':
+          description: Bid submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bid'
+
+  /bids/{id}:
+    get:
+      summary: Get bid details
+      tags: [Bidding]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bid details
+        '404':
+          description: Not found
+    delete:
+      summary: Withdraw a bid
+      tags: [Bidding]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bid withdrawn
+
+  /bids/{id}/accept:
+    post:
+      summary: Accept a bid
+      tags: [Bidding]
+      description: Requires team-lead role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bid accepted
+
+  /bids/task/{taskId}:
+    get:
+      summary: Get all bids for a task
+      tags: [Bidding]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of bids
+
+  /bids/task/{taskId}/evaluate:
+    post:
+      summary: Evaluate bids for a task
+      tags: [Bidding]
+      description: Requires team-lead role. Returns ranked bids based on criteria.
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ranked bids
+
+  /bids/task/{taskId}/auction:
+    post:
+      summary: Run auction for a task
+      tags: [Bidding]
+      description: Requires team-lead role. Automatically selects winning bid.
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auctionType:
+                  type: string
+                  enum: [first_price, second_price, vickrey]
+                  default: second_price
+      responses:
+        '200':
+          description: Auction result with winner
+
+  /bids/{swarmId}/stats:
+    get:
+      summary: Get bidding statistics
+      tags: [Bidding]
+      parameters:
+        - name: swarmId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bidding statistics
+
+  # ============================================================================
+  # PAYOFFS (Task Incentives)
+  # ============================================================================
+  /payoffs:
+    post:
+      summary: Define payoff structure for a task
+      tags: [Payoffs]
+      description: Requires team-lead role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskId, payoffType, baseValue]
+              properties:
+                taskId:
+                  type: string
+                swarmId:
+                  type: string
+                payoffType:
+                  type: string
+                  enum: [completion, quality, speed, cooperation, penalty, bonus]
+                baseValue:
+                  type: number
+                multiplier:
+                  type: number
+                  default: 1.0
+                deadline:
+                  type: integer
+                decayRate:
+                  type: number
+                  default: 0.0
+                dependencies:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Payoff defined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskPayoff'
+
+  /payoffs/{taskId}:
+    get:
+      summary: Get payoffs for a task
+      tags: [Payoffs]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task payoffs
+
+  /payoffs/{taskId}/calculate:
+    get:
+      summary: Calculate current payoff value
+      tags: [Payoffs]
+      description: Applies decay and multipliers to get current value
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: payoffType
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Calculated payoff value
+
 tags:
   - name: System
     description: Health and metrics endpoints
@@ -1617,3 +2642,15 @@ tags:
     description: Session continuity
   - name: Swarms
     description: Swarm management
+  - name: Pheromones
+    description: Stigmergic coordination - agents leave trails on resources they interact with
+  - name: Beliefs
+    description: Theory of mind - agents share knowledge, assumptions, and beliefs about others
+  - name: Credits
+    description: Credit-based reputation system for tracking agent contributions
+  - name: Consensus
+    description: Proposals and voting for swarm-level decision making
+  - name: Bidding
+    description: Market-based task allocation via auctions
+  - name: Payoffs
+    description: Incentive structures and payoff calculation for tasks

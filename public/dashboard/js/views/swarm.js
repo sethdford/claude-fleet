@@ -1,10 +1,11 @@
 /**
  * Swarm Detail View
- * Shows agent hierarchy, blackboard messages, and spawn queue
+ * Shows agent hierarchy, blackboard messages, spawn queue, and swarm intelligence
  */
 
 import store from '../store.js';
 import ApiClient, { MESSAGE_TYPES, MESSAGE_PRIORITIES } from '../api.js';
+import { renderSwarmIntelligence } from './swarm-intelligence.js';
 
 /**
  * Render swarm header
@@ -367,6 +368,48 @@ function renderSpawnQueue(queue) {
 }
 
 /**
+ * Render overview tab content
+ */
+function renderOverviewContent(swarm, swarmWorkers, blackboard, currentFilter, spawnQueue) {
+  return `
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg);">
+      <div>
+        <div class="mt-md">
+          <h2 class="card-subtitle mb-md">Agent Hierarchy</h2>
+          <div class="card">
+            <div id="agent-graph" style="min-height: 300px;"></div>
+          </div>
+        </div>
+
+        <div class="mt-md" id="spawn-queue-container">
+          ${renderSpawnQueue(spawnQueue)}
+        </div>
+      </div>
+
+      <div id="blackboard-container">
+        ${renderBlackboard(blackboard, currentFilter)}
+      </div>
+    </div>
+
+    <div class="mt-md">
+      <h2 class="card-subtitle mb-md">Post to Blackboard</h2>
+      <div class="card">
+        <form id="post-blackboard-form" class="flex gap-sm">
+          <select class="form-input" id="message-type" style="width: 140px;">
+            ${MESSAGE_TYPES.map(t => `<option value="${t}">${t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join('')}
+          </select>
+          <select class="form-input" id="message-priority" style="width: 100px;">
+            ${MESSAGE_PRIORITIES.map(p => `<option value="${p}" ${p === 'normal' ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`).join('')}
+          </select>
+          <input type="text" class="form-input" id="blackboard-message" placeholder="Enter message..." style="flex: 1;">
+          <button type="submit" class="btn btn-primary">Post</button>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Render the swarm view
  */
 export async function renderSwarm(container, swarmId) {
@@ -374,6 +417,9 @@ export async function renderSwarm(container, swarmId) {
   let blackboard = [];
   let spawnQueue = null;
   let currentFilter = 'all';
+  let currentTab = 'overview';
+  let pollInterval = null;
+  let unsubWorkers = null;
 
   // Fetch swarm details
   try {
@@ -427,52 +473,130 @@ export async function renderSwarm(container, swarmId) {
   // Get workers in this swarm
   const swarmWorkers = (store.get('workers') || []).filter(w => w.swarmId === swarmId);
 
+  // Render the main container with tabs
   container.innerHTML = `
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg);">
-      <div>
-        <div id="swarm-header">
-          ${renderSwarmHeader(swarm)}
-        </div>
-
-        <div class="mt-md">
-          <h2 class="card-subtitle mb-md">Agent Hierarchy</h2>
-          <div class="card">
-            <div id="agent-graph" style="min-height: 300px;"></div>
-          </div>
-        </div>
-
-        <div class="mt-md" id="spawn-queue-container">
-          ${renderSpawnQueue(spawnQueue)}
-        </div>
-      </div>
-
-      <div id="blackboard-container">
-        ${renderBlackboard(blackboard, currentFilter)}
-      </div>
+    <div id="swarm-header">
+      ${renderSwarmHeader(swarm)}
     </div>
 
-    <div class="mt-md">
-      <h2 class="card-subtitle mb-md">Post to Blackboard</h2>
-      <div class="card">
-        <form id="post-blackboard-form" class="flex gap-sm">
-          <select class="form-input" id="message-type" style="width: 140px;">
-            ${MESSAGE_TYPES.map(t => `<option value="${t}">${t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join('')}
-          </select>
-          <select class="form-input" id="message-priority" style="width: 100px;">
-            ${MESSAGE_PRIORITIES.map(p => `<option value="${p}" ${p === 'normal' ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`).join('')}
-          </select>
-          <input type="text" class="form-input" id="blackboard-message" placeholder="Enter message..." style="flex: 1;">
-          <button type="submit" class="btn btn-primary">Post</button>
-        </form>
-      </div>
+    <!-- Tab Navigation -->
+    <div class="tabs mt-md" style="display: flex; gap: var(--space-xs); border-bottom: 1px solid var(--border-primary); margin-bottom: var(--space-lg);">
+      <button class="tab-btn active" data-tab="overview" style="
+        padding: var(--space-sm) var(--space-md);
+        background: none;
+        border: none;
+        border-bottom: 2px solid var(--accent-blue);
+        color: var(--text-primary);
+        font-weight: 600;
+        cursor: pointer;
+      ">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+          <rect x="3" y="3" width="7" height="7"/>
+          <rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        Overview
+      </button>
+      <button class="tab-btn" data-tab="intelligence" style="
+        padding: var(--space-sm) var(--space-md);
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-secondary);
+        font-weight: 500;
+        cursor: pointer;
+      ">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+          <path d="M12 6v6l4 2"/>
+        </svg>
+        Swarm Intelligence
+      </button>
+    </div>
+
+    <!-- Tab Content -->
+    <div id="tab-content">
+      ${renderOverviewContent(swarm, swarmWorkers, blackboard, currentFilter, spawnQueue)}
     </div>
   `;
 
-  // Render agent graph
-  renderAgentGraph(document.getElementById('agent-graph'), swarmWorkers);
+  // Setup tab switching
+  function setupTabs() {
+    container.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tab = btn.dataset.tab;
+        if (tab === currentTab) return;
 
-  // Fetch data
+        // Update tab styles
+        container.querySelectorAll('.tab-btn').forEach(b => {
+          b.style.borderBottomColor = 'transparent';
+          b.style.color = 'var(--text-secondary)';
+          b.style.fontWeight = '500';
+          b.classList.remove('active');
+        });
+        btn.style.borderBottomColor = 'var(--accent-blue)';
+        btn.style.color = 'var(--text-primary)';
+        btn.style.fontWeight = '600';
+        btn.classList.add('active');
+
+        currentTab = tab;
+        const tabContent = document.getElementById('tab-content');
+
+        if (tab === 'overview') {
+          tabContent.innerHTML = renderOverviewContent(swarm, swarmWorkers, blackboard, currentFilter, spawnQueue);
+          renderAgentGraph(document.getElementById('agent-graph'), swarmWorkers);
+          await Promise.all([fetchBlackboard(), fetchSpawnQueue()]);
+          setupPostForm();
+          startOverviewPolling();
+        } else if (tab === 'intelligence') {
+          stopOverviewPolling();
+          await renderSwarmIntelligence(tabContent, swarmId);
+        }
+      });
+    });
+  }
+
+  // Setup post to blackboard form
+  function setupPostForm() {
+    document.getElementById('post-blackboard-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const messageType = document.getElementById('message-type').value;
+      const priority = document.getElementById('message-priority').value;
+      const message = document.getElementById('blackboard-message').value.trim();
+
+      if (!message) return;
+
+      try {
+        await ApiClient.postBlackboard(swarmId, message, messageType, null, priority);
+        document.getElementById('blackboard-message').value = '';
+        await fetchBlackboard(currentFilter);
+      } catch (e) {
+        alert('Failed to post message: ' + e.message);
+      }
+    });
+  }
+
+  // Start polling for overview tab
+  function startOverviewPolling() {
+    stopOverviewPolling();
+    pollInterval = setInterval(() => fetchBlackboard(currentFilter), 10000);
+  }
+
+  // Stop polling
+  function stopOverviewPolling() {
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+  }
+
+  // Initial setup
+  setupTabs();
+  renderAgentGraph(document.getElementById('agent-graph'), swarmWorkers);
   await Promise.all([fetchBlackboard(), fetchSpawnQueue()]);
+  setupPostForm();
+  startOverviewPolling();
 
   // Kill swarm button
   document.getElementById('kill-swarm')?.addEventListener('click', async () => {
@@ -486,36 +610,17 @@ export async function renderSwarm(container, swarmId) {
     }
   });
 
-  // Post to blackboard form
-  document.getElementById('post-blackboard-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const messageType = document.getElementById('message-type').value;
-    const priority = document.getElementById('message-priority').value;
-    const message = document.getElementById('blackboard-message').value.trim();
-
-    if (!message) return;
-
-    try {
-      await ApiClient.postBlackboard(swarmId, message, messageType, null, priority);
-      document.getElementById('blackboard-message').value = '';
-      await fetchBlackboard(currentFilter);
-    } catch (e) {
-      alert('Failed to post message: ' + e.message);
+  // Subscribe to worker updates to refresh graph
+  unsubWorkers = store.subscribe('workers', (workers) => {
+    const updated = workers?.filter(w => w.swarmId === swarmId) || [];
+    if (currentTab === 'overview') {
+      renderAgentGraph(document.getElementById('agent-graph'), updated);
     }
   });
 
-  // Subscribe to worker updates to refresh graph
-  const unsubWorkers = store.subscribe('workers', (workers) => {
-    const updated = workers?.filter(w => w.swarmId === swarmId) || [];
-    renderAgentGraph(document.getElementById('agent-graph'), updated);
-  });
-
-  // Poll blackboard every 10 seconds
-  const pollInterval = setInterval(() => fetchBlackboard(currentFilter), 10000);
-
   // Return cleanup function
   return () => {
-    unsubWorkers();
-    clearInterval(pollInterval);
+    if (unsubWorkers) unsubWorkers();
+    stopOverviewPolling();
   };
 }

@@ -23,6 +23,7 @@ import type {
   MailMessage,
   Handoff,
   AgentRole,
+  SpawnMode,
   SwarmTemplate,
 } from '../types.js';
 
@@ -110,7 +111,25 @@ export class SQLiteStorage implements TeamStorage {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.initSchema();
+    this.runMigrations();
     this.stmts = this.prepareStatements();
+  }
+
+  /**
+   * Run migrations to add new columns to existing databases
+   */
+  private runMigrations(): void {
+    // Add spawn_mode and pane_id columns to workers table if they don't exist
+    try {
+      this.db.exec('ALTER TABLE workers ADD COLUMN spawn_mode TEXT DEFAULT \'process\'');
+    } catch {
+      // Column already exists, ignore
+    }
+    try {
+      this.db.exec('ALTER TABLE workers ADD COLUMN pane_id TEXT');
+    } catch {
+      // Column already exists, ignore
+    }
   }
 
   private initSchema(): void {
@@ -187,9 +206,14 @@ export class SQLiteStorage implements TeamStorage {
         role TEXT DEFAULT 'worker',
         swarm_id TEXT,
         depth_level INTEGER DEFAULT 1,
+        spawn_mode TEXT DEFAULT 'process',
+        pane_id TEXT,
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         dismissed_at INTEGER
       );
+
+      -- Add spawn_mode and pane_id columns if they don't exist (migration for existing databases)
+      -- SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we use a try-catch pattern in code
 
       CREATE INDEX IF NOT EXISTS idx_workers_handle ON workers(handle);
       CREATE INDEX IF NOT EXISTS idx_workers_status ON workers(status);
@@ -498,14 +522,15 @@ export class SQLiteStorage implements TeamStorage {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id TEXT NOT NULL,
         swarm_id TEXT,
-        payoff_type TEXT NOT NULL CHECK (payoff_type IN ('completion', 'quality', 'speed', 'cooperation', 'penalty')),
+        payoff_type TEXT NOT NULL CHECK (payoff_type IN ('completion', 'quality', 'speed', 'cooperation', 'penalty', 'bonus')),
         base_value REAL NOT NULL,
         multiplier REAL DEFAULT 1.0,
         deadline INTEGER,
         decay_rate REAL DEFAULT 0.0,
         dependencies TEXT DEFAULT '[]',
         created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
+        updated_at INTEGER NOT NULL,
+        UNIQUE(task_id, payoff_type)
       );
 
       CREATE INDEX IF NOT EXISTS idx_payoffs_task ON task_payoffs(task_id);
@@ -653,8 +678,9 @@ export class SQLiteStorage implements TeamStorage {
       // Workers (Phase 1)
       insertWorker: this.db.prepare(`
         INSERT INTO workers (id, handle, status, worktree_path, worktree_branch, pid, session_id,
-                             initial_prompt, last_heartbeat, restart_count, role, swarm_id, depth_level, created_at, dismissed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             initial_prompt, last_heartbeat, restart_count, role, swarm_id, depth_level,
+                             spawn_mode, pane_id, created_at, dismissed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `),
       getWorker: this.db.prepare('SELECT * FROM workers WHERE id = ?'),
       getWorkerByHandle: this.db.prepare('SELECT * FROM workers WHERE handle = ?'),
@@ -1068,6 +1094,8 @@ export class SQLiteStorage implements TeamStorage {
       worker.role,
       worker.swarmId,
       worker.depthLevel,
+      worker.spawnMode,
+      worker.paneId,
       worker.createdAt,
       worker.dismissedAt
     );
@@ -1087,6 +1115,8 @@ export class SQLiteStorage implements TeamStorage {
     role: string;
     swarm_id: string | null;
     depth_level: number;
+    spawn_mode: string | null;
+    pane_id: string | null;
     created_at: number;
     dismissed_at: number | null;
   }): PersistentWorker {
@@ -1104,6 +1134,8 @@ export class SQLiteStorage implements TeamStorage {
       role: row.role as AgentRole,
       swarmId: row.swarm_id,
       depthLevel: row.depth_level,
+      spawnMode: (row.spawn_mode as SpawnMode) ?? 'process',
+      paneId: row.pane_id,
       createdAt: row.created_at,
       dismissedAt: row.dismissed_at,
     };
@@ -1124,6 +1156,8 @@ export class SQLiteStorage implements TeamStorage {
       role: string;
       swarm_id: string | null;
       depth_level: number;
+      spawn_mode: string | null;
+      pane_id: string | null;
       created_at: number;
       dismissed_at: number | null;
     } | undefined;
@@ -1147,6 +1181,8 @@ export class SQLiteStorage implements TeamStorage {
       role: string;
       swarm_id: string | null;
       depth_level: number;
+      spawn_mode: string | null;
+      pane_id: string | null;
       created_at: number;
       dismissed_at: number | null;
     } | undefined;
@@ -1170,6 +1206,8 @@ export class SQLiteStorage implements TeamStorage {
       role: string;
       swarm_id: string | null;
       depth_level: number;
+      spawn_mode: string | null;
+      pane_id: string | null;
       created_at: number;
       dismissed_at: number | null;
     }>;
@@ -1192,6 +1230,8 @@ export class SQLiteStorage implements TeamStorage {
       role: string;
       swarm_id: string | null;
       depth_level: number;
+      spawn_mode: string | null;
+      pane_id: string | null;
       created_at: number;
       dismissed_at: number | null;
     }>;

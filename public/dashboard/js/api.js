@@ -384,6 +384,313 @@ class ApiClient {
       body: JSON.stringify({ filePath }),
     });
   }
+
+  // ============================================================================
+  // Swarm Intelligence API Methods
+  // ============================================================================
+
+  // --- Pheromones (Stigmergic Coordination) ---
+
+  /**
+   * Get pheromone trails for a swarm
+   */
+  static async getPheromones(swarmId, options = {}) {
+    const params = new URLSearchParams();
+    if (options.resourceType) params.set('resourceType', options.resourceType);
+    if (options.trailType) params.set('trailType', options.trailType);
+    if (options.limit) params.set('limit', String(options.limit));
+    const query = params.toString() ? `?${params}` : '';
+    return this.request(`/pheromones/${encodeURIComponent(swarmId)}${query}`);
+  }
+
+  /**
+   * Deposit a pheromone trail
+   */
+  static async depositPheromone(swarmId, resourceId, resourceType, trailType, intensity = 1.0, metadata = {}) {
+    const user = this.getUser();
+    return this.request('/pheromones', {
+      method: 'POST',
+      body: JSON.stringify({
+        swarmId,
+        depositorHandle: user?.handle || 'dashboard',
+        resourceId,
+        resourceType,
+        trailType,
+        intensity,
+        metadata,
+      }),
+    });
+  }
+
+  /**
+   * Get hot resources (most active)
+   */
+  static async getHotResources(swarmId, limit = 10) {
+    return this.request(`/pheromones/${encodeURIComponent(swarmId)}/activity?limit=${limit}`);
+  }
+
+  /**
+   * Get pheromone statistics
+   */
+  static async getPheromoneStats(swarmId) {
+    return this.request(`/pheromones/${encodeURIComponent(swarmId)}/stats`);
+  }
+
+  // --- Agent Beliefs (Theory of Mind) ---
+
+  /**
+   * Get beliefs for an agent
+   */
+  static async getBeliefs(swarmId, handle, options = {}) {
+    const params = new URLSearchParams();
+    if (options.subject) params.set('subject', options.subject);
+    if (options.beliefType) params.set('beliefType', options.beliefType);
+    const query = params.toString() ? `?${params}` : '';
+    return this.request(`/beliefs/${encodeURIComponent(swarmId)}/${encodeURIComponent(handle)}${query}`);
+  }
+
+  /**
+   * Upsert a belief
+   */
+  static async upsertBelief(swarmId, subject, beliefType, beliefValue, confidence = 0.8, evidence = []) {
+    const user = this.getUser();
+    return this.request('/beliefs', {
+      method: 'POST',
+      body: JSON.stringify({
+        swarmId,
+        agentHandle: user?.handle || 'dashboard',
+        subject,
+        beliefType,
+        beliefValue,
+        confidence,
+        evidence,
+      }),
+    });
+  }
+
+  /**
+   * Get swarm consensus on a subject
+   */
+  static async getConsensus(swarmId, subject) {
+    return this.request(`/beliefs/${encodeURIComponent(swarmId)}/consensus/${encodeURIComponent(subject)}`);
+  }
+
+  /**
+   * Get belief statistics
+   */
+  static async getBeliefStats(swarmId) {
+    return this.request(`/beliefs/${encodeURIComponent(swarmId)}/stats`);
+  }
+
+  // --- Credits & Reputation ---
+
+  /**
+   * Get agent credits and reputation
+   */
+  static async getCredits(swarmId, handle) {
+    return this.request(`/credits/${encodeURIComponent(swarmId)}/${encodeURIComponent(handle)}`);
+  }
+
+  /**
+   * Get credits leaderboard
+   */
+  static async getLeaderboard(swarmId, limit = 10) {
+    return this.request(`/credits/${encodeURIComponent(swarmId)}/leaderboard?limit=${limit}`);
+  }
+
+  /**
+   * Transfer credits to another agent
+   */
+  static async transferCredits(swarmId, toHandle, amount, description = '') {
+    const user = this.getUser();
+    return this.request('/credits/transfer', {
+      method: 'POST',
+      body: JSON.stringify({
+        swarmId,
+        fromHandle: user?.handle || 'dashboard',
+        toHandle,
+        amount,
+        description,
+      }),
+    });
+  }
+
+  /**
+   * Get credit statistics
+   */
+  static async getCreditStats(swarmId) {
+    return this.request(`/credits/${encodeURIComponent(swarmId)}/stats`);
+  }
+
+  // --- Consensus Proposals ---
+
+  /**
+   * List proposals for a swarm
+   */
+  static async getProposals(swarmId, options = {}) {
+    const params = new URLSearchParams();
+    if (options.status) params.set('status', options.status);
+    if (options.limit) params.set('limit', String(options.limit));
+    const query = params.toString() ? `?${params}` : '';
+    return this.request(`/consensus/${encodeURIComponent(swarmId)}/proposals${query}`);
+  }
+
+  /**
+   * Create a new proposal
+   */
+  static async createProposal(swarmId, subject, description, options, deadline = null) {
+    const user = this.getUser();
+    const body = {
+      swarmId,
+      proposerHandle: user?.handle || 'dashboard',
+      subject,
+      description,
+      options,
+    };
+    if (deadline) body.deadline = deadline;
+    return this.request('/consensus/proposals', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  /**
+   * Get proposal details
+   */
+  static async getProposal(proposalId) {
+    return this.request(`/consensus/proposals/${encodeURIComponent(proposalId)}`);
+  }
+
+  /**
+   * Vote on a proposal
+   */
+  static async voteOnProposal(proposalId, vote, weight = 1.0, rationale = '') {
+    const user = this.getUser();
+    return this.request(`/consensus/proposals/${encodeURIComponent(proposalId)}/vote`, {
+      method: 'POST',
+      body: JSON.stringify({
+        voterHandle: user?.handle || 'dashboard',
+        vote,
+        weight,
+        rationale,
+      }),
+    });
+  }
+
+  /**
+   * Close a proposal (tally votes)
+   */
+  static async closeProposal(proposalId) {
+    return this.request(`/consensus/proposals/${encodeURIComponent(proposalId)}/close`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Get consensus statistics
+   */
+  static async getConsensusStats(swarmId) {
+    return this.request(`/consensus/${encodeURIComponent(swarmId)}/stats`);
+  }
+
+  // --- Task Bidding ---
+
+  /**
+   * Get bids for a task
+   */
+  static async getBids(taskId, options = {}) {
+    const params = new URLSearchParams();
+    if (options.status) params.set('status', options.status);
+    const query = params.toString() ? `?${params}` : '';
+    return this.request(`/bids/task/${encodeURIComponent(taskId)}${query}`);
+  }
+
+  /**
+   * Submit a bid on a task
+   */
+  static async submitBid(swarmId, taskId, amount, estimatedDuration = null, rationale = '') {
+    const user = this.getUser();
+    const body = {
+      swarmId,
+      taskId,
+      bidderHandle: user?.handle || 'dashboard',
+      amount,
+      rationale,
+    };
+    if (estimatedDuration) body.estimatedDuration = estimatedDuration;
+    return this.request('/bids', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  /**
+   * Accept a bid
+   */
+  static async acceptBid(bidId) {
+    return this.request(`/bids/${encodeURIComponent(bidId)}/accept`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Withdraw a bid
+   */
+  static async withdrawBid(bidId) {
+    return this.request(`/bids/${encodeURIComponent(bidId)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Run auction for a task
+   */
+  static async runAuction(taskId, auctionType = 'first_price') {
+    return this.request(`/bids/task/${encodeURIComponent(taskId)}/auction`, {
+      method: 'POST',
+      body: JSON.stringify({ auctionType }),
+    });
+  }
+
+  /**
+   * Get bidding statistics
+   */
+  static async getBiddingStats(swarmId) {
+    return this.request(`/bids/${encodeURIComponent(swarmId)}/stats`);
+  }
+
+  // --- Task Payoffs ---
+
+  /**
+   * Get payoffs for a task
+   */
+  static async getPayoffs(taskId) {
+    return this.request(`/payoffs/${encodeURIComponent(taskId)}`);
+  }
+
+  /**
+   * Define a payoff for a task
+   */
+  static async definePayoff(swarmId, taskId, payoffType, baseValue, decayRate = 0.0, bonusConditions = {}) {
+    return this.request('/payoffs', {
+      method: 'POST',
+      body: JSON.stringify({
+        swarmId,
+        taskId,
+        payoffType,
+        baseValue,
+        decayRate,
+        bonusConditions,
+      }),
+    });
+  }
+
+  /**
+   * Calculate current payoff value
+   */
+  static async calculatePayoff(taskId) {
+    return this.request(`/payoffs/${encodeURIComponent(taskId)}/calculate`);
+  }
 }
 
 export default ApiClient;

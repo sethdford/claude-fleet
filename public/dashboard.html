@@ -46,6 +46,27 @@
     }
     .connection.connected { background: rgba(63, 185, 80, 0.2); color: #3fb950; }
     .connection.disconnected { background: rgba(248, 81, 73, 0.2); color: #f85149; }
+    .task {
+      background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+      padding: 12px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px;
+    }
+    .task-priority {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .task-priority.critical { background: #f85149; }
+    .task-priority.high { background: #d29922; }
+    .task-priority.normal { background: #3fb950; }
+    .task-priority.low { background: #8b949e; }
+    .task-name { font-weight: bold; color: #c9d1d9; }
+    .task-info { color: #8b949e; font-size: 12px; }
+    .task-trigger {
+      margin-left: auto;
+      padding: 2px 8px;
+      background: rgba(56, 139, 253, 0.1);
+      border-radius: 4px;
+      font-size: 11px;
+      color: #388bfd;
+    }
   </style>
 </head>
 <body>
@@ -61,6 +82,17 @@
     <div class="card"><div class="card-title">Restarts (1h)</div><div class="card-value yellow" id="restarts">0</div></div>
     <div class="card"><div class="card-title">Agents</div><div class="card-value" id="agents">0</div></div>
   </div>
+
+  <h2>Autonomous Operations</h2>
+  <div class="grid">
+    <div class="card"><div class="card-title">Queued Tasks</div><div class="card-value" id="sched-queued">0</div></div>
+    <div class="card"><div class="card-title">Running</div><div class="card-value green" id="sched-running">0</div></div>
+    <div class="card"><div class="card-title">Schedules</div><div class="card-value" id="sched-count">0</div></div>
+    <div class="card"><div class="card-title">Active Schedules</div><div class="card-value green" id="sched-enabled">0</div></div>
+  </div>
+
+  <h2>Task Queue</h2>
+  <div class="workers-list" id="task-queue"><div style="color: #8b949e;">No queued tasks</div></div>
 
   <h2>Active Workers</h2>
   <div class="workers-list" id="workers-list"><div style="color: #8b949e;">No active workers</div></div>
@@ -116,6 +148,22 @@
         const list = document.getElementById('workers-list');
         list.innerHTML = w.length === 0 ? '<div style="color:#8b949e">No active workers</div>' :
           w.map(x => '<div class="worker"><div class="worker-status '+(x.health||'healthy')+'"></div><div><div class="worker-handle">'+x.handle+'</div><div class="worker-state">'+x.state+' • '+x.teamName+'</div></div></div>').join('');
+
+        // Fetch scheduler status
+        try {
+          const sched = await fetch(SERVER + '/scheduler/status', { headers }).then(r => r.json());
+          document.getElementById('sched-queued').textContent = sched.queued || 0;
+          document.getElementById('sched-running').textContent = sched.running || 0;
+          document.getElementById('sched-count').textContent = sched.schedules || 0;
+          document.getElementById('sched-enabled').textContent = sched.enabledSchedules || 0;
+
+          // Fetch task queue
+          const queue = await fetch(SERVER + '/scheduler/queue', { headers }).then(r => r.json());
+          const queueEl = document.getElementById('task-queue');
+          const allTasks = [...(queue.running || []), ...(queue.queued || [])];
+          queueEl.innerHTML = allTasks.length === 0 ? '<div style="color:#8b949e">No queued tasks</div>' :
+            allTasks.map(t => '<div class="task"><div class="task-priority '+t.priority+'"></div><div><div class="task-name">'+t.name+'</div><div class="task-info">'+(t.repository||'')+(t.status==='running'?' • Running...':'')+'</div></div><div class="task-trigger">'+t.trigger+'</div></div>').join('');
+        } catch(e) { /* Scheduler not available */ }
       } catch(e) { console.error('Refresh error:', e); }
     }
 

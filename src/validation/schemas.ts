@@ -132,6 +132,8 @@ export const spawnWorkerSchema = z.object({
   sessionId: z.string().max(100).optional(),
   swarmId: z.string().max(100).optional(),
   depthLevel: z.number().int().min(0).max(10).optional(),
+  spawnMode: z.enum(['process', 'tmux']).optional(),
+  model: z.string().max(50).optional(),
 });
 
 export type SpawnWorkerInput = z.infer<typeof spawnWorkerSchema>;

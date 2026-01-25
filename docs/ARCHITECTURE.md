@@ -411,15 +411,42 @@ interface ServerConfig {
 | `COLLAB_SERVER_URL` | Server URL for MCP | `http://localhost:3847` |
 | `LOG_LEVEL` | Logging verbosity | `info` |
 
-## Future Enhancements (FLEET-INTEGRATION-PLAN.md)
+## Swarm Intelligence Features
 
-The FLEET-INTEGRATION-PLAN.md outlines planned enhancements:
+Claude Fleet includes advanced swarm intelligence capabilities for multi-agent coordination:
 
-1. **Blackboard Messaging System** - Typed inter-agent communication with priority routing
-2. **Spawn Queue with DAG Dependencies** - Spawn limit enforcement and dependency resolution
-3. **Swarm Management** - Group workers into swarms with bulk operations
-4. **Agent Specialization** - Role-based prompts (scout, kraken, oracle, critic, architect)
-5. **Checkpoint System** - Structured handoffs with YAML checkpoints for session continuity
+### Pheromone System (Stigmergic Coordination)
+Agents leave trails on resources they interact with, enabling indirect coordination:
+- **Trail Types**: touch, modify, complete, error, warning, success
+- **Resource Types**: file, function, module, endpoint, test, config
+- **Decay**: Trails fade over time, keeping data fresh
+- **Hot Resources**: Query most active resources across the swarm
+
+### Belief System (Theory of Mind)
+Agents share knowledge and track beliefs about each other:
+- **Belief Types**: knowledge, assumption, inference, observation
+- **Confidence Scores**: 0-1 scale with evidence tracking
+- **Meta-Beliefs**: Beliefs about other agents' capabilities/reliability
+- **Consensus**: Query swarm-wide agreement on subjects
+
+### Credit System (Reputation)
+Track agent contributions and build reputation:
+- **Credits**: Earned for task completion, spent on resource access
+- **Reputation**: Rolling score based on task quality
+- **Leaderboard**: Rank agents by contributions
+- **Transfers**: Agents can transfer credits to each other
+
+### Consensus (Voting)
+Make swarm-level decisions through proposals:
+- **Proposals**: Create issues for swarm voting
+- **Weighted Votes**: Vote weight based on reputation
+- **Automatic Close**: Proposals close by deadline or threshold
+
+### Task Bidding (Market Allocation)
+Agents bid for tasks based on capability:
+- **Auctions**: First-price, second-price, or Vickrey auctions
+- **Evaluation**: Score bids by amount, duration, reputation
+- **Payoffs**: Define completion bonuses with decay rates
 
 ---
 
@@ -427,5 +454,5 @@ The FLEET-INTEGRATION-PLAN.md outlines planned enhancements:
 
 - [README.md](README.md) - Quick start and usage
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment guide
-- [FLEET-INTEGRATION-PLAN.md](FLEET-INTEGRATION-PLAN.md) - Future fleet capabilities
+- [TMUX-AUTOMATION.md](TMUX-AUTOMATION.md) - Tmux integration for worker panes
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Development guidelines

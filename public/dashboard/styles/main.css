@@ -1052,4 +1052,230 @@ button {
   .swarm-grid {
     grid-template-columns: 1fr;
   }
+
+  .swarm-intel-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ============================================================================
+   SWARM INTELLIGENCE COMPONENTS
+   ============================================================================ */
+
+/* Tab Buttons */
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  transition: all var(--transition-fast);
+}
+
+.tab-btn:hover {
+  color: var(--text-primary) !important;
+  background: var(--bg-secondary);
+}
+
+.tab-btn.active {
+  color: var(--text-primary) !important;
+  border-bottom-color: var(--accent-blue) !important;
+}
+
+/* Swarm Intelligence Stats Grid */
+.swarm-intel-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-md);
+}
+
+.stat-card {
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Pheromone Trail Items */
+.pheromone-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.pheromone-item {
+  transition: background var(--transition-fast);
+}
+
+.pheromone-item:hover {
+  background: var(--bg-tertiary) !important;
+}
+
+/* Hot Resources */
+.hot-resource-item {
+  padding: var(--space-xs) 0;
+}
+
+/* Beliefs */
+.beliefs-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.belief-group {
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.belief-subject {
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+  color: var(--text-primary);
+}
+
+.belief-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  border-top: 1px solid var(--border-muted);
+}
+
+.confidence-bar {
+  width: 60px;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+/* Leaderboard */
+.leaderboard {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border-muted);
+  transition: background var(--transition-fast);
+}
+
+.leaderboard-item:hover {
+  background: var(--bg-secondary);
+}
+
+.leaderboard-item:last-child {
+  border-bottom: none;
+}
+
+/* Proposals */
+.proposals-list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.proposal-item {
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-sm);
+  transition: box-shadow var(--transition-fast);
+}
+
+.proposal-item:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.proposal-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-xs);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.proposal-option:hover {
+  background: var(--bg-tertiary);
+}
+
+.proposal-option.winner {
+  background: rgba(63, 185, 80, 0.1);
+  border-color: var(--accent-green);
+}
+
+.proposal-winner {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: rgba(63, 185, 80, 0.1);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent-green);
+}
+
+/* Bids */
+.bids-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.bid-item {
+  padding: var(--space-sm);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-xs);
+  transition: background var(--transition-fast);
+}
+
+.bid-item:hover {
+  background: var(--bg-tertiary);
+}
+
+/* Swarm Intelligence View */
+.swarm-intelligence-view {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading State */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-default);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
