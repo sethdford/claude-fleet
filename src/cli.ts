@@ -14,8 +14,12 @@ import {
   messageTypeSchema,
 } from './validation/schemas.js';
 
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json') as { version: string };
+
 const DEFAULT_URL = process.env.CLAUDE_FLEET_URL ?? 'http://localhost:3847';
-const VERSION = '2.1.0';
+const VERSION = pkg.version;
 
 // ============================================================================
 // JWT HELPER
