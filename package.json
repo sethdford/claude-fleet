@@ -1,6 +1,6 @@
 {
   "name": "claude-fleet",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Multi-agent orchestration server for Claude Code with fleet coordination",
   "type": "module",
   "main": "dist/index.js",
@@ -75,7 +75,6 @@
     "electron:build:linux": "npm run build && electron-builder --linux --config electron/electron-builder.json"
   },
   "dependencies": {
-    "@claude-fleet/tmux": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "better-sqlite3": "^9.6.0",
     "cors": "^2.8.5",

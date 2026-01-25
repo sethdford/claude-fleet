@@ -23,7 +23,16 @@ import { MailStorage } from '../storage/mail.js';
 import type { SpawnController } from './spawn-controller.js';
 import type { FleetAgentRole } from './agent-roles.js';
 import { getSystemPromptForRole } from './agent-roles.js';
-import { TmuxWorkerAdapter, ContextManager } from '@claude-fleet/tmux';
+// Optional tmux support - gracefully handle when not available
+let TmuxWorkerAdapter: typeof import('@claude-fleet/tmux').TmuxWorkerAdapter | null = null;
+let ContextManager: typeof import('@claude-fleet/tmux').ContextManager | null = null;
+try {
+  const tmux = await import('@claude-fleet/tmux');
+  TmuxWorkerAdapter = tmux.TmuxWorkerAdapter;
+  ContextManager = tmux.ContextManager;
+} catch {
+  // @claude-fleet/tmux not available - tmux features disabled
+}
 
 const MAX_OUTPUT_LINES = 100;
 
@@ -69,8 +78,10 @@ export class WorkerManager extends EventEmitter {
   private useWorktrees: boolean;
   private injectMail: boolean;
   private spawnController: SpawnController | null = null;
-  private tmuxAdapter: TmuxWorkerAdapter | null = null;
-  private contextManager: ContextManager | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private tmuxAdapter: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private contextManager: any = null;
   private defaultSpawnMode: SpawnMode;
   private contextRolloverThreshold: number;
 
@@ -99,15 +110,23 @@ export class WorkerManager extends EventEmitter {
     }
 
     // Initialize tmux adapter if available
-    this.tmuxAdapter = new TmuxWorkerAdapter();
-    if (this.tmuxAdapter.isAvailable()) {
-      console.log('[WORKER] Tmux spawning available');
-      this.setupTmuxEventForwarding();
-      // Initialize context manager for tmux workers
-      this.contextManager = new ContextManager();
+    if (TmuxWorkerAdapter !== null) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.tmuxAdapter = new (TmuxWorkerAdapter as any)();
+      if (this.tmuxAdapter.isAvailable()) {
+        console.log('[WORKER] Tmux spawning available');
+        this.setupTmuxEventForwarding();
+        // Initialize context manager for tmux workers
+        if (ContextManager !== null) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          this.contextManager = new (ContextManager as any)();
+        }
+      } else {
+        console.log('[WORKER] Tmux not available, using process spawning only');
+        this.tmuxAdapter = null;
+      }
     } else {
-      console.log('[WORKER] Tmux not available, using process spawning only');
-      this.tmuxAdapter = null;
+      console.log('[WORKER] @claude-fleet/tmux not installed, tmux features disabled');
     }
 
     // Context rollover threshold (default 70%)
@@ -342,7 +361,7 @@ export class WorkerManager extends EventEmitter {
         const summary = this.contextManager.generateContinueSummary(worker.paneId);
         this.contextManager.rolloverToNewPane(worker.paneId, {
           initialPrompt: `Continue from previous session. Summary:\n${summary.summary}`,
-        }).then(({ paneId: newPaneId, summary: rolloverSummary }) => {
+        }).then(({ paneId: newPaneId, summary: rolloverSummary }: { paneId: string; summary: string }) => {
           console.log(`[CONTEXT] ${worker.handle} rolled over to pane ${newPaneId}`);
           worker.paneId = newPaneId;
 
@@ -1140,7 +1159,8 @@ Please work on this task. When complete, include "TASK COMPLETE" in your respons
   /**
    * Get the tmux adapter for external operations (wave orchestration, etc.)
    */
-  getTmuxAdapter(): TmuxWorkerAdapter | null {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getTmuxAdapter(): any {
     return this.tmuxAdapter;
   }
 
