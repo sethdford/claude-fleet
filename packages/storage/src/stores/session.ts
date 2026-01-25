@@ -191,7 +191,7 @@ export class SessionStore {
       params.push(projectPath);
     }
 
-    sql += ` ORDER BY rank LIMIT ?`;
+    sql += ' ORDER BY rank LIMIT ?';
     params.push(limit);
 
     const rows = this.db.prepare(sql).all(...params) as (SessionRow & { snippet: string })[];

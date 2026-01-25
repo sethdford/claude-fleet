@@ -6,6 +6,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { FleetManager } from '@claude-fleet/fleet';
+import type { WorkerRole, WorkerStatus } from '@claude-fleet/common';
 
 export function fleetCommands(): Command {
   const fleet = new Command('fleet')
@@ -24,7 +25,7 @@ export function fleetCommands(): Command {
         const manager = new FleetManager();
         const worker = await manager.spawn({
           handle,
-          role: options.role as any,
+          role: options.role as WorkerRole,
           prompt: options.prompt,
           worktree: options.worktree,
         });
@@ -73,8 +74,8 @@ export function fleetCommands(): Command {
     .action(async (options) => {
       const manager = new FleetManager();
       const workers = manager.listWorkers({
-        status: options.status as any,
-        role: options.role as any,
+        status: options.status as WorkerStatus,
+        role: options.role as WorkerRole,
       });
 
       if (options.json) {

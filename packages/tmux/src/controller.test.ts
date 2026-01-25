@@ -11,7 +11,7 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn(),
 }));
 
-import { execSync, spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
 
 describe('TmuxController', () => {
   let controller: TmuxController;

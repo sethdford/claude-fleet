@@ -13,7 +13,6 @@ import type {
   TaskStatus,
   PersistentWorker,
   WorkerStatus,
-  AgentRole,
   WorkItem,
   WorkItemStatus,
   Batch,

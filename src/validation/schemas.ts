@@ -241,7 +241,7 @@ export type SendMailInput = z.infer<typeof sendMailSchema>;
 export const createHandoffSchema = z.object({
   from: handleSchema,
   to: handleSchema,
-  context: z.looseObject({}),
+  context: z.record(z.string(), z.unknown()),
 });
 
 export type CreateHandoffInput = z.infer<typeof createHandoffSchema>;
@@ -259,7 +259,7 @@ export const blackboardPostSchema = z.object({
   swarmId: z.string().min(1).max(100),
   senderHandle: handleSchema,
   messageType: messageTypeSchema,
-  payload: z.looseObject({}),
+  payload: z.record(z.string(), z.unknown()),
   targetHandle: handleSchema.optional(),
   priority: messagePrioritySchema.optional().default('normal'),
 });
@@ -620,6 +620,338 @@ export const listExecutionsQuerySchema = z.object({
 });
 
 export type ListExecutionsQuery = z.infer<typeof listExecutionsQuerySchema>;
+
+// ============================================================================
+// SWARM TEMPLATE SCHEMAS
+// ============================================================================
+
+/** Template name schema (alphanumeric with dashes/underscores) */
+export const templateNameSchema = z
+  .string()
+  .min(1, 'Template name is required')
+  .max(100, 'Template name must be at most 100 characters')
+  .regex(/^[a-zA-Z0-9_-]+$/, 'Template name must be alphanumeric with dashes/underscores');
+
+/** Phase roles schema - validates FleetAgentRole array */
+export const phaseRolesSchema = z
+  .array(z.string().min(1).max(50).regex(/^[a-zA-Z0-9_-]+$/, 'Invalid role ID'))
+  .max(20, 'Maximum 20 roles per phase');
+
+/** Template phases schema */
+export const templatePhasesSchema = z.object({
+  discovery: phaseRolesSchema.optional().default([]),
+  development: phaseRolesSchema.optional().default([]),
+  quality: phaseRolesSchema.optional().default([]),
+  delivery: phaseRolesSchema.optional().default([]),
+});
+
+/** Create template request */
+export const createSwarmTemplateSchema = z
+  .object({
+    name: templateNameSchema,
+    description: z.string().max(500).optional(),
+    phases: templatePhasesSchema,
+  })
+  .refine(
+    data => {
+      const total = Object.values(data.phases).flat().length;
+      return total > 0 && total <= 50;
+    },
+    { message: 'Template must have between 1 and 50 total roles across all phases' }
+  );
+
+export type CreateSwarmTemplateInput = z.infer<typeof createSwarmTemplateSchema>;
+
+/** Update template request */
+export const updateSwarmTemplateSchema = z
+  .object({
+    name: templateNameSchema.optional(),
+    description: z.string().max(500).optional().nullable(),
+    phases: templatePhasesSchema.optional(),
+  })
+  .refine(data => data.name || data.description !== undefined || data.phases, {
+    message: 'At least one field must be provided for update',
+  });
+
+export type UpdateSwarmTemplateInput = z.infer<typeof updateSwarmTemplateSchema>;
+
+/** List templates query */
+export const listTemplatesQuerySchema = z.object({
+  builtin: z.enum(['true', 'false']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export type ListTemplatesQuery = z.infer<typeof listTemplatesQuerySchema>;
+
+/** Run template request */
+export const runTemplateSchema = z.object({
+  swarmName: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/).optional(),
+});
+
+export type RunTemplateInput = z.infer<typeof runTemplateSchema>;
+
+// ============================================================================
+// AUDIT SCHEMAS
+// ============================================================================
+
+/**
+ * Schema for starting an audit loop
+ */
+export const startAuditSchema = z.object({
+  dryRun: z.boolean().optional().default(false),
+  maxIterations: z.number().int().min(1).max(100).optional().default(20),
+}).strict();
+
+export type StartAuditInput = z.infer<typeof startAuditSchema>;
+
+/**
+ * Schema for audit output query params
+ */
+export const auditOutputQuerySchema = z.object({
+  since: z.coerce.number().int().min(0).optional().default(0),
+  limit: z.coerce.number().int().min(1).max(1000).optional().default(100),
+});
+
+export type AuditOutputQuery = z.infer<typeof auditOutputQuerySchema>;
+
+// ============================================================================
+// SWARM INTELLIGENCE SCHEMAS (Phase 6 - Advanced Coordination)
+// ============================================================================
+
+// --- Pheromone Trail Schemas ---
+
+export const pheromoneResourceTypeSchema = z.enum(['file', 'task', 'endpoint', 'module', 'custom']);
+export const pheromoneTrailTypeSchema = z.enum(['touch', 'modify', 'complete', 'error', 'warning', 'success']);
+
+export const depositPheromoneSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  resourceType: pheromoneResourceTypeSchema,
+  resourceId: z.string().min(1).max(500),
+  depositorHandle: handleSchema,
+  trailType: pheromoneTrailTypeSchema,
+  intensity: z.number().min(0).max(10).optional().default(1.0),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type DepositPheromoneInput = z.infer<typeof depositPheromoneSchema>;
+
+export const queryPheromonesSchema = z.object({
+  resourceType: pheromoneResourceTypeSchema.optional(),
+  resourceId: z.string().max(500).optional(),
+  trailType: pheromoneTrailTypeSchema.optional(),
+  depositorHandle: handleSchema.optional(),
+  minIntensity: z.number().min(0).max(10).optional(),
+  activeOnly: z.boolean().optional().default(true),
+  limit: z.coerce.number().int().min(1).max(1000).optional().default(100),
+});
+
+export type QueryPheromonesInput = z.infer<typeof queryPheromonesSchema>;
+
+export const decayPheromonesSchema = z.object({
+  swarmId: z.string().min(1).max(100).optional(),
+  decayRate: z.number().min(0).max(1).optional().default(0.1),
+  minIntensity: z.number().min(0).max(1).optional().default(0.01),
+});
+
+export type DecayPheromonesInput = z.infer<typeof decayPheromonesSchema>;
+
+// --- Agent Belief Schemas ---
+
+export const beliefTypeSchema = z.enum(['knowledge', 'assumption', 'inference', 'observation']);
+export const beliefSourceTypeSchema = z.enum(['direct', 'inferred', 'communicated', 'observed']);
+export const metaBeliefTypeSchema = z.enum(['capability', 'reliability', 'knowledge', 'intention', 'workload']);
+
+export const upsertBeliefSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  agentHandle: handleSchema,
+  beliefType: beliefTypeSchema,
+  subject: z.string().min(1).max(200),
+  beliefValue: z.string().min(1).max(10000),
+  confidence: z.number().min(0).max(1).optional().default(0.5),
+  sourceHandle: handleSchema.optional(),
+  sourceType: beliefSourceTypeSchema.optional().default('direct'),
+  validUntilMs: z.number().int().positive().optional(),
+});
+
+export type UpsertBeliefInput = z.infer<typeof upsertBeliefSchema>;
+
+export const queryBeliefsSchema = z.object({
+  beliefType: beliefTypeSchema.optional(),
+  subject: z.string().max(200).optional(),
+  minConfidence: z.number().min(0).max(1).optional(),
+  includeExpired: z.boolean().optional().default(false),
+  limit: z.coerce.number().int().min(1).max(1000).optional().default(100),
+});
+
+export type QueryBeliefsInput = z.infer<typeof queryBeliefsSchema>;
+
+export const upsertMetaBeliefSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  agentHandle: handleSchema,
+  aboutHandle: handleSchema,
+  metaType: metaBeliefTypeSchema,
+  beliefValue: z.string().min(1).max(10000),
+  confidence: z.number().min(0).max(1).optional().default(0.5),
+});
+
+export type UpsertMetaBeliefInput = z.infer<typeof upsertMetaBeliefSchema>;
+
+export const getSwarmConsensusSchema = z.object({
+  subject: z.string().min(1).max(200),
+  minConfidence: z.number().min(0).max(1).optional().default(0.5),
+});
+
+export type GetSwarmConsensusInput = z.infer<typeof getSwarmConsensusSchema>;
+
+// --- Agent Credits & Reputation Schemas ---
+
+export const creditTransactionTypeSchema = z.enum(['earn', 'spend', 'bonus', 'penalty', 'transfer', 'adjustment']);
+
+export const transferCreditsSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  fromHandle: handleSchema,
+  toHandle: handleSchema,
+  amount: z.number().positive().max(10000),
+  reason: z.string().max(500).optional(),
+});
+
+export type TransferCreditsInput = z.infer<typeof transferCreditsSchema>;
+
+export const recordCreditTransactionSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  agentHandle: handleSchema,
+  transactionType: creditTransactionTypeSchema,
+  amount: z.number().max(10000),
+  referenceType: z.string().max(50).optional(),
+  referenceId: z.string().max(100).optional(),
+  reason: z.string().max(500).optional(),
+});
+
+export type RecordCreditTransactionInput = z.infer<typeof recordCreditTransactionSchema>;
+
+export const creditHistoryQuerySchema = z.object({
+  transactionType: creditTransactionTypeSchema.optional(),
+  sinceMs: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional().default(100),
+});
+
+export type CreditHistoryQuery = z.infer<typeof creditHistoryQuerySchema>;
+
+export const leaderboardQuerySchema = z.object({
+  orderBy: z.enum(['balance', 'reputation', 'earned', 'tasks']).optional().default('reputation'),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+});
+
+export type LeaderboardQuery = z.infer<typeof leaderboardQuerySchema>;
+
+// --- Game-Theoretic Payoff Schemas ---
+
+export const payoffTypeSchema = z.enum(['completion', 'quality', 'speed', 'cooperation', 'penalty']);
+
+export const definePayoffSchema = z.object({
+  taskId: z.string().min(1).max(100),
+  swarmId: z.string().max(100).optional(),
+  payoffType: payoffTypeSchema,
+  baseValue: z.number().min(-10000).max(10000),
+  multiplier: z.number().min(0).max(100).optional().default(1.0),
+  deadline: z.number().int().positive().optional(),
+  decayRate: z.number().min(0).max(1).optional().default(0),
+  dependencies: z.array(z.string().max(100)).max(20).optional(),
+});
+
+export type DefinePayoffInput = z.infer<typeof definePayoffSchema>;
+
+export const calculatePayoffQuerySchema = z.object({
+  includeBreakdown: z.enum(['true', 'false']).optional().default('false'),
+});
+
+export type CalculatePayoffQuery = z.infer<typeof calculatePayoffQuerySchema>;
+
+// --- Consensus Mechanism Schemas ---
+
+export const consensusProposalTypeSchema = z.enum(['decision', 'election', 'approval', 'ranking', 'allocation']);
+export const votingMethodSchema = z.enum(['majority', 'supermajority', 'unanimous', 'ranked', 'weighted']);
+export const proposalStatusSchema = z.enum(['open', 'closed', 'passed', 'failed', 'cancelled']);
+export const quorumTypeSchema = z.enum(['percentage', 'absolute', 'none']);
+
+export const createProposalSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  proposerHandle: handleSchema,
+  proposalType: consensusProposalTypeSchema,
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).optional(),
+  options: z.array(z.string().min(1).max(200)).min(2).max(20),
+  votingMethod: votingMethodSchema.optional().default('majority'),
+  quorumType: quorumTypeSchema.optional().default('percentage'),
+  quorumValue: z.number().min(0).max(1).optional().default(0.5),
+  weightByReputation: z.boolean().optional().default(false),
+  deadlineMs: z.number().int().positive().optional(),
+});
+
+export type CreateProposalInput = z.infer<typeof createProposalSchema>;
+
+export const castVoteSchema = z.object({
+  voterHandle: handleSchema,
+  voteValue: z.string().min(1).max(500), // Can be option text or JSON for ranked
+  rationale: z.string().max(1000).optional(),
+});
+
+export type CastVoteInput = z.infer<typeof castVoteSchema>;
+
+export const listProposalsQuerySchema = z.object({
+  status: proposalStatusSchema.optional(),
+  proposalType: consensusProposalTypeSchema.optional(),
+  proposerHandle: handleSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+});
+
+export type ListProposalsQuery = z.infer<typeof listProposalsQuerySchema>;
+
+// --- Market-Based Task Bidding Schemas ---
+
+export const bidStatusSchema = z.enum(['pending', 'accepted', 'rejected', 'withdrawn', 'expired']);
+export const auctionTypeSchema = z.enum(['first_price', 'second_price', 'dutch', 'vickrey']);
+
+export const submitBidSchema = z.object({
+  taskId: z.string().min(1).max(100),
+  swarmId: z.string().min(1).max(100),
+  bidderHandle: handleSchema,
+  bidAmount: z.number().min(0).max(10000),
+  estimatedDuration: z.number().int().positive().max(86400000).optional(), // ms, max 24h
+  confidence: z.number().min(0).max(1).optional().default(0.5),
+  rationale: z.string().max(2000).optional(),
+});
+
+export type SubmitBidInput = z.infer<typeof submitBidSchema>;
+
+export const listBidsQuerySchema = z.object({
+  status: bidStatusSchema.optional(),
+  bidderHandle: handleSchema.optional(),
+  minBid: z.coerce.number().min(0).optional(),
+  maxBid: z.coerce.number().min(0).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+});
+
+export type ListBidsQuery = z.infer<typeof listBidsQuerySchema>;
+
+export const configureAuctionSchema = z.object({
+  taskId: z.string().min(1).max(100),
+  swarmId: z.string().min(1).max(100),
+  auctionType: auctionTypeSchema.optional().default('first_price'),
+  minBid: z.number().min(0).optional().default(0),
+  maxBid: z.number().min(0).optional(),
+  durationMs: z.number().int().positive().max(86400000).optional(), // max 24h
+  autoAccept: z.boolean().optional().default(false),
+  reputationThreshold: z.number().min(0).max(1).optional(),
+});
+
+export type ConfigureAuctionInput = z.infer<typeof configureAuctionSchema>;
+
+export const acceptBidSchema = z.object({
+  settleCredits: z.boolean().optional().default(true),
+});
+
+export type AcceptBidInput = z.infer<typeof acceptBidSchema>;
 
 // ============================================================================
 // VALIDATION HELPER

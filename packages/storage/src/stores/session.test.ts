@@ -144,7 +144,7 @@ describe('SessionStore', () => {
     });
 
     it('respects offset', () => {
-      const all = store.list();
+      store.list(); // Verify full list works
       const offset = store.list({ offset: 2 });
       expect(offset.length).toBe(3);
     });

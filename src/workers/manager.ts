@@ -35,7 +35,6 @@ export interface WorkerManagerEvents {
   'worker:restart': { workerId: string; handle: string; restartCount: number };
 }
 
-const HEARTBEAT_INTERVAL = 10000; // 10 seconds
 const HEALTH_CHECK_INTERVAL = 15000; // 15 seconds
 const HEALTHY_THRESHOLD = 30000; // 30 seconds without activity = degraded
 const UNHEALTHY_THRESHOLD = 60000; // 60 seconds = unhealthy

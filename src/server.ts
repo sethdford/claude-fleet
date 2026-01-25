@@ -7,6 +7,7 @@
 
 import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import http from 'node:http';
@@ -21,7 +22,7 @@ import { WorkflowStorage } from './storage/workflow.js';
 import { WorkflowEngine } from './workers/workflow-engine.js';
 import { createStorage, getStorageConfigFromEnv } from './storage/factory.js';
 import type { IStorage } from './storage/interfaces.js';
-import { createAuthMiddleware, requireRole } from './middleware/auth.js';
+import { createAuthMiddleware, requireRole, requireTeamMembership } from './middleware/auth.js';
 import { metricsMiddleware, metricsHandler } from './metrics/prometheus.js';
 import type {
   ServerConfig,
@@ -40,15 +41,23 @@ const __dirname = path.dirname(__filename);
 
 export function getConfig(): ServerConfig {
   const storageConfig = getStorageConfigFromEnv();
+
+  // Warn if JWT_SECRET not set in production
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret && process.env.NODE_ENV === 'production') {
+    console.error('[SECURITY] WARNING: JWT_SECRET not set in production! Tokens will be invalid after restart.');
+  }
+
   return {
     port: parseInt(process.env.PORT ?? '3847', 10),
     dbPath: storageConfig.backend === 'sqlite' ? storageConfig.path : path.join(__dirname, '..', 'fleet.db'),
     storageBackend: storageConfig.backend,
-    jwtSecret: process.env.JWT_SECRET ?? crypto.randomBytes(32).toString('hex'),
+    jwtSecret: jwtSecret ?? crypto.randomBytes(32).toString('hex'),
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '24h',
     maxWorkers: parseInt(process.env.MAX_WORKERS ?? '5', 10),
     rateLimitWindow: 60000,
     rateLimitMax: 100,
+    corsOrigins: process.env.CORS_ORIGINS?.split(',').map(s => s.trim()) ?? ['http://localhost:3847'],
   };
 }
 
@@ -108,6 +117,9 @@ export class CollabServer {
       this.legacyStorage = new SQLiteStorage(this.config.dbPath);
     }
 
+    // Seed builtin swarm templates
+    this.legacyStorage.seedBuiltinTemplates();
+
     // Workflow storage still uses legacy storage (not yet abstracted)
     this.workflowStorage = new WorkflowStorage(this.legacyStorage);
     this.workflowStorage.seedTemplates();
@@ -161,7 +173,35 @@ export class CollabServer {
   // ============================================================================
 
   private setupMiddleware(): void {
-    this.app.use(cors());
+    // Security headers (XSS, clickjacking, MIME sniffing protection)
+    this.app.use(helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ['\'self\''],
+          // Allow jsdelivr CDN for dashboard libraries (d3, chart.js, xterm)
+          scriptSrc: ['\'self\'', '\'unsafe-inline\'', 'https://cdn.jsdelivr.net'],
+          styleSrc: ['\'self\'', '\'unsafe-inline\'', 'https://cdn.jsdelivr.net'],
+          imgSrc: ['\'self\'', 'data:'],
+          connectSrc: ['\'self\'', 'ws:', 'wss:'],
+          fontSrc: ['\'self\'', 'https://cdn.jsdelivr.net'],
+        },
+      },
+      crossOriginEmbedderPolicy: false, // Allow loading resources
+    }));
+
+    // CORS with configured origins
+    this.app.use(cors({
+      origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+        if (this.config.corsOrigins.includes(origin) || this.config.corsOrigins.includes('*')) {
+          return callback(null, true);
+        }
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      },
+      credentials: true,
+    }));
+
     this.app.use(express.json({ limit: '1mb' }));
     this.app.use(metricsMiddleware);
     this.app.use(this.rateLimitMiddleware.bind(this));
@@ -220,10 +260,10 @@ export class CollabServer {
     this.app.get('/users/:uid', routes.createGetUserHandler(this.deps));
     this.app.get('/users/:uid/chats', routes.createGetUserChatsHandler(this.deps));
 
-    // Team routes
-    this.app.get('/teams/:teamName/agents', routes.createGetTeamAgentsHandler(this.deps));
-    this.app.post('/teams/:teamName/broadcast', requireRole('team-lead'), routes.createBroadcastHandler(this.deps, broadcastToChat));
-    this.app.get('/teams/:teamName/tasks', routes.createGetTeamTasksHandler(this.deps));
+    // Team routes (require team membership)
+    this.app.get('/teams/:teamName/agents', requireTeamMembership(), routes.createGetTeamAgentsHandler(this.deps));
+    this.app.post('/teams/:teamName/broadcast', requireRole('team-lead'), requireTeamMembership(), routes.createBroadcastHandler(this.deps, broadcastToChat));
+    this.app.get('/teams/:teamName/tasks', requireTeamMembership(), routes.createGetTeamTasksHandler(this.deps));
 
     // Chat routes
     this.app.post('/chats', routes.createCreateChatHandler(this.deps));
@@ -298,6 +338,14 @@ export class CollabServer {
     this.app.get('/swarms/:id', requireRole('team-lead', 'worker'), routes.createSwarmGetHandler(this.deps));
     this.app.post('/swarms/:id/kill', requireRole('team-lead'), routes.createSwarmKillHandler(this.deps));
 
+    // Template routes (swarm templates)
+    this.app.post('/templates', requireRole('team-lead'), routes.createCreateTemplateHandler(this.deps));
+    this.app.get('/templates', requireRole('team-lead', 'worker'), routes.createListTemplatesHandler(this.deps));
+    this.app.get('/templates/:id', requireRole('team-lead', 'worker'), routes.createGetTemplateHandler(this.deps));
+    this.app.patch('/templates/:id', requireRole('team-lead'), routes.createUpdateTemplateHandler(this.deps));
+    this.app.delete('/templates/:id', requireRole('team-lead'), routes.createDeleteTemplateHandler(this.deps));
+    this.app.post('/templates/:id/run', requireRole('team-lead'), routes.createRunTemplateHandler(this.deps));
+
     // TLDR routes (token-efficient code analysis)
     // Use POST with body for file paths to avoid URL encoding issues
     this.app.post('/tldr/summary/get', requireRole('team-lead', 'worker'), routes.createGetFileSummaryHandler(this.deps));
@@ -339,6 +387,61 @@ export class CollabServer {
 
     // Workflow trigger routes
     this.app.delete('/triggers/:id', requireRole('team-lead'), routes.createDeleteTriggerHandler(this.deps));
+
+    // Audit routes (codebase health checks)
+    this.app.get('/audit/status', routes.createAuditStatusHandler(this.deps));
+    this.app.get('/audit/output', routes.createAuditOutputHandler(this.deps));
+    this.app.post('/audit/start', requireRole('team-lead'), routes.createAuditStartHandler(this.deps));
+    this.app.post('/audit/stop', requireRole('team-lead'), routes.createAuditStopHandler(this.deps));
+    this.app.post('/audit/quick', requireRole('team-lead'), routes.createQuickAuditHandler(this.deps));
+
+    // Swarm Intelligence routes (stigmergic coordination, beliefs, credits, consensus, bidding)
+    // Pheromone trails
+    this.app.post('/pheromones', requireRole('team-lead', 'worker'), routes.createDepositPheromoneHandler(this.deps));
+    this.app.get('/pheromones/:swarmId', requireRole('team-lead', 'worker'), routes.createQueryPheromonesHandler(this.deps));
+    this.app.get('/pheromones/:swarmId/resource/:resourceId', requireRole('team-lead', 'worker'), routes.createGetResourceTrailsHandler(this.deps));
+    this.app.get('/pheromones/:swarmId/activity', requireRole('team-lead', 'worker'), routes.createGetResourceActivityHandler(this.deps));
+    this.app.post('/pheromones/decay', requireRole('team-lead'), routes.createDecayPheromonesHandler(this.deps));
+    this.app.get('/pheromones/:swarmId/stats', requireRole('team-lead', 'worker'), routes.createPheromoneStatsHandler(this.deps));
+
+    // Agent beliefs (Theory of Mind)
+    this.app.post('/beliefs', requireRole('team-lead', 'worker'), routes.createUpsertBeliefHandler(this.deps));
+    this.app.get('/beliefs/:swarmId/:handle', requireRole('team-lead', 'worker'), routes.createGetBeliefsHandler(this.deps));
+    this.app.post('/beliefs/meta', requireRole('team-lead', 'worker'), routes.createUpsertMetaBeliefHandler(this.deps));
+    this.app.get('/beliefs/:swarmId/consensus/:subject', requireRole('team-lead', 'worker'), routes.createGetSwarmConsensusHandler(this.deps));
+    this.app.get('/beliefs/:swarmId/stats', requireRole('team-lead', 'worker'), routes.createBeliefStatsHandler(this.deps));
+
+    // Credits & reputation
+    this.app.get('/credits/:swarmId/:handle', requireRole('team-lead', 'worker'), routes.createGetCreditsHandler(this.deps));
+    this.app.get('/credits/:swarmId/leaderboard', requireRole('team-lead', 'worker'), routes.createGetLeaderboardHandler(this.deps));
+    this.app.post('/credits/transfer', requireRole('team-lead', 'worker'), routes.createTransferCreditsHandler(this.deps));
+    this.app.post('/credits/transaction', requireRole('team-lead'), routes.createRecordTransactionHandler(this.deps));
+    this.app.get('/credits/:swarmId/:handle/history', requireRole('team-lead', 'worker'), routes.createGetCreditHistoryHandler(this.deps));
+    this.app.get('/credits/:swarmId/stats', requireRole('team-lead', 'worker'), routes.createCreditStatsHandler(this.deps));
+    this.app.post('/credits/reputation', requireRole('team-lead'), routes.createUpdateReputationHandler(this.deps));
+
+    // Consensus voting
+    this.app.post('/consensus/proposals', requireRole('team-lead', 'worker'), routes.createCreateProposalHandler(this.deps));
+    this.app.get('/consensus/:swarmId/proposals', requireRole('team-lead', 'worker'), routes.createListProposalsHandler(this.deps));
+    this.app.get('/consensus/proposals/:id', requireRole('team-lead', 'worker'), routes.createGetProposalHandler(this.deps));
+    this.app.post('/consensus/proposals/:id/vote', requireRole('team-lead', 'worker'), routes.createCastVoteHandler(this.deps));
+    this.app.post('/consensus/proposals/:id/close', requireRole('team-lead'), routes.createCloseProposalHandler(this.deps));
+    this.app.get('/consensus/:swarmId/stats', requireRole('team-lead', 'worker'), routes.createConsensusStatsHandler(this.deps));
+
+    // Task bidding
+    this.app.post('/bids', requireRole('team-lead', 'worker'), routes.createSubmitBidHandler(this.deps));
+    this.app.get('/bids/task/:taskId', requireRole('team-lead', 'worker'), routes.createGetTaskBidsHandler(this.deps));
+    this.app.get('/bids/:id', requireRole('team-lead', 'worker'), routes.createGetBidHandler(this.deps));
+    this.app.post('/bids/:id/accept', requireRole('team-lead'), routes.createAcceptBidHandler(this.deps));
+    this.app.delete('/bids/:id', requireRole('team-lead', 'worker'), routes.createWithdrawBidHandler(this.deps));
+    this.app.post('/bids/task/:taskId/evaluate', requireRole('team-lead'), routes.createEvaluateBidsHandler(this.deps));
+    this.app.post('/bids/task/:taskId/auction', requireRole('team-lead'), routes.createRunAuctionHandler(this.deps));
+    this.app.get('/bids/:swarmId/stats', requireRole('team-lead', 'worker'), routes.createBiddingStatsHandler(this.deps));
+
+    // Game-theoretic payoffs
+    this.app.post('/payoffs', requireRole('team-lead'), routes.createDefinePayoffHandler(this.deps));
+    this.app.get('/payoffs/:taskId', requireRole('team-lead', 'worker'), routes.createGetPayoffsHandler(this.deps));
+    this.app.get('/payoffs/:taskId/calculate', requireRole('team-lead', 'worker'), routes.createCalculatePayoffHandler(this.deps));
   }
 
   // ============================================================================

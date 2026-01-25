@@ -44,6 +44,33 @@ export class FleetTmuxManager {
 
   constructor() {
     this.controller = new TmuxController();
+    // Auto-discover existing workers from pane titles
+    this.discoverWorkers();
+  }
+
+  /**
+   * Discover workers from existing pane titles matching pattern "role:handle" or "worker:handle"
+   */
+  discoverWorkers(): void {
+    if (!this.controller.isInsideTmux()) return;
+
+    const panes = this.controller.listPanes();
+    const workerPattern = /^(worker|scout|coordinator|team-lead):(.+)$/;
+
+    for (const pane of panes) {
+      const match = pane.title.match(workerPattern);
+      if (match && match[2]) {
+        const handle = match[2];
+        if (!this.workers.has(handle)) {
+          this.workers.set(handle, {
+            workerId: `discovered-${pane.id}`,
+            handle,
+            paneId: pane.id,
+            createdAt: Date.now(),
+          });
+        }
+      }
+    }
   }
 
   /**

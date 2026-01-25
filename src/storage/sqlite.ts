@@ -23,6 +23,7 @@ import type {
   MailMessage,
   Handoff,
   AgentRole,
+  SwarmTemplate,
 } from '../types.js';
 
 export class SQLiteStorage implements TeamStorage {
@@ -94,6 +95,15 @@ export class SQLiteStorage implements TeamStorage {
     getSwarm: Database.Statement;
     getAllSwarms: Database.Statement;
     deleteSwarm: Database.Statement;
+    // Templates
+    insertTemplate: Database.Statement;
+    getTemplate: Database.Statement;
+    getTemplateByName: Database.Statement;
+    getAllTemplates: Database.Statement;
+    getBuiltinTemplates: Database.Statement;
+    getUserTemplates: Database.Statement;
+    updateTemplate: Database.Statement;
+    deleteTemplate: Database.Statement;
   };
 
   constructor(dbPath: string) {
@@ -406,6 +416,193 @@ export class SQLiteStorage implements TeamStorage {
       );
 
       CREATE INDEX IF NOT EXISTS idx_swarms_name ON swarms(name);
+
+      -- Swarm templates table (reusable swarm configurations)
+      CREATE TABLE IF NOT EXISTS swarm_templates (
+        id TEXT PRIMARY KEY,
+        name TEXT UNIQUE NOT NULL,
+        description TEXT,
+        is_builtin INTEGER DEFAULT 0,
+        phases TEXT NOT NULL,
+        created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+        updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_swarm_templates_name ON swarm_templates(name);
+      CREATE INDEX IF NOT EXISTS idx_swarm_templates_builtin ON swarm_templates(is_builtin);
+
+      -- ============================================================================
+      -- SWARM INTELLIGENCE TABLES (Phase 6) - 2026 Research Features
+      -- ============================================================================
+
+      -- Pheromone trails for stigmergic coordination
+      CREATE TABLE IF NOT EXISTS pheromone_trails (
+        id TEXT PRIMARY KEY,
+        swarm_id TEXT NOT NULL,
+        resource_type TEXT NOT NULL CHECK (resource_type IN ('file', 'task', 'endpoint', 'module', 'custom')),
+        resource_id TEXT NOT NULL,
+        depositor_handle TEXT NOT NULL,
+        trail_type TEXT NOT NULL CHECK (trail_type IN ('touch', 'modify', 'complete', 'error', 'warning', 'success')),
+        intensity REAL NOT NULL DEFAULT 1.0 CHECK (intensity >= 0.0 AND intensity <= 1.0),
+        metadata TEXT DEFAULT '{}',
+        created_at INTEGER NOT NULL,
+        decayed_at INTEGER
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_pheromone_swarm_resource ON pheromone_trails(swarm_id, resource_type, resource_id);
+      CREATE INDEX IF NOT EXISTS idx_pheromone_active ON pheromone_trails(swarm_id, decayed_at);
+      CREATE INDEX IF NOT EXISTS idx_pheromone_depositor ON pheromone_trails(depositor_handle);
+      CREATE INDEX IF NOT EXISTS idx_pheromone_intensity ON pheromone_trails(intensity);
+
+      -- Agent belief states for theory of mind
+      CREATE TABLE IF NOT EXISTS agent_beliefs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        swarm_id TEXT NOT NULL,
+        agent_handle TEXT NOT NULL,
+        belief_type TEXT NOT NULL CHECK (belief_type IN ('knowledge', 'assumption', 'inference', 'observation')),
+        subject TEXT NOT NULL,
+        belief_value TEXT NOT NULL,
+        confidence REAL NOT NULL DEFAULT 0.5 CHECK (confidence >= 0.0 AND confidence <= 1.0),
+        source_handle TEXT,
+        source_type TEXT CHECK (source_type IN ('direct', 'inferred', 'communicated', 'observed')),
+        valid_until INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        UNIQUE(swarm_id, agent_handle, subject)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_beliefs_agent ON agent_beliefs(swarm_id, agent_handle);
+      CREATE INDEX IF NOT EXISTS idx_beliefs_subject ON agent_beliefs(subject);
+      CREATE INDEX IF NOT EXISTS idx_beliefs_confidence ON agent_beliefs(confidence);
+
+      -- Agent meta-beliefs (beliefs about other agents)
+      CREATE TABLE IF NOT EXISTS agent_meta_beliefs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        swarm_id TEXT NOT NULL,
+        agent_handle TEXT NOT NULL,
+        about_handle TEXT NOT NULL,
+        meta_type TEXT NOT NULL CHECK (meta_type IN ('capability', 'reliability', 'knowledge', 'intention', 'workload')),
+        belief_value TEXT NOT NULL,
+        confidence REAL NOT NULL DEFAULT 0.5 CHECK (confidence >= 0.0 AND confidence <= 1.0),
+        evidence_count INTEGER DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        UNIQUE(swarm_id, agent_handle, about_handle, meta_type)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_meta_beliefs_holder ON agent_meta_beliefs(swarm_id, agent_handle);
+      CREATE INDEX IF NOT EXISTS idx_meta_beliefs_about ON agent_meta_beliefs(about_handle);
+
+      -- Game-theoretic payoffs for tasks
+      CREATE TABLE IF NOT EXISTS task_payoffs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id TEXT NOT NULL,
+        swarm_id TEXT,
+        payoff_type TEXT NOT NULL CHECK (payoff_type IN ('completion', 'quality', 'speed', 'cooperation', 'penalty')),
+        base_value REAL NOT NULL,
+        multiplier REAL DEFAULT 1.0,
+        deadline INTEGER,
+        decay_rate REAL DEFAULT 0.0,
+        dependencies TEXT DEFAULT '[]',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_payoffs_task ON task_payoffs(task_id);
+      CREATE INDEX IF NOT EXISTS idx_payoffs_swarm ON task_payoffs(swarm_id);
+
+      -- Agent credits & reputation ledger
+      CREATE TABLE IF NOT EXISTS agent_credits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        swarm_id TEXT NOT NULL,
+        agent_handle TEXT NOT NULL,
+        balance REAL NOT NULL DEFAULT 100.0,
+        reputation_score REAL NOT NULL DEFAULT 0.5 CHECK (reputation_score >= 0.0 AND reputation_score <= 1.0),
+        total_earned REAL DEFAULT 0.0,
+        total_spent REAL DEFAULT 0.0,
+        task_count INTEGER DEFAULT 0,
+        success_count INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        UNIQUE(swarm_id, agent_handle)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_credits_agent ON agent_credits(swarm_id, agent_handle);
+      CREATE INDEX IF NOT EXISTS idx_credits_reputation ON agent_credits(reputation_score DESC);
+
+      -- Credit transactions (audit log)
+      CREATE TABLE IF NOT EXISTS credit_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        swarm_id TEXT NOT NULL,
+        agent_handle TEXT NOT NULL,
+        transaction_type TEXT NOT NULL CHECK (transaction_type IN ('earn', 'spend', 'bonus', 'penalty', 'transfer', 'adjustment')),
+        amount REAL NOT NULL,
+        balance_after REAL NOT NULL,
+        reference_type TEXT,
+        reference_id TEXT,
+        reason TEXT,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_transactions_agent ON credit_transactions(swarm_id, agent_handle, created_at);
+      CREATE INDEX IF NOT EXISTS idx_transactions_reference ON credit_transactions(reference_type, reference_id);
+
+      -- Consensus proposals for voting
+      CREATE TABLE IF NOT EXISTS consensus_proposals (
+        id TEXT PRIMARY KEY,
+        swarm_id TEXT NOT NULL,
+        proposer_handle TEXT NOT NULL,
+        proposal_type TEXT NOT NULL CHECK (proposal_type IN ('decision', 'election', 'approval', 'ranking', 'allocation')),
+        title TEXT NOT NULL,
+        description TEXT,
+        options TEXT NOT NULL,
+        voting_method TEXT NOT NULL DEFAULT 'majority' CHECK (voting_method IN ('majority', 'supermajority', 'unanimous', 'ranked', 'weighted')),
+        quorum_type TEXT DEFAULT 'percentage' CHECK (quorum_type IN ('percentage', 'absolute')),
+        quorum_value REAL DEFAULT 0.5,
+        weight_by_reputation INTEGER DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed', 'passed', 'failed', 'cancelled')),
+        deadline INTEGER,
+        result TEXT,
+        created_at INTEGER NOT NULL,
+        closed_at INTEGER
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_proposals_swarm ON consensus_proposals(swarm_id, status);
+      CREATE INDEX IF NOT EXISTS idx_proposals_proposer ON consensus_proposals(proposer_handle);
+
+      -- Consensus votes
+      CREATE TABLE IF NOT EXISTS consensus_votes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        proposal_id TEXT NOT NULL,
+        voter_handle TEXT NOT NULL,
+        vote_value TEXT NOT NULL,
+        vote_weight REAL DEFAULT 1.0,
+        rationale TEXT,
+        created_at INTEGER NOT NULL,
+        UNIQUE(proposal_id, voter_handle),
+        FOREIGN KEY (proposal_id) REFERENCES consensus_proposals(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_votes_proposal ON consensus_votes(proposal_id);
+
+      -- Task bids for market-based allocation
+      CREATE TABLE IF NOT EXISTS task_bids (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        swarm_id TEXT NOT NULL,
+        bidder_handle TEXT NOT NULL,
+        bid_amount REAL NOT NULL,
+        estimated_duration INTEGER,
+        confidence REAL DEFAULT 0.5 CHECK (confidence >= 0.0 AND confidence <= 1.0),
+        rationale TEXT,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'withdrawn', 'expired')),
+        created_at INTEGER NOT NULL,
+        processed_at INTEGER
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_bids_task ON task_bids(task_id, status);
+      CREATE INDEX IF NOT EXISTS idx_bids_bidder ON task_bids(bidder_handle);
+      CREATE INDEX IF NOT EXISTS idx_bids_swarm ON task_bids(swarm_id);
     `);
   }
 
@@ -534,6 +731,26 @@ export class SQLiteStorage implements TeamStorage {
       getSwarm: this.db.prepare('SELECT * FROM swarms WHERE id = ?'),
       getAllSwarms: this.db.prepare('SELECT * FROM swarms ORDER BY created_at DESC'),
       deleteSwarm: this.db.prepare('DELETE FROM swarms WHERE id = ?'),
+
+      // Swarm Templates
+      insertTemplate: this.db.prepare(`
+        INSERT INTO swarm_templates (id, name, description, is_builtin, phases, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `),
+      getTemplate: this.db.prepare('SELECT * FROM swarm_templates WHERE id = ?'),
+      getTemplateByName: this.db.prepare('SELECT * FROM swarm_templates WHERE name = ?'),
+      getAllTemplates: this.db.prepare('SELECT * FROM swarm_templates ORDER BY created_at DESC'),
+      getBuiltinTemplates: this.db.prepare(
+        'SELECT * FROM swarm_templates WHERE is_builtin = 1 ORDER BY name'
+      ),
+      getUserTemplates: this.db.prepare(
+        'SELECT * FROM swarm_templates WHERE is_builtin = 0 ORDER BY created_at DESC'
+      ),
+      updateTemplate: this.db.prepare(`
+        UPDATE swarm_templates SET name = ?, description = ?, phases = ?, updated_at = ?
+        WHERE id = ? AND is_builtin = 0
+      `),
+      deleteTemplate: this.db.prepare('DELETE FROM swarm_templates WHERE id = ? AND is_builtin = 0'),
     };
   }
 
@@ -1395,6 +1612,187 @@ export class SQLiteStorage implements TeamStorage {
 
   deleteSwarm(swarmId: string): void {
     this.stmts.deleteSwarm.run(swarmId);
+  }
+
+  // ============================================================================
+  // Swarm Templates
+  // ============================================================================
+
+  private mapTemplateRow(row: {
+    id: string;
+    name: string;
+    description: string | null;
+    is_builtin: number;
+    phases: string;
+    created_at: number;
+    updated_at: number;
+  }): SwarmTemplate {
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      isBuiltin: row.is_builtin === 1,
+      phases: JSON.parse(row.phases) as SwarmTemplate['phases'],
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  insertTemplate(template: SwarmTemplate): void {
+    this.stmts.insertTemplate.run(
+      template.id,
+      template.name,
+      template.description,
+      template.isBuiltin ? 1 : 0,
+      JSON.stringify(template.phases),
+      template.createdAt,
+      template.updatedAt
+    );
+  }
+
+  getTemplate(id: string): SwarmTemplate | null {
+    const row = this.stmts.getTemplate.get(id) as {
+      id: string;
+      name: string;
+      description: string | null;
+      is_builtin: number;
+      phases: string;
+      created_at: number;
+      updated_at: number;
+    } | undefined;
+
+    if (!row) return null;
+    return this.mapTemplateRow(row);
+  }
+
+  getTemplateByName(name: string): SwarmTemplate | null {
+    const row = this.stmts.getTemplateByName.get(name) as {
+      id: string;
+      name: string;
+      description: string | null;
+      is_builtin: number;
+      phases: string;
+      created_at: number;
+      updated_at: number;
+    } | undefined;
+
+    if (!row) return null;
+    return this.mapTemplateRow(row);
+  }
+
+  getAllTemplates(options?: { builtin?: boolean; limit?: number }): SwarmTemplate[] {
+    let rows: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      is_builtin: number;
+      phases: string;
+      created_at: number;
+      updated_at: number;
+    }>;
+
+    if (options?.builtin === true) {
+      rows = this.stmts.getBuiltinTemplates.all() as typeof rows;
+    } else if (options?.builtin === false) {
+      rows = this.stmts.getUserTemplates.all() as typeof rows;
+    } else {
+      rows = this.stmts.getAllTemplates.all() as typeof rows;
+    }
+
+    if (options?.limit) {
+      rows = rows.slice(0, options.limit);
+    }
+
+    return rows.map((row) => this.mapTemplateRow(row));
+  }
+
+  updateTemplate(
+    id: string,
+    updates: Partial<Pick<SwarmTemplate, 'name' | 'description' | 'phases'>>
+  ): SwarmTemplate | null {
+    const existing = this.getTemplate(id);
+    if (!existing || existing.isBuiltin) return null;
+
+    const updated: SwarmTemplate = {
+      ...existing,
+      name: updates.name ?? existing.name,
+      description: updates.description !== undefined ? updates.description : existing.description,
+      phases: updates.phases ?? existing.phases,
+      updatedAt: Date.now(),
+    };
+
+    const result = this.stmts.updateTemplate.run(
+      updated.name,
+      updated.description,
+      JSON.stringify(updated.phases),
+      updated.updatedAt,
+      id
+    );
+
+    if (result.changes === 0) return null;
+    return updated;
+  }
+
+  deleteTemplate(id: string): boolean {
+    const template = this.getTemplate(id);
+    if (!template || template.isBuiltin) return false;
+
+    const result = this.stmts.deleteTemplate.run(id);
+    return result.changes > 0;
+  }
+
+  seedBuiltinTemplates(): void {
+    const templates: SwarmTemplate[] = [
+      {
+        id: 'builtin-feature-dev',
+        name: 'feature-development',
+        description: 'Standard feature development with discovery through delivery',
+        isBuiltin: true,
+        phases: {
+          discovery: ['product-analyst', 'architect'],
+          development: ['backend-dev', 'frontend-dev'],
+          quality: ['qa-engineer', 'security-engineer'],
+          delivery: ['tech-writer'],
+        },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+      {
+        id: 'builtin-backend-api',
+        name: 'backend-api',
+        description: 'Backend API development focused',
+        isBuiltin: true,
+        phases: {
+          discovery: ['architect'],
+          development: ['backend-dev', 'data-engineer'],
+          quality: ['qa-engineer', 'performance-engineer'],
+          delivery: ['devops-engineer'],
+        },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+      {
+        id: 'builtin-quick-fix',
+        name: 'quick-fix',
+        description: 'Fast bug fix with minimal overhead',
+        isBuiltin: true,
+        phases: {
+          discovery: [],
+          development: ['fullstack-dev'],
+          quality: ['qa-engineer'],
+          delivery: [],
+        },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    ];
+
+    for (const template of templates) {
+      const existing = this.getTemplate(template.id);
+      if (!existing) {
+        this.insertTemplate(template);
+      }
+    }
   }
 
   // ============================================================================

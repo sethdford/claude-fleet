@@ -15,7 +15,6 @@ import {
 import type {
   ErrorResponse,
   WorkItemStatus,
-  WorkItem,
 } from '../types.js';
 import type { RouteDependencies } from './types.js';
 import { asyncHandler } from './types.js';

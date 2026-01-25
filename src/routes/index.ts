@@ -134,3 +134,68 @@ export {
   createDeleteTriggerHandler,
   createGetExecutionEventsHandler,
 } from './workflows.js';
+
+// Audit routes (codebase health checks and audit loop)
+export {
+  createAuditStatusHandler,
+  createAuditOutputHandler,
+  createAuditStartHandler,
+  createAuditStopHandler,
+  createQuickAuditHandler,
+} from './audit.js';
+
+// Template routes (swarm templates management)
+export {
+  createCreateTemplateHandler,
+  createListTemplatesHandler,
+  createGetTemplateHandler,
+  createUpdateTemplateHandler,
+  createDeleteTemplateHandler,
+  createRunTemplateHandler,
+} from './templates.js';
+
+// Swarm intelligence routes (stigmergic coordination, beliefs, credits, consensus, bidding)
+export {
+  // Pheromone trails
+  createDepositPheromoneHandler,
+  createQueryPheromonesHandler,
+  createGetResourceTrailsHandler,
+  createGetResourceActivityHandler,
+  createDecayPheromonesHandler,
+  createPheromoneStatsHandler,
+  // Agent beliefs
+  createUpsertBeliefHandler,
+  createGetBeliefsHandler,
+  createUpsertMetaBeliefHandler,
+  createGetSwarmConsensusHandler,
+  createBeliefStatsHandler,
+  // Credits & reputation
+  createGetCreditsHandler,
+  createGetLeaderboardHandler,
+  createTransferCreditsHandler,
+  createRecordTransactionHandler,
+  createGetCreditHistoryHandler,
+  createCreditStatsHandler,
+  // Consensus voting
+  createCreateProposalHandler,
+  createListProposalsHandler,
+  createGetProposalHandler,
+  createCastVoteHandler,
+  createCloseProposalHandler,
+  createConsensusStatsHandler,
+  // Task bidding
+  createSubmitBidHandler,
+  createGetTaskBidsHandler,
+  createGetBidHandler,
+  createAcceptBidHandler,
+  createWithdrawBidHandler,
+  createEvaluateBidsHandler,
+  createBiddingStatsHandler,
+  // Payoffs
+  createDefinePayoffHandler,
+  createCalculatePayoffHandler,
+  createGetPayoffsHandler,
+  // Additional handlers
+  createUpdateReputationHandler,
+  createRunAuctionHandler,
+} from './swarm-intelligence.js';

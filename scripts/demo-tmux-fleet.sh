@@ -42,16 +42,18 @@ fi
 echo -e "${GREEN}✓ Running inside tmux${NC}"
 echo ""
 
-# Check if cct is available
-if ! command -v cct &> /dev/null; then
-    echo -e "${YELLOW}cct command not found, using npx...${NC}"
-    CF="npx tsx apps/cli/src/index.ts"
-else
-    CF="cct"
-fi
-
 cd "$(dirname "$0")/.."
 PROJECT_DIR=$(pwd)
+
+# Check if cct/cf is available
+if command -v cct &> /dev/null; then
+    CF="cct"
+elif [ -x "$PROJECT_DIR/cf" ]; then
+    CF="$PROJECT_DIR/cf"
+else
+    echo -e "${YELLOW}cct command not found, using local ./cf runner...${NC}"
+    CF="node $PROJECT_DIR/apps/cli/dist/index.js"
+fi
 echo -e "${BLUE}Project directory: ${PROJECT_DIR}${NC}"
 echo ""
 

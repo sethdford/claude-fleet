@@ -41,7 +41,7 @@ export function lmshCommand(): Command {
       try {
         const lmshModule = await import('@claude-fleet/lmsh') as LmshModule;
         translator = lmshModule.createTranslator();
-      } catch (err) {
+      } catch {
         console.log(chalk.yellow('LMSH native module not available.'));
         console.log(chalk.dim('Build Rust crates with: pnpm build:rust'));
         console.log(chalk.dim('\nUsing fallback pattern matcher...\n'));

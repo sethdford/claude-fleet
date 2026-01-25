@@ -10,7 +10,7 @@ import {
   sendMailSchema,
   createHandoffSchema,
 } from '../validation/schemas.js';
-import type { ErrorResponse, SendMailOptions } from '../types.js';
+import type { ErrorResponse } from '../types.js';
 import type { RouteDependencies } from './types.js';
 import { asyncHandler } from './types.js';
 

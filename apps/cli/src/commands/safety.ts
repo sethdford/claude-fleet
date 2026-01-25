@@ -5,6 +5,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { SafetyManager } from '@claude-fleet/safety';
+import type { OperationType } from '@claude-fleet/safety';
 
 export function safetyCommands(): Command {
   const safety = new Command('safety')
@@ -107,7 +108,7 @@ export function safetyCommands(): Command {
     .action(async (path, options) => {
       const manager = new SafetyManager();
       const result = manager.check({
-        operation: options.operation as any,
+        operation: options.operation as OperationType,
         filePath: path,
       });
 

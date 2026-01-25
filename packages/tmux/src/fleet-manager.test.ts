@@ -4,7 +4,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FleetTmuxManager } from './fleet-manager.js';
-import { TmuxController } from './controller.js';
 
 // Mock the controller
 vi.mock('./controller.js', () => ({

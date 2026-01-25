@@ -12,11 +12,9 @@ import { EventEmitter } from 'node:events';
 import type { WorkflowStorage } from '../storage/workflow.js';
 import type { IWorkItemStorage, IBlackboardStorage } from '../storage/interfaces.js';
 import type {
-  Workflow,
   WorkflowExecution,
   WorkflowStep,
   WorkflowStepStatus,
-  WorkflowStatus,
   WorkflowGuard,
   WorkflowTrigger,
   TaskStepConfig,
@@ -665,8 +663,8 @@ export class WorkflowEngine extends EventEmitter {
    * Execute a parallel step
    */
   private async executeParallelStep(
-    step: WorkflowStep,
-    execution: WorkflowExecution
+    _step: WorkflowStep,
+    _execution: WorkflowExecution
   ): Promise<Record<string, unknown>> {
     // Parallel steps just mark their sub-steps as ready
     // The engine will process them in subsequent iterations

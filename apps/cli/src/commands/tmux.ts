@@ -164,7 +164,7 @@ export function tmuxCommands(): Command {
     .option('--json', 'Output as JSON')
     .action(async (handle, commandParts, options) => {
       const command = commandParts.join(' ');
-      const spinner = ora(`Executing command...`).start();
+      const spinner = ora('Executing command...').start();
 
       try {
         const result = await manager.executeInWorker(handle, command, {
@@ -234,7 +234,7 @@ export function tmuxCommands(): Command {
         if (found) {
           spinner.succeed(`Pattern found in ${handle}`);
         } else {
-          spinner.warn(`Pattern not found before timeout`);
+          spinner.warn('Pattern not found before timeout');
           process.exit(1);
         }
       } catch (error) {
@@ -321,7 +321,7 @@ export function tmuxCommands(): Command {
 
       try {
         await manager.broadcast(message);
-        console.log(chalk.green(`Message broadcast to all workers`));
+        console.log(chalk.green('Message broadcast to all workers'));
       } catch (error) {
         console.error(chalk.red(`Failed: ${(error as Error).message}`));
         process.exit(1);

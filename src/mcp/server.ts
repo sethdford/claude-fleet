@@ -884,6 +884,123 @@ function createServer(): Server {
       },
 
       // ============================================================================
+      // Templates (Swarm Configuration)
+      // ============================================================================
+      {
+        name: 'template_list',
+        description: 'List all available swarm templates',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            builtin_only: {
+              type: 'boolean',
+              description: 'Only show builtin templates (default: false)',
+            },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'template_get',
+        description: 'Get details of a specific template including phases and roles',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            template_id: {
+              type: 'string',
+              description: 'The template ID to retrieve',
+            },
+          },
+          required: ['template_id'],
+        },
+      },
+      {
+        name: 'template_run',
+        description: 'Run a template to spawn a new swarm with pre-configured agents',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            template_id: {
+              type: 'string',
+              description: 'The template ID to run',
+            },
+            swarm_name: {
+              type: 'string',
+              description: 'Custom name for the swarm (auto-generated if not provided)',
+            },
+          },
+          required: ['template_id'],
+        },
+      },
+
+      // ============================================================================
+      // Audit System (Codebase Health)
+      // ============================================================================
+      {
+        name: 'audit_status',
+        description: 'Get the current status of the codebase audit loop (running, idle, iteration count)',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+      },
+      {
+        name: 'audit_output',
+        description: 'Get audit output logs with pagination',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            since: {
+              type: 'number',
+              description: 'Line number to start from (default: 0)',
+            },
+            limit: {
+              type: 'number',
+              description: 'Maximum lines to return (default: 100, max: 1000)',
+            },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'audit_start',
+        description: 'Start the codebase audit loop (typecheck, lint, tests, build)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            dry_run: {
+              type: 'boolean',
+              description: 'Run in dry-run mode without making changes (default: false)',
+            },
+            max_iterations: {
+              type: 'number',
+              description: 'Maximum iterations before stopping (default: unlimited)',
+            },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'audit_stop',
+        description: 'Stop the currently running audit loop',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+      },
+      {
+        name: 'audit_quick',
+        description: 'Run a quick one-time audit check (typecheck, lint, tests, build) without looping',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+      },
+
+      // ============================================================================
       // Spawn Control (Fleet Coordination)
       // ============================================================================
       {
@@ -1086,6 +1203,430 @@ function createServer(): Server {
           type: 'object',
           properties: {},
           required: [],
+        },
+      },
+
+      // ============================================================================
+      // Swarm Intelligence - Pheromones (Stigmergic Coordination)
+      // ============================================================================
+      {
+        name: 'pheromone_deposit',
+        description: 'Deposit a pheromone trail on a resource to signal activity',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            resource_type: { type: 'string', enum: ['file', 'task', 'endpoint', 'module', 'custom'], description: 'Type of resource' },
+            resource_id: { type: 'string', description: 'Resource identifier (file path, task ID, etc.)' },
+            trail_type: { type: 'string', enum: ['touch', 'modify', 'complete', 'error', 'warning', 'success'], description: 'Type of activity' },
+            intensity: { type: 'number', description: 'Signal intensity 0-1 (default: 1.0)' },
+          },
+          required: ['resource_type', 'resource_id', 'trail_type'],
+        },
+      },
+      {
+        name: 'pheromone_query',
+        description: 'Query pheromone trails to see where other agents have been active',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            resource_type: { type: 'string', description: 'Filter by resource type' },
+            min_intensity: { type: 'number', description: 'Minimum intensity threshold' },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'pheromone_hot_resources',
+        description: 'Get resources with high pheromone activity (hot spots)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            resource_type: { type: 'string', description: 'Filter by resource type' },
+            limit: { type: 'number', description: 'Max resources to return (default: 20)' },
+          },
+          required: [],
+        },
+      },
+
+      // ============================================================================
+      // Swarm Intelligence - Beliefs (Theory of Mind)
+      // ============================================================================
+      {
+        name: 'belief_set',
+        description: 'Record a belief about a subject (what you know or think)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            subject: { type: 'string', description: 'What the belief is about (e.g., "auth_system_complexity")' },
+            value: { type: 'string', description: 'The belief value/content' },
+            belief_type: { type: 'string', enum: ['knowledge', 'assumption', 'inference', 'observation'], description: 'Type of belief' },
+            confidence: { type: 'number', description: 'Confidence level 0-1 (default: 0.5)' },
+          },
+          required: ['subject', 'value'],
+        },
+      },
+      {
+        name: 'belief_get',
+        description: 'Get your beliefs or another agent\'s beliefs',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            agent_handle: { type: 'string', description: 'Agent handle (default: yourself)' },
+            belief_type: { type: 'string', description: 'Filter by belief type' },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'belief_consensus',
+        description: 'Get the swarm consensus on a subject (aggregated beliefs)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            subject: { type: 'string', description: 'Subject to get consensus on' },
+            min_confidence: { type: 'number', description: 'Minimum confidence threshold' },
+          },
+          required: ['subject'],
+        },
+      },
+
+      // ============================================================================
+      // Swarm Intelligence - Credits & Reputation
+      // ============================================================================
+      {
+        name: 'credits_balance',
+        description: 'Get your credit balance and reputation score',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'credits_leaderboard',
+        description: 'Get the credit/reputation leaderboard for the swarm',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            order_by: { type: 'string', enum: ['balance', 'reputation', 'earned', 'tasks'], description: 'Sort order (default: balance)' },
+            limit: { type: 'number', description: 'Max entries to return (default: 10)' },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'credits_transfer',
+        description: 'Transfer credits to another agent',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            to_handle: { type: 'string', description: 'Agent to transfer credits to' },
+            amount: { type: 'number', description: 'Amount to transfer' },
+            reason: { type: 'string', description: 'Reason for transfer' },
+          },
+          required: ['to_handle', 'amount'],
+        },
+      },
+      {
+        name: 'credits_history',
+        description: 'Get your credit transaction history',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            limit: { type: 'number', description: 'Max transactions to return' },
+          },
+          required: [],
+        },
+      },
+
+      // ============================================================================
+      // Swarm Intelligence - Consensus Voting
+      // ============================================================================
+      {
+        name: 'proposal_create',
+        description: 'Create a proposal for the swarm to vote on',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            title: { type: 'string', description: 'Proposal title' },
+            options: { type: 'array', items: { type: 'string' }, description: 'Voting options (min 2)' },
+            voting_method: { type: 'string', enum: ['majority', 'supermajority', 'plurality', 'ranked', 'unanimous'], description: 'Voting method (default: majority)' },
+            deadline: { type: 'number', description: 'Deadline timestamp (optional)' },
+          },
+          required: ['title', 'options'],
+        },
+      },
+      {
+        name: 'proposal_list',
+        description: 'List proposals in the swarm',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            status: { type: 'string', enum: ['active', 'closed', 'all'], description: 'Filter by status' },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'proposal_vote',
+        description: 'Cast your vote on a proposal',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            proposal_id: { type: 'string', description: 'Proposal ID' },
+            vote_value: { type: 'string', description: 'Your vote (must match one of the options)' },
+            rationale: { type: 'string', description: 'Optional rationale for your vote' },
+          },
+          required: ['proposal_id', 'vote_value'],
+        },
+      },
+      {
+        name: 'proposal_close',
+        description: 'Close a proposal and tally the votes (lead only)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            proposal_id: { type: 'string', description: 'Proposal ID to close' },
+          },
+          required: ['proposal_id'],
+        },
+      },
+
+      // ============================================================================
+      // Swarm Intelligence - Task Bidding
+      // ============================================================================
+      {
+        name: 'bid_submit',
+        description: 'Submit a bid on a task',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            swarm_id: { type: 'string', description: 'Swarm ID (uses current swarm if not provided)' },
+            task_id: { type: 'string', description: 'Task to bid on' },
+            bid_amount: { type: 'number', description: 'Your bid amount (credits)' },
+            confidence: { type: 'number', description: 'Confidence you can complete (0-1)' },
+            rationale: { type: 'string', description: 'Why you should win this bid' },
+          },
+          required: ['task_id', 'bid_amount'],
+        },
+      },
+      {
+        name: 'bid_list',
+        description: 'List bids for a task',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task_id: { type: 'string', description: 'Task ID' },
+            status: { type: 'string', enum: ['pending', 'accepted', 'rejected', 'withdrawn'], description: 'Filter by status' },
+          },
+          required: ['task_id'],
+        },
+      },
+      {
+        name: 'bid_accept',
+        description: 'Accept a winning bid (lead only)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            bid_id: { type: 'string', description: 'Bid ID to accept' },
+            settle_credits: { type: 'boolean', description: 'Deduct credits from winner (default: true)' },
+          },
+          required: ['bid_id'],
+        },
+      },
+      {
+        name: 'bid_withdraw',
+        description: 'Withdraw your bid',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            bid_id: { type: 'string', description: 'Bid ID to withdraw' },
+          },
+          required: ['bid_id'],
+        },
+      },
+      {
+        name: 'auction_run',
+        description: 'Run an auction to automatically select a winner (lead only)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task_id: { type: 'string', description: 'Task ID to auction' },
+            auction_type: { type: 'string', enum: ['first-price', 'second-price'], description: 'Auction type (default: first-price)' },
+          },
+          required: ['task_id'],
+        },
+      },
+
+      // ============================================================================
+      // Swarm Intelligence - Payoffs
+      // ============================================================================
+      {
+        name: 'payoff_define',
+        description: 'Define a payoff structure for a task',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task_id: { type: 'string', description: 'Task ID' },
+            swarm_id: { type: 'string', description: 'Swarm ID (optional)' },
+            payoff_type: { type: 'string', enum: ['completion', 'quality', 'speed', 'cooperation', 'penalty'], description: 'Type of payoff' },
+            base_value: { type: 'number', description: 'Base payoff value' },
+            deadline: { type: 'number', description: 'Deadline timestamp for time-based decay' },
+          },
+          required: ['task_id', 'payoff_type', 'base_value'],
+        },
+      },
+      {
+        name: 'payoff_calculate',
+        description: 'Calculate the current payoff value for a task',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task_id: { type: 'string', description: 'Task ID' },
+          },
+          required: ['task_id'],
+        },
+      },
+
+      // ============================================================================
+      // Workflows (DAG-based Task Automation)
+      // ============================================================================
+      {
+        name: 'workflow_list',
+        description: 'List all workflows',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            is_template: { type: 'boolean', description: 'Filter by template status' },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'workflow_get',
+        description: 'Get workflow details including steps',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workflow_id: { type: 'string', description: 'Workflow ID' },
+          },
+          required: ['workflow_id'],
+        },
+      },
+      {
+        name: 'workflow_start',
+        description: 'Start a workflow execution (lead only)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workflow_id: { type: 'string', description: 'Workflow ID to start' },
+            inputs: { type: 'object', description: 'Input parameters for the workflow' },
+            swarm_id: { type: 'string', description: 'Swarm to run in (optional)' },
+          },
+          required: ['workflow_id'],
+        },
+      },
+      {
+        name: 'execution_list',
+        description: 'List workflow executions',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workflow_id: { type: 'string', description: 'Filter by workflow ID' },
+            status: { type: 'string', enum: ['pending', 'running', 'paused', 'completed', 'failed', 'cancelled'], description: 'Filter by status' },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'execution_get',
+        description: 'Get execution details including step statuses',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            execution_id: { type: 'string', description: 'Execution ID' },
+          },
+          required: ['execution_id'],
+        },
+      },
+      {
+        name: 'execution_steps',
+        description: 'Get all steps for an execution',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            execution_id: { type: 'string', description: 'Execution ID' },
+          },
+          required: ['execution_id'],
+        },
+      },
+      {
+        name: 'execution_pause',
+        description: 'Pause a running execution (lead only)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            execution_id: { type: 'string', description: 'Execution ID to pause' },
+          },
+          required: ['execution_id'],
+        },
+      },
+      {
+        name: 'execution_resume',
+        description: 'Resume a paused execution (lead only)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            execution_id: { type: 'string', description: 'Execution ID to resume' },
+          },
+          required: ['execution_id'],
+        },
+      },
+      {
+        name: 'execution_cancel',
+        description: 'Cancel an execution (lead only)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            execution_id: { type: 'string', description: 'Execution ID to cancel' },
+          },
+          required: ['execution_id'],
+        },
+      },
+      {
+        name: 'step_complete',
+        description: 'Mark a step as completed with output',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            step_id: { type: 'string', description: 'Step ID' },
+            output: { type: 'object', description: 'Step output data' },
+          },
+          required: ['step_id'],
+        },
+      },
+      {
+        name: 'step_retry',
+        description: 'Retry a failed step',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            step_id: { type: 'string', description: 'Step ID to retry' },
+          },
+          required: ['step_id'],
         },
       },
 
@@ -1617,9 +2158,8 @@ function createServer(): Server {
             return formatResponse('Agent not registered. Set CLAUDE_CODE_AGENT_NAME', true);
           }
 
-          const { checkpoint_id, latest } = args as {
+          const { checkpoint_id } = args as {
             checkpoint_id?: number;
-            latest?: boolean;
           };
 
           let path: string;
@@ -1742,6 +2282,77 @@ function createServer(): Server {
             targetHandle: null, // null = broadcast to all
             priority: priority ?? 'high',
           });
+          return formatResponse(result);
+        }
+
+        // ============================================================================
+        // Templates (Swarm Configuration)
+        // ============================================================================
+        case 'template_list': {
+          const { builtin_only } = args as { builtin_only?: boolean };
+
+          const params: string[] = [];
+          if (builtin_only) params.push('builtin=true');
+
+          const query = params.length > 0 ? `?${params.join('&')}` : '';
+          const templates = await callApi('GET', `/templates${query}`);
+          return formatResponse(templates);
+        }
+
+        case 'template_get': {
+          const { template_id } = args as { template_id: string };
+
+          const template = await callApi('GET', `/templates/${encodeURIComponent(template_id)}`);
+          return formatResponse(template);
+        }
+
+        case 'template_run': {
+          const permError = checkPermission('spawn');
+          if (permError) return permError;
+
+          const { template_id, swarm_name } = args as {
+            template_id: string;
+            swarm_name?: string;
+          };
+
+          const body: Record<string, unknown> = {};
+          if (swarm_name) body.swarmName = swarm_name;
+
+          const result = await callApi('POST', `/templates/${encodeURIComponent(template_id)}/run`, body);
+          return formatResponse(result);
+        }
+
+        // ============================================================================
+        // Audit System (Codebase Health)
+        // ============================================================================
+        case 'audit_status': {
+          const result = await callApi('GET', '/audit/status');
+          return formatResponse(result);
+        }
+
+        case 'audit_output': {
+          const { since = 0, limit = 100 } = args as { since?: number; limit?: number };
+          const cappedLimit = Math.min(limit, 1000);
+          const result = await callApi('GET', `/audit/output?since=${since}&limit=${cappedLimit}`);
+          return formatResponse(result);
+        }
+
+        case 'audit_start': {
+          const { dry_run, max_iterations } = args as { dry_run?: boolean; max_iterations?: number };
+          const body: Record<string, unknown> = {};
+          if (dry_run !== undefined) body.dryRun = dry_run;
+          if (max_iterations !== undefined) body.maxIterations = max_iterations;
+          const result = await callApi('POST', '/audit/start', body);
+          return formatResponse(result);
+        }
+
+        case 'audit_stop': {
+          const result = await callApi('POST', '/audit/stop');
+          return formatResponse(result);
+        }
+
+        case 'audit_quick': {
+          const result = await callApi('POST', '/audit/quick');
           return formatResponse(result);
         }
 
@@ -1884,6 +2495,558 @@ function createServer(): Server {
 
         case 'tldr_stats': {
           const result = await callApi('GET', '/tldr/stats');
+          return formatResponse(result);
+        }
+
+        // ============================================================================
+        // Swarm Intelligence - Pheromones (Stigmergic Coordination)
+        // ============================================================================
+        case 'pheromone_deposit': {
+          const myHandle = process.env.CLAUDE_CODE_AGENT_NAME;
+          if (!myHandle) {
+            return formatResponse('Agent not registered. Set CLAUDE_CODE_AGENT_NAME', true);
+          }
+
+          const { swarm_id, resource_type, resource_id, trail_type, intensity } = args as {
+            swarm_id?: string;
+            resource_type: string;
+            resource_id: string;
+            trail_type: string;
+            intensity?: number;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const result = await callApi('POST', '/pheromones', {
+            swarmId: swarmResult.swarmId,
+            depositorHandle: myHandle,
+            resourceType: resource_type,
+            resourceId: resource_id,
+            trailType: trail_type,
+            intensity: intensity ?? 1.0,
+          });
+          return formatResponse(result);
+        }
+
+        case 'pheromone_query': {
+          const { swarm_id, resource_type, min_intensity } = args as {
+            swarm_id?: string;
+            resource_type?: string;
+            min_intensity?: number;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const params: string[] = ['activeOnly=true'];
+          if (resource_type) params.push(`resourceType=${encodeURIComponent(resource_type)}`);
+          if (min_intensity) params.push(`minIntensity=${min_intensity}`);
+
+          const path = `/pheromones/${encodeURIComponent(swarmResult.swarmId)}?${params.join('&')}`;
+          const result = await callApi('GET', path);
+          return formatResponse(result);
+        }
+
+        case 'pheromone_hot_resources': {
+          const { swarm_id, resource_type, limit } = args as {
+            swarm_id?: string;
+            resource_type?: string;
+            limit?: number;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const params: string[] = [];
+          if (resource_type) params.push(`resourceType=${encodeURIComponent(resource_type)}`);
+          if (limit) params.push(`limit=${limit}`);
+
+          const query = params.length > 0 ? `?${params.join('&')}` : '';
+          const path = `/pheromones/${encodeURIComponent(swarmResult.swarmId)}/activity${query}`;
+          const result = await callApi('GET', path);
+          return formatResponse(result);
+        }
+
+        // ============================================================================
+        // Swarm Intelligence - Beliefs (Theory of Mind)
+        // ============================================================================
+        case 'belief_set': {
+          const myHandle = process.env.CLAUDE_CODE_AGENT_NAME;
+          if (!myHandle) {
+            return formatResponse('Agent not registered. Set CLAUDE_CODE_AGENT_NAME', true);
+          }
+
+          const { swarm_id, subject, value, belief_type, confidence } = args as {
+            swarm_id?: string;
+            subject: string;
+            value: string;
+            belief_type?: string;
+            confidence?: number;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const result = await callApi('POST', '/beliefs', {
+            swarmId: swarmResult.swarmId,
+            agentHandle: myHandle,
+            subject,
+            beliefValue: value,
+            beliefType: belief_type ?? 'knowledge',
+            confidence: confidence ?? 0.5,
+            sourceType: 'direct',
+          });
+          return formatResponse(result);
+        }
+
+        case 'belief_get': {
+          const myHandle = process.env.CLAUDE_CODE_AGENT_NAME;
+          if (!myHandle) {
+            return formatResponse('Agent not registered. Set CLAUDE_CODE_AGENT_NAME', true);
+          }
+
+          const { swarm_id, agent_handle, belief_type } = args as {
+            swarm_id?: string;
+            agent_handle?: string;
+            belief_type?: string;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const handle = agent_handle ?? myHandle;
+          const params: string[] = [];
+          if (belief_type) params.push(`beliefType=${encodeURIComponent(belief_type)}`);
+          const query = params.length > 0 ? `?${params.join('&')}` : '';
+
+          const path = `/beliefs/${encodeURIComponent(swarmResult.swarmId)}/${encodeURIComponent(handle)}${query}`;
+          const result = await callApi('GET', path);
+          return formatResponse(result);
+        }
+
+        case 'belief_consensus': {
+          const { swarm_id, subject, min_confidence } = args as {
+            swarm_id?: string;
+            subject: string;
+            min_confidence?: number;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const params: string[] = [];
+          if (min_confidence) params.push(`minConfidence=${min_confidence}`);
+          const query = params.length > 0 ? `?${params.join('&')}` : '';
+
+          const path = `/beliefs/${encodeURIComponent(swarmResult.swarmId)}/consensus/${encodeURIComponent(subject)}${query}`;
+          const result = await callApi('GET', path);
+          return formatResponse(result);
+        }
+
+        // ============================================================================
+        // Swarm Intelligence - Credits & Reputation
+        // ============================================================================
+        case 'credits_balance': {
+          const myHandle = process.env.CLAUDE_CODE_AGENT_NAME;
+          if (!myHandle) {
+            return formatResponse('Agent not registered. Set CLAUDE_CODE_AGENT_NAME', true);
+          }
+
+          const { swarm_id } = args as { swarm_id?: string };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const path = `/credits/${encodeURIComponent(swarmResult.swarmId)}/${encodeURIComponent(myHandle)}`;
+          const result = await callApi('GET', path);
+          return formatResponse(result);
+        }
+
+        case 'credits_leaderboard': {
+          const { swarm_id, order_by, limit } = args as {
+            swarm_id?: string;
+            order_by?: string;
+            limit?: number;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const params: string[] = [];
+          if (order_by) params.push(`orderBy=${encodeURIComponent(order_by)}`);
+          if (limit) params.push(`limit=${limit}`);
+          const query = params.length > 0 ? `?${params.join('&')}` : '';
+
+          const path = `/credits/${encodeURIComponent(swarmResult.swarmId)}/leaderboard${query}`;
+          const result = await callApi('GET', path);
+          return formatResponse(result);
+        }
+
+        case 'credits_transfer': {
+          const myHandle = process.env.CLAUDE_CODE_AGENT_NAME;
+          if (!myHandle) {
+            return formatResponse('Agent not registered. Set CLAUDE_CODE_AGENT_NAME', true);
+          }
+
+          const { swarm_id, to_handle, amount, reason } = args as {
+            swarm_id?: string;
+            to_handle: string;
+            amount: number;
+            reason?: string;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const body: Record<string, unknown> = {
+            swarmId: swarmResult.swarmId,
+            fromHandle: myHandle,
+            toHandle: to_handle,
+            amount,
+          };
+          if (reason) body.reason = reason;
+
+          const result = await callApi('POST', '/credits/transfer', body);
+          return formatResponse(result);
+        }
+
+        case 'credits_history': {
+          const myHandle = process.env.CLAUDE_CODE_AGENT_NAME;
+          if (!myHandle) {
+            return formatResponse('Agent not registered. Set CLAUDE_CODE_AGENT_NAME', true);
+          }
+
+          const { swarm_id, limit } = args as {
+            swarm_id?: string;
+            limit?: number;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const params: string[] = [];
+          if (limit) params.push(`limit=${limit}`);
+          const query = params.length > 0 ? `?${params.join('&')}` : '';
+
+          const path = `/credits/${encodeURIComponent(swarmResult.swarmId)}/${encodeURIComponent(myHandle)}/history${query}`;
+          const result = await callApi('GET', path);
+          return formatResponse(result);
+        }
+
+        // ============================================================================
+        // Swarm Intelligence - Consensus Voting
+        // ============================================================================
+        case 'proposal_create': {
+          const myHandle = process.env.CLAUDE_CODE_AGENT_NAME;
+          if (!myHandle) {
+            return formatResponse('Agent not registered. Set CLAUDE_CODE_AGENT_NAME', true);
+          }
+
+          const { swarm_id, title, options, voting_method, deadline } = args as {
+            swarm_id?: string;
+            title: string;
+            options: string[];
+            voting_method?: string;
+            deadline?: number;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const body: Record<string, unknown> = {
+            swarmId: swarmResult.swarmId,
+            proposerHandle: myHandle,
+            title,
+            options,
+            proposalType: 'decision',
+            votingMethod: voting_method ?? 'majority',
+          };
+          if (deadline) body.deadline = deadline;
+
+          const result = await callApi('POST', '/consensus/proposals', body);
+          return formatResponse(result);
+        }
+
+        case 'proposal_list': {
+          const { swarm_id, status } = args as {
+            swarm_id?: string;
+            status?: string;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const params: string[] = [];
+          if (status) params.push(`status=${encodeURIComponent(status)}`);
+          const query = params.length > 0 ? `?${params.join('&')}` : '';
+
+          const path = `/consensus/${encodeURIComponent(swarmResult.swarmId)}/proposals${query}`;
+          const result = await callApi('GET', path);
+          return formatResponse(result);
+        }
+
+        case 'proposal_vote': {
+          const myHandle = process.env.CLAUDE_CODE_AGENT_NAME;
+          if (!myHandle) {
+            return formatResponse('Agent not registered. Set CLAUDE_CODE_AGENT_NAME', true);
+          }
+
+          const { proposal_id, vote_value, rationale } = args as {
+            proposal_id: string;
+            vote_value: string;
+            rationale?: string;
+          };
+
+          const body: Record<string, unknown> = {
+            voterHandle: myHandle,
+            voteValue: vote_value,
+          };
+          if (rationale) body.rationale = rationale;
+
+          const result = await callApi('POST', `/consensus/proposals/${encodeURIComponent(proposal_id)}/vote`, body);
+          return formatResponse(result);
+        }
+
+        case 'proposal_close': {
+          const permError = checkPermission('assign');
+          if (permError) return permError;
+
+          const { proposal_id } = args as { proposal_id: string };
+          const result = await callApi('POST', `/consensus/proposals/${encodeURIComponent(proposal_id)}/close`);
+          return formatResponse(result);
+        }
+
+        // ============================================================================
+        // Swarm Intelligence - Task Bidding
+        // ============================================================================
+        case 'bid_submit': {
+          const myHandle = process.env.CLAUDE_CODE_AGENT_NAME;
+          if (!myHandle) {
+            return formatResponse('Agent not registered. Set CLAUDE_CODE_AGENT_NAME', true);
+          }
+
+          const { swarm_id, task_id, bid_amount, confidence, rationale } = args as {
+            swarm_id?: string;
+            task_id: string;
+            bid_amount: number;
+            confidence?: number;
+            rationale?: string;
+          };
+
+          const swarmResult = requireSwarmId(swarm_id);
+          if (swarmResult.error) return swarmResult.error;
+
+          const body: Record<string, unknown> = {
+            swarmId: swarmResult.swarmId,
+            taskId: task_id,
+            bidderHandle: myHandle,
+            bidAmount: bid_amount,
+            confidence: confidence ?? 0.5,
+          };
+          if (rationale) body.rationale = rationale;
+
+          const result = await callApi('POST', '/bids', body);
+          return formatResponse(result);
+        }
+
+        case 'bid_list': {
+          const { task_id, status } = args as {
+            task_id: string;
+            status?: string;
+          };
+
+          const params: string[] = [];
+          if (status) params.push(`status=${encodeURIComponent(status)}`);
+          const query = params.length > 0 ? `?${params.join('&')}` : '';
+
+          const path = `/bids/task/${encodeURIComponent(task_id)}${query}`;
+          const result = await callApi('GET', path);
+          return formatResponse(result);
+        }
+
+        case 'bid_accept': {
+          const permError = checkPermission('assign');
+          if (permError) return permError;
+
+          const { bid_id, settle_credits } = args as {
+            bid_id: string;
+            settle_credits?: boolean;
+          };
+
+          const result = await callApi('POST', `/bids/${encodeURIComponent(bid_id)}/accept`, {
+            settleCredits: settle_credits ?? true,
+          });
+          return formatResponse(result);
+        }
+
+        case 'bid_withdraw': {
+          const myHandle = process.env.CLAUDE_CODE_AGENT_NAME;
+          if (!myHandle) {
+            return formatResponse('Agent not registered. Set CLAUDE_CODE_AGENT_NAME', true);
+          }
+
+          const { bid_id } = args as { bid_id: string };
+          const result = await callApi('DELETE', `/bids/${encodeURIComponent(bid_id)}?handle=${encodeURIComponent(myHandle)}`);
+          return formatResponse(result);
+        }
+
+        case 'auction_run': {
+          const permError = checkPermission('assign');
+          if (permError) return permError;
+
+          const { task_id, auction_type } = args as {
+            task_id: string;
+            auction_type?: string;
+          };
+
+          const result = await callApi('POST', `/bids/task/${encodeURIComponent(task_id)}/auction`, {
+            auctionType: auction_type ?? 'first-price',
+          });
+          return formatResponse(result);
+        }
+
+        // ============================================================================
+        // Swarm Intelligence - Payoffs
+        // ============================================================================
+        case 'payoff_define': {
+          const permError = checkPermission('assign');
+          if (permError) return permError;
+
+          const { task_id, swarm_id, payoff_type, base_value, deadline } = args as {
+            task_id: string;
+            swarm_id?: string;
+            payoff_type: string;
+            base_value: number;
+            deadline?: number;
+          };
+
+          const body: Record<string, unknown> = {
+            taskId: task_id,
+            payoffType: payoff_type,
+            baseValue: base_value,
+            multiplier: 1.0,
+            decayRate: 0.0,
+          };
+          if (swarm_id) body.swarmId = swarm_id;
+          if (deadline) body.deadline = deadline;
+
+          const result = await callApi('POST', '/payoffs', body);
+          return formatResponse(result);
+        }
+
+        case 'payoff_calculate': {
+          const { task_id } = args as { task_id: string };
+          const result = await callApi('GET', `/payoffs/${encodeURIComponent(task_id)}/calculate`);
+          return formatResponse(result);
+        }
+
+        // ============================================================================
+        // Workflows (DAG-based Task Automation)
+        // ============================================================================
+        case 'workflow_list': {
+          const { is_template } = args as { is_template?: boolean };
+          const params: string[] = [];
+          if (is_template !== undefined) params.push(`isTemplate=${is_template}`);
+          const query = params.length > 0 ? `?${params.join('&')}` : '';
+          const result = await callApi('GET', `/workflows${query}`);
+          return formatResponse(result);
+        }
+
+        case 'workflow_get': {
+          const { workflow_id } = args as { workflow_id: string };
+          const result = await callApi('GET', `/workflows/${encodeURIComponent(workflow_id)}`);
+          return formatResponse(result);
+        }
+
+        case 'workflow_start': {
+          const permError = checkPermission('assign');
+          if (permError) return permError;
+
+          const { workflow_id, inputs, swarm_id } = args as {
+            workflow_id: string;
+            inputs?: Record<string, unknown>;
+            swarm_id?: string;
+          };
+
+          const body: Record<string, unknown> = {};
+          if (inputs) body.inputs = inputs;
+          if (swarm_id) body.swarmId = swarm_id;
+
+          const result = await callApi('POST', `/workflows/${encodeURIComponent(workflow_id)}/start`, body);
+          return formatResponse(result);
+        }
+
+        case 'execution_list': {
+          const { workflow_id, status } = args as {
+            workflow_id?: string;
+            status?: string;
+          };
+
+          const params: string[] = [];
+          if (workflow_id) params.push(`workflowId=${encodeURIComponent(workflow_id)}`);
+          if (status) params.push(`status=${encodeURIComponent(status)}`);
+          const query = params.length > 0 ? `?${params.join('&')}` : '';
+
+          const result = await callApi('GET', `/executions${query}`);
+          return formatResponse(result);
+        }
+
+        case 'execution_get': {
+          const { execution_id } = args as { execution_id: string };
+          const result = await callApi('GET', `/executions/${encodeURIComponent(execution_id)}`);
+          return formatResponse(result);
+        }
+
+        case 'execution_steps': {
+          const { execution_id } = args as { execution_id: string };
+          const result = await callApi('GET', `/executions/${encodeURIComponent(execution_id)}/steps`);
+          return formatResponse(result);
+        }
+
+        case 'execution_pause': {
+          const permError = checkPermission('assign');
+          if (permError) return permError;
+
+          const { execution_id } = args as { execution_id: string };
+          const result = await callApi('POST', `/executions/${encodeURIComponent(execution_id)}/pause`);
+          return formatResponse(result);
+        }
+
+        case 'execution_resume': {
+          const permError = checkPermission('assign');
+          if (permError) return permError;
+
+          const { execution_id } = args as { execution_id: string };
+          const result = await callApi('POST', `/executions/${encodeURIComponent(execution_id)}/resume`);
+          return formatResponse(result);
+        }
+
+        case 'execution_cancel': {
+          const permError = checkPermission('assign');
+          if (permError) return permError;
+
+          const { execution_id } = args as { execution_id: string };
+          const result = await callApi('POST', `/executions/${encodeURIComponent(execution_id)}/cancel`);
+          return formatResponse(result);
+        }
+
+        case 'step_complete': {
+          const { step_id, output } = args as {
+            step_id: string;
+            output?: Record<string, unknown>;
+          };
+
+          const body: Record<string, unknown> = {};
+          if (output) body.output = output;
+
+          const result = await callApi('POST', `/steps/${encodeURIComponent(step_id)}/complete`, body);
+          return formatResponse(result);
+        }
+
+        case 'step_retry': {
+          const { step_id } = args as { step_id: string };
+          const result = await callApi('POST', `/steps/${encodeURIComponent(step_id)}/retry`);
           return formatResponse(result);
         }
 

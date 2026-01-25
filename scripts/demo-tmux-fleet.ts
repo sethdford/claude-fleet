@@ -157,7 +157,9 @@ async function main() {
     // Cleanup on error
     try {
       manager.killAllWorkers();
-    } catch {}
+    } catch {
+      // Ignore cleanup errors
+    }
 
     process.exit(1);
   }

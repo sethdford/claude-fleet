@@ -9,7 +9,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import Database from 'better-sqlite3';
 import { SQLiteStorage } from '../src/storage/sqlite.js';
 import { BlackboardStorage } from '../src/storage/blackboard.js';
 import { SpawnQueueStorage } from '../src/storage/spawn-queue.js';

@@ -105,7 +105,7 @@ describe('SessionManager', () => {
         manager.create(`/project${i}`);
       }
 
-      const all = manager.list();
+      manager.list(); // Verify full list works
       const offset = manager.list({ offset: 2 });
       expect(offset.length).toBe(3);
     });

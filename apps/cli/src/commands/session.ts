@@ -5,6 +5,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { SessionManager, SessionExporter, resumeSession } from '@claude-fleet/session';
+import type { ResumeStrategy, ExportFormat } from '@claude-fleet/session';
 
 export function sessionCommands(): Command {
   const session = new Command('session')
@@ -58,7 +59,7 @@ export function sessionCommands(): Command {
     .option('--json', 'Output as JSON')
     .action(async (id, options) => {
       const result = resumeSession(id, {
-        strategy: options.strategy as any,
+        strategy: options.strategy as ResumeStrategy,
         maxMessages: parseInt(options.maxMessages),
       });
 
@@ -134,7 +135,7 @@ export function sessionCommands(): Command {
     .action(async (id, options) => {
       const exporter = new SessionExporter();
       const result = exporter.export(id, {
-        format: options.format as any,
+        format: options.format as ExportFormat,
         includeMetadata: options.metadata,
         includeTimestamps: options.timestamps,
       });

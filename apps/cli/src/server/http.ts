@@ -9,6 +9,8 @@ import { SessionManager } from '@claude-fleet/session';
 import { FleetManager } from '@claude-fleet/fleet';
 import { SafetyManager } from '@claude-fleet/safety';
 import { BeadStore, CheckpointStore, MailStore, TaskStore } from '@claude-fleet/storage';
+import type { WorkerRole, WorkerStatus, TaskStatus, BeadStatus } from '@claude-fleet/common';
+import type { OperationType } from '@claude-fleet/safety';
 
 interface ServerContext {
   sessionManager: SessionManager;
@@ -111,9 +113,9 @@ const routes: Route[] = [
     path: /^\/api\/workers$/,
     handler: async (ctx, req) => {
       const url = new URL(req.url || '', `http://${req.headers.host}`);
-      const status = url.searchParams.get('status') as any;
-      const role = url.searchParams.get('role') as any;
-      return ctx.fleetManager.listWorkers({ status, role });
+      const status = url.searchParams.get('status') as WorkerStatus | null;
+      const role = url.searchParams.get('role') as WorkerRole | null;
+      return ctx.fleetManager.listWorkers({ status: status || undefined, role: role || undefined });
     },
   },
   {
@@ -128,7 +130,7 @@ const routes: Route[] = [
       };
       return ctx.fleetManager.spawn({
         handle,
-        ...(role ? { role: role as any } : {}),
+        ...(role ? { role: role as WorkerRole } : {}),
         ...(prompt ? { prompt } : {}),
         ...(worktree !== undefined ? { worktree } : {}),
       });
@@ -179,11 +181,11 @@ const routes: Route[] = [
     path: /^\/api\/tasks$/,
     handler: async (ctx, req) => {
       const url = new URL(req.url || '', `http://${req.headers.host}`);
-      const status = url.searchParams.get('status') as any;
+      const status = url.searchParams.get('status') as TaskStatus | null;
       const assignedTo = url.searchParams.get('assignedTo');
       const limit = parseInt(url.searchParams.get('limit') || '50');
       return ctx.taskStore.list({
-        ...(status ? { status } : {}),
+        ...(status ? { status: status } : {}),
         ...(assignedTo ? { assignedTo } : {}),
         limit,
       });
@@ -213,8 +215,8 @@ const routes: Route[] = [
     method: 'PATCH',
     path: /^\/api\/tasks\/([^/]+)$/,
     handler: async (ctx, _req, params, body) => {
-      const { status } = body as { status: string };
-      ctx.taskStore.updateStatus(params.id!, status as any);
+      const { status } = body as { status: TaskStatus };
+      ctx.taskStore.updateStatus(params.id!, status);
       return { success: true };
     },
   },
@@ -225,10 +227,10 @@ const routes: Route[] = [
     path: /^\/api\/beads$/,
     handler: async (ctx, req) => {
       const url = new URL(req.url || '', `http://${req.headers.host}`);
-      const status = url.searchParams.get('status') as any;
+      const status = url.searchParams.get('status') as BeadStatus | null;
       const convoyId = url.searchParams.get('convoyId');
       return ctx.beadStore.list({
-        ...(status ? { status } : {}),
+        ...(status ? { status: status } : {}),
         ...(convoyId ? { convoyId } : {}),
       });
     },
@@ -253,8 +255,8 @@ const routes: Route[] = [
     method: 'PATCH',
     path: /^\/api\/beads\/([^/]+)$/,
     handler: async (ctx, _req, params, body) => {
-      const { status, actor } = body as { status: string; actor?: string };
-      ctx.beadStore.updateStatus(params.id!, status as any, actor);
+      const { status, actor } = body as { status: BeadStatus; actor?: string };
+      ctx.beadStore.updateStatus(params.id!, status, actor);
       return { success: true };
     },
   },
@@ -369,7 +371,7 @@ const routes: Route[] = [
         content?: string;
       };
       return ctx.safetyManager.check({
-        operation: operation as any,
+        operation: operation as OperationType,
         ...(command ? { command } : {}),
         ...(filePath ? { filePath } : {}),
         ...(content ? { content } : {}),

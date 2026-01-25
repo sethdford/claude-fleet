@@ -114,7 +114,7 @@ export class SessionExporter {
   ): string {
     const lines: string[] = [];
 
-    lines.push(`# Session Export`);
+    lines.push('# Session Export');
     lines.push('');
 
     if (includeMetadata) {
@@ -202,7 +202,7 @@ export class SessionExporter {
     lines.push('</head>');
     lines.push('<body>');
 
-    lines.push(`<h1>Session Export</h1>`);
+    lines.push('<h1>Session Export</h1>');
 
     if (includeMetadata) {
       lines.push('<div class="metadata">');
@@ -217,7 +217,7 @@ export class SessionExporter {
       }
 
       if (session.summary) {
-        lines.push(`<h3>Summary</h3>`);
+        lines.push('<h3>Summary</h3>');
         lines.push(`<p>${escapeHtml(session.summary)}</p>`);
       }
 

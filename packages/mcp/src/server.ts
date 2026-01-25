@@ -4,6 +4,8 @@
  * Exposes CCT functionality as MCP tools.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- MCP tool args are untyped by design */
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -114,6 +116,7 @@ export class MCPServer {
     });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MCP args are untyped by design
   private async executeTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     // Session tools
     if (name === 'session_list') {

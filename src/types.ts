@@ -347,6 +347,7 @@ export interface ServerConfig {
   maxWorkers: number;
   rateLimitWindow: number;
   rateLimitMax: number;
+  corsOrigins: string[];
 }
 
 // ============================================================================
@@ -611,6 +612,32 @@ export interface SwarmInfo {
   createdAt: number;
 }
 
+/**
+ * Swarm template for quick plan execution
+ * Stores a reusable configuration of agent roles by SDLC phase
+ */
+export interface SwarmTemplate {
+  /** Unique template ID (UUID) */
+  id: string;
+  /** User-defined template name (alphanumeric with dashes/underscores) */
+  name: string;
+  /** Optional description of the template */
+  description: string | null;
+  /** Built-in templates cannot be modified or deleted */
+  isBuiltin: boolean;
+  /** Roles organized by SDLC phase */
+  phases: {
+    discovery: string[];
+    development: string[];
+    quality: string[];
+    delivery: string[];
+  };
+  /** Creation timestamp (Unix ms) */
+  createdAt: number;
+  /** Last update timestamp (Unix ms) */
+  updatedAt: number;
+}
+
 // Extend PersistentWorker with fleet fields
 export interface FleetWorker extends PersistentWorker {
   swarmId: string | null;
@@ -846,4 +873,227 @@ export interface WorkflowEvent {
   actor: string | null;
   details: Record<string, unknown> | null;
   createdAt: number;
+}
+
+// ============================================================================
+// SWARM INTELLIGENCE TYPES (Phase 6) - 2026 Research Features
+// ============================================================================
+
+// --- Stigmergic Coordination (Pheromone Trails) ---
+
+export type PheromoneResourceType = 'file' | 'task' | 'endpoint' | 'module' | 'custom';
+export type PheromoneTrailType = 'touch' | 'modify' | 'complete' | 'error' | 'warning' | 'success';
+
+export interface PheromoneTrail {
+  id: string;
+  swarmId: string;
+  resourceType: PheromoneResourceType;
+  resourceId: string;
+  depositorHandle: string;
+  trailType: PheromoneTrailType;
+  intensity: number;  // 0.0 - 1.0
+  metadata: Record<string, unknown>;
+  createdAt: number;
+  decayedAt: number | null;
+}
+
+export interface PheromoneQuery {
+  resourceType?: PheromoneResourceType;
+  resourceId?: string;
+  trailType?: PheromoneTrailType;
+  minIntensity?: number;
+  depositorHandle?: string;
+  activeOnly?: boolean;
+  limit?: number;
+}
+
+export interface PheromoneConfig {
+  decayRatePerHour: number;  // default: 0.1 (10% per hour)
+  minIntensity: number;  // below this, trail is considered decayed
+  aggregationMethod: 'sum' | 'max' | 'average';
+}
+
+// --- Agent Belief States (Theory of Mind) ---
+
+export type BeliefType = 'knowledge' | 'assumption' | 'inference' | 'observation';
+export type BeliefSourceType = 'direct' | 'inferred' | 'communicated' | 'observed';
+export type MetaBeliefType = 'capability' | 'reliability' | 'knowledge' | 'intention' | 'workload';
+
+export interface AgentBelief {
+  id: number;
+  swarmId: string;
+  agentHandle: string;
+  beliefType: BeliefType;
+  subject: string;
+  beliefValue: string;
+  confidence: number;  // 0.0 - 1.0
+  sourceHandle?: string;
+  sourceType?: BeliefSourceType;
+  validUntil?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AgentMetaBelief {
+  id: number;
+  swarmId: string;
+  agentHandle: string;
+  aboutHandle: string;
+  metaType: MetaBeliefType;
+  beliefValue: string;
+  confidence: number;
+  evidenceCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface BeliefUpdate {
+  subject: string;
+  beliefType?: BeliefType;
+  beliefValue: Record<string, unknown>;
+  confidence?: number;
+  sourceHandle?: string;
+  sourceType?: BeliefSourceType;
+  validUntil?: number;
+}
+
+// --- Game-Theoretic Payoffs ---
+
+export type PayoffType = 'completion' | 'quality' | 'speed' | 'cooperation' | 'penalty';
+
+export interface TaskPayoff {
+  id: number;
+  taskId: string;
+  swarmId: string | null;
+  payoffType: PayoffType;
+  baseValue: number;
+  multiplier: number;
+  deadline: number | null;
+  decayRate: number;
+  dependencies: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PayoffCalculation {
+  taskId: string;
+  totalPayoff: number;
+  breakdown: Array<{
+    type: PayoffType;
+    value: number;
+    reason: string;
+  }>;
+  bonuses: number;
+  penalties: number;
+  timeDecay: number;
+}
+
+// --- Agent Credits & Reputation ---
+
+export type CreditTransactionType = 'earn' | 'spend' | 'bonus' | 'penalty' | 'transfer' | 'adjustment';
+
+export interface AgentCredits {
+  id: number;
+  swarmId: string;
+  agentHandle: string;
+  balance: number;
+  reputationScore: number;  // 0.0 - 1.0
+  totalEarned: number;
+  totalSpent: number;
+  taskCount: number;
+  successCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CreditTransaction {
+  id: number;
+  swarmId: string;
+  agentHandle: string;
+  transactionType: CreditTransactionType;
+  amount: number;
+  balanceAfter: number;
+  referenceType: string | null;
+  referenceId: string | null;
+  reason: string | null;
+  createdAt: number;
+}
+
+// --- Consensus Mechanisms ---
+
+export type ConsensusProposalType = 'decision' | 'election' | 'approval' | 'ranking' | 'allocation';
+export type VotingMethod = 'majority' | 'supermajority' | 'unanimous' | 'ranked' | 'weighted';
+export type QuorumType = 'percentage' | 'absolute' | 'none';
+export type ProposalStatus = 'open' | 'closed' | 'passed' | 'failed' | 'cancelled';
+
+export interface ConsensusProposal {
+  id: string;
+  swarmId: string;
+  proposerHandle: string;
+  proposalType: ConsensusProposalType;
+  title: string;
+  description: string | null;
+  options: string[];
+  votingMethod: VotingMethod;
+  quorumType: QuorumType;
+  quorumValue: number;
+  weightByReputation: boolean;
+  status: ProposalStatus;
+  deadline: number | null;
+  result: ConsensusResult | null;
+  createdAt: number;
+  closedAt: number | null;
+}
+
+export interface ConsensusVote {
+  id: number;
+  proposalId: string;
+  voterHandle: string;
+  voteValue: string;  // JSON string for ranked/weighted voting
+  voteWeight: number;
+  rationale?: string;
+  createdAt: number;
+}
+
+export interface ConsensusResult {
+  winner: string | null;
+  tally: Record<string, number>;
+  quorumMet: boolean;
+  participationRate: number;
+  totalVotes: number;
+  weightedVotes: number;
+}
+
+// --- Market-Based Task Bidding ---
+
+export type BidStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired';
+
+export interface TaskBid {
+  id: string;
+  taskId: string;
+  swarmId: string;
+  bidderHandle: string;
+  bidAmount: number;
+  estimatedDuration: number | null;  // minutes
+  confidence: number;
+  rationale: string | null;
+  status: BidStatus;
+  createdAt: number;
+  processedAt: number | null;
+}
+
+export interface BidEvaluation {
+  bidId: string;
+  score: number;
+  factors: Record<string, number>;
+  recommendation: 'accept' | 'reject' | 'consider';
+}
+
+export interface AuctionConfig {
+  auctionType: 'first-price' | 'second-price' | 'dutch' | 'english';
+  minBid: number;
+  maxBid: number;
+  durationMs: number;
+  autoAccept: boolean;
+  reputationThreshold: number;
 }

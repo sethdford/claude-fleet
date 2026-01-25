@@ -5,7 +5,7 @@
  * Handles common LLM mistakes: auto-Enter, delays, proper escaping.
  */
 
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import type {
   TmuxPane,
@@ -45,14 +45,18 @@ export class TmuxController {
    */
   private runTmux(args: string[]): string {
     try {
-      const result = execSync(['tmux', ...args].join(' '), {
+      // Use spawnSync with array args to avoid shell interpretation of special chars like |
+      const result = spawnSync('tmux', args, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
       });
-      return result.trim();
+      if (result.status !== 0) {
+        throw new Error(result.stderr || 'tmux command failed');
+      }
+      return (result.stdout || '').trim();
     } catch (error) {
-      const err = error as { stderr?: Buffer; message: string };
-      throw new Error(`tmux command failed: ${err.stderr?.toString() || err.message}`);
+      const err = error as { stderr?: string; message: string };
+      throw new Error(`tmux command failed: ${err.stderr || err.message}`);
     }
   }
 

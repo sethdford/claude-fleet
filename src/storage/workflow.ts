@@ -15,7 +15,6 @@ import type {
   WorkflowStep,
   WorkflowStepStatus,
   WorkflowStepConfig,
-  WorkflowStepDefinition,
   WorkflowTrigger,
   WorkflowTriggerType,
   WorkflowTriggerConfig,
