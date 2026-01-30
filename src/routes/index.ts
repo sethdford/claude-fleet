@@ -214,3 +214,8 @@ export {
   createUpdateReputationHandler,
   createRunAuctionHandler,
 } from './swarm-intelligence.js';
+
+// Compound Machine routes (aggregated fleet visualization)
+export {
+  createCompoundSnapshotHandler,
+} from './compound.js';

@@ -269,7 +269,7 @@ export class CollabServer {
     this.app.get('/metrics', metricsHandler);
     this.app.get('/metrics/json', routes.createMetricsJsonHandler(this.deps));
     this.app.post('/auth', routes.createAuthHandler(this.deps));
-    this.app.get('/debug', routes.createDebugHandler(this.deps));
+    this.app.get('/debug', requireRole('team-lead'), routes.createDebugHandler(this.deps));
 
     // User routes
     this.app.get('/users/:uid', routes.createGetUserHandler(this.deps));
@@ -481,6 +481,9 @@ export class CollabServer {
     this.app.post('/payoffs', requireRole('team-lead'), routes.createDefinePayoffHandler(this.deps));
     this.app.get('/payoffs/:taskId', requireRole('team-lead', 'worker'), routes.createGetPayoffsHandler(this.deps));
     this.app.get('/payoffs/:taskId/calculate', requireRole('team-lead', 'worker'), routes.createCalculatePayoffHandler(this.deps));
+
+    // Compound Machine routes (aggregated fleet visualization)
+    this.app.get('/compound/snapshot', routes.createCompoundSnapshotHandler(this.deps));
   }
 
   // ============================================================================

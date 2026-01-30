@@ -110,12 +110,12 @@ The loop continues until ALL criteria are met:
 - `GET /health` - Server health
 - `GET /metrics` - Prometheus metrics
 - `POST /auth` - Get JWT token
-- `GET /debug` - Debug info
 
 ### Protected Endpoints (require JWT)
 - All other endpoints require `Authorization: Bearer <token>`
 
 ### Team-Lead Only
+- `GET /debug` - Debug info (server internals)
 - `POST /orchestrate/spawn` - Spawn worker
 - `POST /orchestrate/dismiss/:handle` - Dismiss worker
 - `POST /teams/:name/broadcast` - Broadcast message

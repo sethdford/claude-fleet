@@ -24,7 +24,6 @@ export interface AuthenticatedRequest extends Request {
 const PUBLIC_ROUTES = new Set([
   '/health',
   '/metrics',
-  '/debug',
   '/auth', // Auth endpoint for joining teams
 ]);
 

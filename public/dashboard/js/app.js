@@ -12,6 +12,7 @@ import { renderSwarm } from './views/swarm.js';
 import { renderTasks } from './views/tasks.js';
 import { renderGraph } from './views/graph.js';
 import { renderMetrics } from './views/metrics.js';
+import { renderScheduler } from './views/scheduler.js';
 
 // Extend dayjs with relative time
 dayjs.extend(dayjs_plugin_relativeTime);
@@ -479,6 +480,11 @@ router.register('/graph', async () => {
 router.register('/tasks', async () => {
   document.getElementById('page-title').textContent = 'Task Pipeline';
   return renderTasks(document.getElementById('main-view'));
+});
+
+router.register('/scheduler', async () => {
+  document.getElementById('page-title').textContent = 'Scheduler';
+  return renderScheduler(document.getElementById('main-view'));
 });
 
 router.register('/worker/:handle', async (handle) => {
