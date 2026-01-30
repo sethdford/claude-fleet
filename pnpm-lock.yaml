@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@claude-fleet/tmux':
-        specifier: workspace:*
-        version: link:packages/tmux
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.0
         version: 1.25.3(hono@4.11.5)(zod@4.3.6)
@@ -168,6 +165,12 @@ importers:
       '@claude-fleet/search':
         specifier: workspace:*
         version: link:../../crates/search
+
+  crates/compound:
+    devDependencies:
+      '@napi-rs/cli':
+        specifier: ^2.18.0
+        version: 2.18.4
 
   crates/lmsh:
     devDependencies:

@@ -163,6 +163,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cct-compound"
+version = "3.0.0"
+dependencies = [
+ "chrono",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cct-lmsh"
 version = "3.0.0"
 dependencies = [

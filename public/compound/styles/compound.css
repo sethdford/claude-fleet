@@ -1,0 +1,452 @@
+/* Compounding Machine - GitHub Dark Theme */
+
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-overlay: rgba(22, 27, 34, 0.95);
+  --border-default: #30363d;
+  --border-muted: #21262d;
+  --text-primary: #c9d1d9;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent-blue: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-yellow: #d29922;
+  --accent-red: #f85149;
+  --accent-purple: #a371f7;
+  --accent-pink: #db61a2;
+  --accent-orange: #fb923c;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Stats Header Bar --- */
+
+.stats-bar {
+  height: 56px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-lg);
+  flex-shrink: 0;
+}
+
+.stats-bar-title {
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.stats-bar-title .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-green);
+}
+
+.stats-bar-title .dot.disconnected {
+  background: var(--accent-red);
+}
+
+.stats-bar-title .dot.connecting {
+  background: var(--accent-yellow);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.stats-group {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: center;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.stat-value.blue { color: var(--accent-blue); }
+.stat-value.green { color: var(--accent-green); }
+.stat-value.purple { color: var(--accent-purple); }
+.stat-value.yellow { color: var(--accent-yellow); }
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* --- Main Grid --- */
+
+.compound-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  grid-template-rows: 3fr 2fr;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  flex: 1;
+  min-height: 0;
+}
+
+/* --- Panel Base --- */
+
+.panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.panel-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.panel-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* --- Graph Panel --- */
+
+#graph-panel svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.graph-controls {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  z-index: 10;
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.graph-legend {
+  position: absolute;
+  bottom: var(--space-sm);
+  left: var(--space-sm);
+  background: var(--bg-overlay);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: 10px;
+  display: flex;
+  gap: var(--space-md);
+  z-index: 10;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--text-secondary);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* --- D3 Graph Elements --- */
+
+.node {
+  cursor: pointer;
+}
+
+.node circle,
+.node rect {
+  transition: stroke-width 0.2s, r 0.2s;
+}
+
+.node:hover circle {
+  stroke-width: 4px !important;
+}
+
+.node-label {
+  font-size: 10px;
+  fill: var(--text-secondary);
+  pointer-events: none;
+  font-family: var(--font-sans);
+}
+
+.link {
+  stroke-opacity: 0.6;
+}
+
+.link.membership {
+  stroke-dasharray: 4 2;
+}
+
+.link.spawn {
+  stroke-width: 3px;
+}
+
+/* --- Knowledge Flow Particle --- */
+
+.knowledge-particle {
+  pointer-events: none;
+}
+
+/* --- Node Animations --- */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes working-pulse {
+  0%, 100% { r: var(--base-r); }
+  50% { r: calc(var(--base-r) + 2); }
+}
+
+/* --- Metrics Panel --- */
+
+.metrics-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.gauge-row {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.gauge-container {
+  flex: 1;
+  text-align: center;
+}
+
+.gauge-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: var(--space-xs);
+}
+
+.gauge-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+/* --- Activity Feed --- */
+
+.activity-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: var(--space-xs);
+}
+
+.activity-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-sm);
+  margin-bottom: 2px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1.4;
+  transition: background 0.15s;
+}
+
+.activity-entry:hover {
+  background: var(--bg-tertiary);
+}
+
+.activity-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.activity-time {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 55px;
+  font-family: var(--font-mono);
+}
+
+.activity-text {
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.activity-text .highlight {
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.activity-detail {
+  color: var(--text-muted);
+  font-size: 11px;
+  display: block;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Lineage Tree --- */
+
+#lineage-panel svg {
+  width: 100%;
+  height: 100%;
+}
+
+.lineage-node circle {
+  transition: r 0.2s;
+}
+
+.lineage-node text {
+  font-size: 10px;
+  fill: var(--text-secondary);
+  font-family: var(--font-sans);
+}
+
+.lineage-link {
+  fill: none;
+  stroke: var(--border-default);
+  stroke-width: 1.5px;
+}
+
+/* --- Empty State --- */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  gap: var(--space-sm);
+  padding: var(--space-xl);
+}
+
+.empty-state-icon {
+  font-size: 32px;
+  opacity: 0.5;
+}
+
+.empty-state-text {
+  font-size: 13px;
+  text-align: center;
+}
+
+/* --- Buttons --- */
+
+.btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: var(--font-sans);
+}
+
+.btn:hover {
+  background: var(--border-default);
+  border-color: var(--text-muted);
+}
+
+/* --- Scrollbar --- */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* --- Reduced Motion --- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

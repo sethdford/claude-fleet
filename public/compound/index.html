@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Compounding Machine - Claude Fleet</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <link rel="stylesheet" href="styles/compound.css" />
+  </head>
+  <body>
+    <!-- Stats Header -->
+    <header class="stats-bar">
+      <div class="stats-bar-title">
+        <span class="dot" id="connection-dot"></span>
+        Compounding Machine
+      </div>
+      <div class="stats-group">
+        <div class="stat-item">
+          <span class="stat-value blue" id="stat-agents">0</span>
+          <span class="stat-label">Agents</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value green" id="stat-tasks">0</span>
+          <span class="stat-label">Tasks</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value purple" id="stat-knowledge">0</span>
+          <span class="stat-label">Knowledge</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value yellow" id="stat-rate">0.0</span>
+          <span class="stat-label">/min</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main 4-Panel Grid -->
+    <main class="compound-grid">
+      <!-- Top-Left: Agent Network Graph -->
+      <section id="graph-panel" class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Agent Network</span>
+          <span class="panel-badge" id="graph-badge">0 nodes</span>
+        </div>
+        <div class="panel-content" id="graph-container">
+          <div class="graph-controls">
+            <button class="btn" id="zoom-fit" title="Fit to view">Fit</button>
+            <button class="btn" id="zoom-reset" title="Reset zoom">Reset</button>
+          </div>
+          <svg id="network-graph">
+            <defs>
+              <filter id="glow-blue" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="glow-green" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="glow-purple" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <marker id="arrow" viewBox="0 -5 10 10" refX="20" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+                <path fill="#30363d" d="M0,-5L10,0L0,5" />
+              </marker>
+            </defs>
+          </svg>
+          <div class="graph-legend">
+            <div class="legend-item">
+              <span class="legend-dot" style="background: #3fb950;"></span> Worker
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background: #a371f7;"></span> Swarm
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background: #d29922;"></span> Task
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background: #58a6ff;"></span> Knowledge Flow
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Top-Right: Compounding Metrics -->
+      <section id="metrics-panel" class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Compounding Metrics</span>
+          <span class="panel-badge" id="metrics-badge">--</span>
+        </div>
+        <div class="panel-content">
+          <div class="metrics-stack">
+            <div style="flex: 1; min-height: 200px;">
+              <canvas id="growth-chart"></canvas>
+            </div>
+            <div class="gauge-row">
+              <div class="gauge-container">
+                <svg id="gauge-utilization" viewBox="0 0 120 80" width="120" height="80"></svg>
+                <div class="gauge-label">Fleet Utilization</div>
+                <div class="gauge-value green" id="gauge-util-value">0%</div>
+              </div>
+              <div class="gauge-container">
+                <svg id="gauge-velocity" viewBox="0 0 120 80" width="120" height="80"></svg>
+                <div class="gauge-label">Knowledge Velocity</div>
+                <div class="gauge-value blue" id="gauge-vel-value">0/min</div>
+              </div>
+              <div class="gauge-container">
+                <svg id="gauge-throughput" viewBox="0 0 120 80" width="120" height="80"></svg>
+                <div class="gauge-label">Task Throughput</div>
+                <div class="gauge-value purple" id="gauge-thru-value">0/min</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom-Left: Agent Lineage -->
+      <section id="lineage-panel" class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Agent Lineage</span>
+          <span class="panel-badge" id="lineage-badge">0 agents</span>
+        </div>
+        <div class="panel-content">
+          <svg id="lineage-tree"></svg>
+        </div>
+      </section>
+
+      <!-- Bottom-Right: Live Activity Feed -->
+      <section id="activity-panel" class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Live Activity</span>
+          <span class="panel-badge" id="activity-badge">0 events</span>
+        </div>
+        <div class="panel-content">
+          <div class="activity-list" id="activity-list">
+            <div class="empty-state">
+              <div class="empty-state-icon">&#9881;</div>
+              <div class="empty-state-text">Waiting for fleet activity...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="dist/main.js"></script>
+  </body>
+</html>

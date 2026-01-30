@@ -1,0 +1,20 @@
+{
+  "name": "@claude-fleet/compound-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Compounding Machine visualization for Claude Fleet",
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/main.ts --outdir dist --minify --sourcemap=external",
+    "dev": "bun build src/main.ts --outdir dist --sourcemap=external --watch"
+  },
+  "dependencies": {
+    "d3": "^7.9.0",
+    "chart.js": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "typescript": "^5.3.0",
+    "bun-types": "latest"
+  }
+}
