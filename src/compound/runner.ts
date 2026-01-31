@@ -366,13 +366,7 @@ export class CompoundRunner {
   // ── Step 3: Tmux Layout ─────────────────────────────────────────────────
 
   private createTmuxLayout(): TmuxLayout {
-    // Kill existing session
-    try {
-      execSync(`tmux kill-session -t ${SESSION_NAME} 2>/dev/null`, { encoding: 'utf-8' });
-    } catch {
-      // No existing session
-    }
-
+    // Stale session already killed by preflight() — go straight to creation
     // Create new session
     execSync(
       `tmux new-session -d -s ${SESSION_NAME} -x 220 -y 55 -c "${this.projectDir}"`,
@@ -478,13 +472,13 @@ export class CompoundRunner {
 
     let serverCmd: string;
     if (existsSync(distPath)) {
-      serverCmd = `DB_PATH=${this.shellQuote(dbPath)} PORT=${this.options.port} ${nodeBin} ${this.shellQuote(distPath)} 2>&1`;
+      serverCmd = `DB_PATH=${shellQuote(dbPath)} PORT=${this.options.port} ${nodeBin} ${shellQuote(distPath)} 2>&1`;
     } else {
-      serverCmd = `DB_PATH=${this.shellQuote(dbPath)} PORT=${this.options.port} npx tsx ${this.shellQuote(join(this.projectDir, 'src', 'index.ts'))} 2>&1`;
+      serverCmd = `DB_PATH=${shellQuote(dbPath)} PORT=${this.options.port} npx tsx ${shellQuote(join(this.projectDir, 'src', 'index.ts'))} 2>&1`;
     }
 
     execSync(
-      `tmux send-keys -t ${this.layout.serverPane} ${this.shellQuote(serverCmd)} Enter`,
+      `tmux send-keys -t ${this.layout.serverPane} ${shellQuote(serverCmd)} Enter`,
       { encoding: 'utf-8' },
     );
 
@@ -628,15 +622,15 @@ export class CompoundRunner {
 
       // The tmux command is now trivially simple — no escaping needed
       execSync(
-        `tmux send-keys -t ${pane} ${this.shellQuote(`bash ${scriptPath}`)} Enter`,
+        `tmux send-keys -t ${pane} ${shellQuote(`bash ${scriptPath}`)} Enter`,
         { encoding: 'utf-8' },
       );
     } else {
       // Simulated mode: write a script that echoes and marks complete
       const sentinelPath = join(this.promptDir, `${handle}-iter${iteration}.done`);
-      const cmd = `echo '[${handle}] Simulated worker (use --live for real Claude Code)' && sleep 5 && echo '[${handle}] TASK COMPLETE' && touch ${this.shellQuote(sentinelPath)}`;
+      const cmd = `echo '[${handle}] Simulated worker (use --live for real Claude Code)' && sleep 5 && echo '[${handle}] TASK COMPLETE' && touch ${shellQuote(sentinelPath)}`;
       execSync(
-        `tmux send-keys -t ${pane} ${this.shellQuote(cmd)} Enter`,
+        `tmux send-keys -t ${pane} ${shellQuote(cmd)} Enter`,
         { encoding: 'utf-8' },
       );
     }
@@ -688,18 +682,18 @@ export class CompoundRunner {
 
     const script = [
       '#!/bin/bash',
-      `export CLAUDE_CODE_AGENT_NAME=${this.shellQuote(handle)}`,
+      `export CLAUDE_CODE_AGENT_NAME=${shellQuote(handle)}`,
       'export CLAUDE_CODE_TEAM_NAME=compound-team',
-      `export CLAUDE_CODE_SWARM_ID=${this.shellQuote(this.swarmId)}`,
-      `export CLAUDE_CODE_MISSION_ID=${this.shellQuote(this.missionId)}`,
-      `export CLAUDE_FLEET_URL=${this.shellQuote(this.options.serverUrl)}`,
-      `cd ${this.shellQuote(this.options.targetDir)}`,
-      `cat ${this.shellQuote(promptPath)} | \\`,
+      `export CLAUDE_CODE_SWARM_ID=${shellQuote(this.swarmId)}`,
+      `export CLAUDE_CODE_MISSION_ID=${shellQuote(this.missionId)}`,
+      `export CLAUDE_FLEET_URL=${shellQuote(this.options.serverUrl)}`,
+      `cd ${shellQuote(this.options.targetDir)}`,
+      `cat ${shellQuote(promptPath)} | \\`,
       `  claude -p --dangerously-skip-permissions \\`,
       `  --output-format stream-json \\`,
-      `  --mcp-config ${this.shellQuote(mcpConfigPath)} \\`,
+      `  --mcp-config ${shellQuote(mcpConfigPath)} \\`,
       `  --strict-mcp-config`,
-      `touch ${this.shellQuote(sentinelPath)}`,
+      `touch ${shellQuote(sentinelPath)}`,
     ].join('\n');
 
     writeFileSync(filepath, script, 'utf-8');
@@ -723,9 +717,9 @@ export class CompoundRunner {
       .map((pane, i) => `${pane}:scout-${i + 1}:${i === 0 ? 'fixer' : 'verifier'}`)
       .join(' ');
 
-    const dashCmd = `bash ${this.shellQuote(scriptPath)} ${this.options.port} ${this.shellQuote(this.token)} ${this.shellQuote(this.missionId)} ${this.shellQuote(this.swarmId)} ${this.shellQuote(this.options.targetDir)} ${this.projectType} ${workerInfo}`;
+    const dashCmd = `bash ${shellQuote(scriptPath)} ${this.options.port} ${shellQuote(this.token)} ${shellQuote(this.missionId)} ${shellQuote(this.swarmId)} ${shellQuote(this.options.targetDir)} ${this.projectType} ${workerInfo}`;
     execSync(
-      `tmux send-keys -t ${this.layout.dashboardPane} ${this.shellQuote(dashCmd)} Enter`,
+      `tmux send-keys -t ${this.layout.dashboardPane} ${shellQuote(dashCmd)} Enter`,
       { encoding: 'utf-8' },
     );
   }
@@ -1043,16 +1037,16 @@ export class CompoundRunner {
         const scriptPath = this.writeWorkerScript(handle, nextIteration, promptPath, mcpConfigPath);
 
         // Echo the re-engaged marker then run the wrapper script
-        const cmd = `echo '=== ITERATION ${nextIteration}: RE-ENGAGED ===' && bash ${this.shellQuote(scriptPath)}`;
+        const cmd = `echo '=== ITERATION ${nextIteration}: RE-ENGAGED ===' && bash ${shellQuote(scriptPath)}`;
         execSync(
-          `tmux send-keys -t ${pane} ${this.shellQuote(cmd)} Enter`,
+          `tmux send-keys -t ${pane} ${shellQuote(cmd)} Enter`,
           { encoding: 'utf-8' },
         );
       } else {
         const sentinelPath = join(this.promptDir, `${handle}-iter${nextIteration}.done`);
-        const cmd = `echo '=== ITERATION ${nextIteration}: RE-ENGAGED ===' && echo '[${handle}] Re-engaged (simulated)' && sleep 3 && echo '[${handle}] TASK COMPLETE' && touch ${this.shellQuote(sentinelPath)}`;
+        const cmd = `echo '=== ITERATION ${nextIteration}: RE-ENGAGED ===' && echo '[${handle}] Re-engaged (simulated)' && sleep 3 && echo '[${handle}] TASK COMPLETE' && touch ${shellQuote(sentinelPath)}`;
         execSync(
-          `tmux send-keys -t ${pane} ${this.shellQuote(cmd)} Enter`,
+          `tmux send-keys -t ${pane} ${shellQuote(cmd)} Enter`,
           { encoding: 'utf-8' },
         );
       }
@@ -1150,17 +1144,6 @@ export class CompoundRunner {
     }
   }
 
-  // ── Shell Quoting ──────────────────────────────────────────────────────
-
-  /**
-   * POSIX-safe single-quote wrapping.
-   * Wraps the string in single quotes, escaping any internal single quotes
-   * using the '\'' pattern (end quote, escaped quote, start quote).
-   */
-  private shellQuote(s: string): string {
-    return "'" + s.replace(/'/g, "'\\''") + "'";
-  }
-
   // ── Cleanup ───────────────────────────────────────────────────────────
 
   /** Remove temp prompt/script directory. Idempotent — safe to call multiple times. */
@@ -1182,4 +1165,13 @@ export class CompoundRunner {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * POSIX-safe single-quote wrapping for shell arguments.
+ * Wraps the string in single quotes, escaping any internal single quotes
+ * using the '\'' pattern (end quote, escaped quote, start quote).
+ */
+export function shellQuote(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
 }
