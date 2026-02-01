@@ -311,3 +311,25 @@ export interface BiddingStats {
   totalBids?: number;
   pendingBids?: number;
 }
+
+/** Agent memory entry from GET /memory/:agentId */
+export interface MemoryEntry {
+  id: string;
+  agentId: string;
+  key: string;
+  value: string;
+  tags: string[];
+  memoryType: 'fact' | 'decision' | 'pattern' | 'error';
+  relevance: number;
+  accessCount: number;
+  createdAt: string;
+  lastAccessed: string;
+}
+
+/** Routing recommendation from POST /routing/classify */
+export interface RoutingRecommendation {
+  complexity: 'simple' | 'medium' | 'complex';
+  strategy: 'direct' | 'supervised' | 'swarm';
+  model: string;
+  confidence: number;
+}

@@ -128,6 +128,9 @@ export class NativeAdapter implements CoordinationAdapter {
       status: 'pending',
       owner: _agentId,
       blockedBy: task.blockedBy ?? [],
+      blocks: [],
+      activeForm: null,
+      metadata: {},
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });

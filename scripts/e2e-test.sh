@@ -231,8 +231,73 @@ if ! echo "$COMPLETE_RESPONSE" | grep -q '"resolved"'; then
 fi
 echo "[E2E]   Task status: resolved"
 
-# Step 14: Verify final state
-echo "[E2E] Step 14: Verifying final state..."
+# Step 14: Memory store
+echo "[E2E] Step 14: Storing agent memory..."
+MEM_STORE_RESPONSE=$(api POST /memory/store '{
+  "agentId": "worker",
+  "key": "project-context",
+  "value": "Working on JWT auth module",
+  "memoryType": "fact",
+  "tags": ["auth", "jwt"]
+}' "$WORKER_TOKEN")
+MEM_KEY=$(echo "$MEM_STORE_RESPONSE" | grep -o '"key":"[^"]*"' | cut -d'"' -f4)
+if [[ "$MEM_KEY" != "project-context" ]]; then
+  echo "[E2E] FAIL: Memory store failed"
+  echo "$MEM_STORE_RESPONSE"
+  exit 1
+fi
+echo "[E2E]   Memory stored: $MEM_KEY"
+
+# Step 15: Memory recall
+echo "[E2E] Step 15: Recalling agent memory..."
+MEM_RECALL_RESPONSE=$(api GET "/memory/recall/worker/project-context" "" "$WORKER_TOKEN")
+MEM_VALUE=$(echo "$MEM_RECALL_RESPONSE" | grep -o '"value":"[^"]*"' | cut -d'"' -f4)
+if [[ -z "$MEM_VALUE" ]]; then
+  echo "[E2E] FAIL: Memory recall failed"
+  echo "$MEM_RECALL_RESPONSE"
+  exit 1
+fi
+echo "[E2E]   Memory value: $MEM_VALUE"
+
+# Step 16: Memory search
+echo "[E2E] Step 16: Searching agent memories..."
+MEM_SEARCH_RESPONSE=$(api POST /memory/search '{
+  "agentId": "worker",
+  "query": "JWT"
+}' "$WORKER_TOKEN")
+if ! echo "$MEM_SEARCH_RESPONSE" | grep -q '"results"'; then
+  echo "[E2E] FAIL: Memory search failed"
+  echo "$MEM_SEARCH_RESPONSE"
+  exit 1
+fi
+echo "[E2E]   Memory search returned results"
+
+# Step 17: Memory list
+echo "[E2E] Step 17: Listing agent memories..."
+MEM_LIST_RESPONSE=$(api GET "/memory/worker?limit=10" "" "$WORKER_TOKEN")
+if ! echo "$MEM_LIST_RESPONSE" | grep -q '"memories"'; then
+  echo "[E2E] FAIL: Memory list failed"
+  echo "$MEM_LIST_RESPONSE"
+  exit 1
+fi
+echo "[E2E]   Memory list returned"
+
+# Step 18: Task routing classify
+echo "[E2E] Step 18: Classifying task complexity..."
+ROUTE_RESPONSE=$(api POST /routing/classify '{
+  "subject": "Refactor authentication module",
+  "description": "Extract JWT logic into a reusable service"
+}' "$LEAD_TOKEN")
+COMPLEXITY=$(echo "$ROUTE_RESPONSE" | grep -o '"complexity":"[^"]*"' | cut -d'"' -f4)
+if [[ -z "$COMPLEXITY" ]]; then
+  echo "[E2E] FAIL: Task routing failed"
+  echo "$ROUTE_RESPONSE"
+  exit 1
+fi
+echo "[E2E]   Complexity: $COMPLEXITY"
+
+# Step 19: Verify final state
+echo "[E2E] Step 19: Verifying final state..."
 HEALTH_RESPONSE=$(api GET /health)
 AGENTS=$(echo "$HEALTH_RESPONSE" | grep -o '"agents":[0-9]*' | cut -d':' -f2)
 CHATS=$(echo "$HEALTH_RESPONSE" | grep -o '"chats":[0-9]*' | cut -d':' -f2)
@@ -260,6 +325,8 @@ echo "║  ✓ Task status updates (open → in_progress → resolved)        �
 echo "║  ✓ Chat creation (authenticated)                              ║"
 echo "║  ✓ Message exchange (authenticated)                           ║"
 echo "║  ✓ Mark as read (authenticated)                               ║"
+echo "║  ✓ Memory store/recall/search/list (authenticated)            ║"
+echo "║  ✓ Task routing classification (authenticated)                ║"
 echo "║  ✓ Final state verification                                   ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 echo ""

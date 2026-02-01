@@ -3,7 +3,7 @@
  *
  * Tests the MCP server's tool registration and protocol behavior.
  * These tests verify that:
- * 1. All 93 tools are registered with correct schemas
+ * 1. All 98 tools are registered with correct schemas
  * 2. Tool names follow category naming conventions
  * 3. Every registered tool has a matching handler case
  * 4. Permission checks via role-based access
@@ -50,7 +50,7 @@ vi.mock('@modelcontextprotocol/sdk/types.js', () => ({
 }));
 
 /**
- * Complete list of all 93 MCP tools organized by category.
+ * Complete list of all 98 MCP tools organized by category.
  * This serves as the canonical reference and regression test.
  * If a tool is added or removed from the MCP server, this list must be updated.
  */
@@ -120,10 +120,13 @@ const EXPECTED_TOOLS: Record<string, string[]> = {
   'DAG Solver': [
     'dag_sort',
   ],
+  'Native TeammateTool Aliases': [
+    'send_message', 'read_messages', 'create_task', 'update_task', 'list_tasks',
+  ],
 };
 
 const ALL_EXPECTED_TOOL_NAMES = Object.values(EXPECTED_TOOLS).flat().sort();
-const EXPECTED_TOOL_COUNT = 93;
+const EXPECTED_TOOL_COUNT = 98;
 
 describe('MCP Integration', () => {
   beforeEach(() => {
@@ -233,6 +236,8 @@ describe('MCP Integration', () => {
             'mission', 'gate', 'compound',
             'memory', 'task',
             'lmsh', 'search', 'dag',
+            // Native TeammateTool aliases use verb-first naming
+            'send', 'read', 'create', 'update', 'list',
           ];
           expect(validPrefixes).toContain(prefix);
         }

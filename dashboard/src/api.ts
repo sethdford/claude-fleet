@@ -27,6 +27,8 @@ import type {
   Proposal,
   Bid,
   BiddingStats,
+  MemoryEntry,
+  RoutingRecommendation,
 } from '@/types';
 
 /** Valid blackboard message types (from schema) */
@@ -762,6 +764,43 @@ export async function resumeExecution(executionId: string): Promise<unknown> {
 
 export async function cancelExecution(executionId: string): Promise<unknown> {
   return request(`/executions/${encodeURIComponent(executionId)}/cancel`, { method: 'POST' });
+}
+
+// ---------------------------------------------------------------------------
+// Memory
+// ---------------------------------------------------------------------------
+
+export async function listMemories(agentId: string, limit = 50): Promise<{ memories: MemoryEntry[] }> {
+  return request<{ memories: MemoryEntry[] }>(`/memory/${encodeURIComponent(agentId)}?limit=${limit}`);
+}
+
+export async function recallMemory(agentId: string, key: string): Promise<MemoryEntry> {
+  return request<MemoryEntry>(`/memory/recall/${encodeURIComponent(agentId)}/${encodeURIComponent(key)}`);
+}
+
+export async function storeMemory(agentId: string, key: string, value: string, memoryType?: string, tags?: string[]): Promise<MemoryEntry> {
+  return request<MemoryEntry>('/memory/store', {
+    method: 'POST',
+    body: JSON.stringify({ agentId, key, value, memoryType, tags }),
+  });
+}
+
+export async function searchMemories(agentId: string, query: string, limit?: number): Promise<{ results: MemoryEntry[] }> {
+  return request<{ results: MemoryEntry[] }>('/memory/search', {
+    method: 'POST',
+    body: JSON.stringify({ agentId, query, limit }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Routing
+// ---------------------------------------------------------------------------
+
+export async function classifyTask(subject: string, description?: string): Promise<RoutingRecommendation> {
+  return request<RoutingRecommendation>('/routing/classify', {
+    method: 'POST',
+    body: JSON.stringify({ subject, description }),
+  });
 }
 
 // ---------------------------------------------------------------------------

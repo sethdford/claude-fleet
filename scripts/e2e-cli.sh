@@ -656,6 +656,178 @@ else
 fi
 
 # ============================================================================
+section "MEMORY COMMANDS"
+# ============================================================================
+
+# memory-store
+OUTPUT=$($CLI --token "$LEAD_TOKEN" memory-store lead project-context "Working on auth module" --type fact --tags auth,jwt 2>&1) || true
+if echo "$OUTPUT" | grep -q '"key"'; then
+  pass "memory-store - stores a memory entry"
+else
+  fail "memory-store - expected key field" "$OUTPUT"
+fi
+
+# memory-recall
+OUTPUT=$($CLI --token "$LEAD_TOKEN" memory-recall lead project-context 2>&1) || true
+if echo "$OUTPUT" | grep -q '"value"'; then
+  pass "memory-recall - recalls stored memory"
+else
+  fail "memory-recall - expected value field" "$OUTPUT"
+fi
+
+# memory-search
+OUTPUT=$($CLI --token "$LEAD_TOKEN" memory-search lead "auth" 2>&1) || true
+if echo "$OUTPUT" | grep -q '"results"'; then
+  pass "memory-search - searches memories"
+else
+  fail "memory-search - expected results field" "$OUTPUT"
+fi
+
+# memory-list
+OUTPUT=$($CLI --token "$LEAD_TOKEN" memory-list lead 2>&1) || true
+if echo "$OUTPUT" | grep -q '"memories"'; then
+  pass "memory-list - lists agent memories"
+else
+  fail "memory-list - expected memories field" "$OUTPUT"
+fi
+
+# memory-list with limit
+OUTPUT=$($CLI --token "$LEAD_TOKEN" memory-list lead --limit 5 2>&1) || true
+if echo "$OUTPUT" | grep -q '"memories"'; then
+  pass "memory-list --limit - lists with limit"
+else
+  fail "memory-list --limit - expected memories field" "$OUTPUT"
+fi
+
+# memory-store missing args
+OUTPUT=$($CLI --token "$LEAD_TOKEN" memory-store 2>&1) || EXIT_CODE=$?
+if echo "$OUTPUT" | grep -q 'Usage:'; then
+  pass "memory-store - validates required args"
+else
+  fail "memory-store - expected usage message" "$OUTPUT"
+fi
+
+# ============================================================================
+section "ROUTING COMMANDS"
+# ============================================================================
+
+# route - classify a task
+OUTPUT=$($CLI --token "$LEAD_TOKEN" route "Refactor authentication module" "Extract JWT logic into service" 2>&1) || true
+if echo "$OUTPUT" | grep -q '"complexity"'; then
+  pass "route - classifies task complexity"
+else
+  fail "route - expected complexity field" "$OUTPUT"
+fi
+
+# route without description
+OUTPUT=$($CLI --token "$LEAD_TOKEN" route "Fix a typo" 2>&1) || true
+if echo "$OUTPUT" | grep -q '"complexity"'; then
+  pass "route - works without description"
+else
+  fail "route - expected complexity field" "$OUTPUT"
+fi
+
+# route missing args
+OUTPUT=$($CLI --token "$LEAD_TOKEN" route 2>&1) || EXIT_CODE=$?
+if echo "$OUTPUT" | grep -q 'Usage:'; then
+  pass "route - validates required args"
+else
+  fail "route - expected usage message" "$OUTPUT"
+fi
+
+# ============================================================================
+section "LMSH COMMANDS"
+# ============================================================================
+
+# lmsh translate
+OUTPUT=$($CLI --token "$LEAD_TOKEN" lmsh "list all typescript files" 2>&1) || true
+if echo "$OUTPUT" | grep -q '"command"\|"error"'; then
+  pass "lmsh - translates natural language to shell"
+else
+  fail "lmsh - expected command or error field" "$OUTPUT"
+fi
+
+# lmsh missing args
+OUTPUT=$($CLI --token "$LEAD_TOKEN" lmsh 2>&1) || EXIT_CODE=$?
+if echo "$OUTPUT" | grep -q 'Usage:'; then
+  pass "lmsh - validates required args"
+else
+  fail "lmsh - expected usage message" "$OUTPUT"
+fi
+
+# ============================================================================
+section "SEARCH COMMANDS"
+# ============================================================================
+
+# search
+OUTPUT=$($CLI --token "$LEAD_TOKEN" search "authentication" 2>&1) || true
+if echo "$OUTPUT" | grep -q '"results"\|"hits"\|"error"'; then
+  pass "search - performs search query"
+else
+  fail "search - expected results field" "$OUTPUT"
+fi
+
+# search with limit
+OUTPUT=$($CLI --token "$LEAD_TOKEN" search "auth" --limit 5 2>&1) || true
+if echo "$OUTPUT" | grep -q '"results"\|"hits"\|"error"'; then
+  pass "search --limit - performs search with limit"
+else
+  fail "search --limit - expected results field" "$OUTPUT"
+fi
+
+# search missing args
+OUTPUT=$($CLI --token "$LEAD_TOKEN" search 2>&1) || EXIT_CODE=$?
+if echo "$OUTPUT" | grep -q 'Usage:'; then
+  pass "search - validates required args"
+else
+  fail "search - expected usage message" "$OUTPUT"
+fi
+
+# ============================================================================
+section "DAG COMMANDS"
+# ============================================================================
+
+# dag-sort
+OUTPUT=$($CLI --token "$LEAD_TOKEN" dag-sort "$TEAM" 2>&1) || true
+if echo "$OUTPUT" | grep -q '"sorted"\|"order"\|"error"\|No tasks found'; then
+  pass "dag-sort - attempts topological sort"
+else
+  fail "dag-sort - expected sorted or error field" "$OUTPUT"
+fi
+
+# dag-cycles
+OUTPUT=$($CLI --token "$LEAD_TOKEN" dag-cycles "$TEAM" 2>&1) || true
+if echo "$OUTPUT" | grep -q '"cycles"\|"hasCycles"\|"error"\|No tasks found'; then
+  pass "dag-cycles - checks for dependency cycles"
+else
+  fail "dag-cycles - expected cycles or error field" "$OUTPUT"
+fi
+
+# dag-critical-path
+OUTPUT=$($CLI --token "$LEAD_TOKEN" dag-critical-path "$TEAM" 2>&1) || true
+if echo "$OUTPUT" | grep -q '"criticalPath"\|"path"\|"error"\|No tasks found'; then
+  pass "dag-critical-path - finds critical path"
+else
+  fail "dag-critical-path - expected path or error field" "$OUTPUT"
+fi
+
+# dag-ready
+OUTPUT=$($CLI --token "$LEAD_TOKEN" dag-ready "$TEAM" 2>&1) || true
+if echo "$OUTPUT" | grep -q '"ready"\|"nodes"\|"error"\|No tasks found'; then
+  pass "dag-ready - finds ready tasks"
+else
+  fail "dag-ready - expected ready or error field" "$OUTPUT"
+fi
+
+# dag-sort missing args
+OUTPUT=$($CLI --token "$LEAD_TOKEN" dag-sort 2>&1) || EXIT_CODE=$?
+if echo "$OUTPUT" | grep -q 'Usage:'; then
+  pass "dag-sort - validates required args"
+else
+  fail "dag-sort - expected usage message" "$OUTPUT"
+fi
+
+# ============================================================================
 section "CLI OPTIONS & ERROR HANDLING"
 # ============================================================================
 

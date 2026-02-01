@@ -35,6 +35,12 @@ interface NativeTaskFile {
   status: NativeTaskStatus;
   owner: string | null;
   blockedBy: string[];
+  /** Task IDs that this task blocks (inverse of blockedBy) */
+  blocks: string[];
+  /** Present-continuous form shown in spinner UI (e.g. "Running tests") */
+  activeForm: string | null;
+  /** Arbitrary metadata for tool-specific data */
+  metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -204,6 +210,9 @@ export class TaskSyncBridge extends EventEmitter {
         status: nativeStatus,
         owner: fleetTask.ownerHandle ?? null,
         blockedBy: Array.isArray(blockedBy) ? blockedBy : [],
+        blocks: [],
+        activeForm: null,
+        metadata: {},
         createdAt: fleetTask.createdAt,
         updatedAt: new Date().toISOString(),
       };
@@ -251,7 +260,21 @@ export class TaskSyncBridge extends EventEmitter {
       }
 
       const content = readFileSync(filePath, 'utf-8');
-      const nativeTask = JSON.parse(content) as NativeTaskFile;
+      const raw = JSON.parse(content) as Partial<NativeTaskFile>;
+      // Normalize: older native files may lack blocks/activeForm/metadata
+      const nativeTask: NativeTaskFile = {
+        id: raw.id ?? taskId,
+        subject: raw.subject ?? '',
+        description: raw.description ?? '',
+        status: raw.status ?? 'pending',
+        owner: raw.owner ?? null,
+        blockedBy: raw.blockedBy ?? [],
+        blocks: raw.blocks ?? [],
+        activeForm: raw.activeForm ?? null,
+        metadata: raw.metadata ?? {},
+        createdAt: raw.createdAt ?? new Date().toISOString(),
+        updatedAt: raw.updatedAt ?? new Date().toISOString(),
+      };
       const fleetStatus = nativeToFleetStatus(nativeTask.status);
 
       // Check if task exists in Fleet

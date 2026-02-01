@@ -16,6 +16,24 @@ import { homedir } from 'node:os';
 import { EventEmitter } from 'node:events';
 import type { AgentRole } from '../types.js';
 
+/**
+ * Deterministic color assignment from an agent handle.
+ * Uses a simple hash to pick from a palette of 12 distinct colors.
+ */
+const AGENT_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
+  '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F',
+  '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA',
+];
+
+function agentColorFromHandle(handle: string): string {
+  let hash = 0;
+  for (let i = 0; i < handle.length; i++) {
+    hash = ((hash << 5) - hash + handle.charCodeAt(i)) | 0;
+  }
+  return AGENT_COLORS[Math.abs(hash) % AGENT_COLORS.length];
+}
+
 /** JSON format for native task files at ~/.claude/tasks/{team}/{id}.json */
 export interface NativeTaskFile {
   id: string;
@@ -24,6 +42,12 @@ export interface NativeTaskFile {
   status: 'pending' | 'in_progress' | 'completed';
   owner: string | null;
   blockedBy: string[];
+  /** Task IDs that this task blocks (inverse of blockedBy) */
+  blocks: string[];
+  /** Present-continuous form shown in spinner UI (e.g. "Running tests") */
+  activeForm: string | null;
+  /** Arbitrary metadata for tool-specific data */
+  metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -182,12 +206,18 @@ export class NativeBridge extends EventEmitter {
   buildNativeEnv(handle: string, teamName: string, role: AgentRole): Record<string, string> {
     const agentId = `${teamName}-${handle}`;
     return {
+      // Core identity
       CLAUDE_CODE_TEAM_NAME: teamName,
       CLAUDE_CODE_AGENT_ID: agentId,
       CLAUDE_CODE_AGENT_TYPE: role,
       CLAUDE_CODE_AGENT_NAME: handle,
       CLAUDE_FLEET_URL: process.env.CLAUDE_FLEET_URL ?? 'http://localhost:3847',
       CLAUDE_CODE_SPAWN_BACKEND: 'native',
+      // Native team mode activation
+      CLAUDE_CODE_TEAM_MODE: 'true',
+      CLAUDE_CODE_AGENT_COLOR: agentColorFromHandle(handle),
+      CLAUDE_CODE_PLAN_MODE_REQUIRED: process.env.CLAUDE_CODE_PLAN_MODE_REQUIRED ?? 'false',
+      CLAUDE_CODE_PARENT_SESSION_ID: process.env.CLAUDE_CODE_SESSION_ID ?? agentId,
     };
   }
 
@@ -224,7 +254,21 @@ export class NativeBridge extends EventEmitter {
     if (!existsSync(filePath)) return null;
     try {
       const content = readFileSync(filePath, 'utf-8');
-      return JSON.parse(content) as NativeTaskFile;
+      const raw = JSON.parse(content) as Partial<NativeTaskFile>;
+      // Normalize: older files may lack blocks/activeForm/metadata
+      return {
+        id: raw.id ?? taskId,
+        subject: raw.subject ?? '',
+        description: raw.description ?? '',
+        status: raw.status ?? 'pending',
+        owner: raw.owner ?? null,
+        blockedBy: raw.blockedBy ?? [],
+        blocks: raw.blocks ?? [],
+        activeForm: raw.activeForm ?? null,
+        metadata: raw.metadata ?? {},
+        createdAt: raw.createdAt ?? new Date().toISOString(),
+        updatedAt: raw.updatedAt ?? new Date().toISOString(),
+      };
     } catch {
       return null;
     }
@@ -244,7 +288,21 @@ export class NativeBridge extends EventEmitter {
       if (!file.endsWith('.json')) continue;
       try {
         const content = readFileSync(join(teamDir, file), 'utf-8');
-        tasks.push(JSON.parse(content) as NativeTaskFile);
+        const raw = JSON.parse(content) as Partial<NativeTaskFile>;
+        const taskId = file.replace('.json', '');
+        tasks.push({
+          id: raw.id ?? taskId,
+          subject: raw.subject ?? '',
+          description: raw.description ?? '',
+          status: raw.status ?? 'pending',
+          owner: raw.owner ?? null,
+          blockedBy: raw.blockedBy ?? [],
+          blocks: raw.blocks ?? [],
+          activeForm: raw.activeForm ?? null,
+          metadata: raw.metadata ?? {},
+          createdAt: raw.createdAt ?? new Date().toISOString(),
+          updatedAt: raw.updatedAt ?? new Date().toISOString(),
+        });
       } catch {
         // Skip malformed files
       }

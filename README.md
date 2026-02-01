@@ -144,6 +144,9 @@ npm install -g claude-fleet
 ### Start the Server
 
 ```bash
+# Set your API key (required for spawning agents)
+export ANTHROPIC_API_KEY="sk-ant-..."
+
 # Start the fleet server (default port 3847)
 claude-fleet
 
@@ -209,6 +212,15 @@ fleet wave --repos api,frontend,shared \
 | `POST` | `/swarms/:id/blackboard` | Post to blackboard |
 | `GET` | `/swarms/:id/blackboard` | Read blackboard |
 | `POST` | `/teams/:name/broadcast` | Broadcast to team (lead only) |
+| `POST` | `/memory/store` | Store agent memory |
+| `GET` | `/memory/recall/:agentId/:key` | Recall a memory |
+| `POST` | `/memory/search` | Search memories (FTS5) |
+| `GET` | `/memory/:agentId` | List agent memories |
+| `POST` | `/routing/classify` | Classify task complexity |
+| `POST` | `/dag/sort` | Topological sort of tasks |
+| `POST` | `/dag/ready` | Find unblocked tasks |
+| `POST` | `/lmsh/translate` | Natural language to shell |
+| `POST` | `/search` | Full-text code search |
 
 See `docs/api.md` for the complete API reference.
 
@@ -253,6 +265,27 @@ fleet blackboard-post <swarm> <sender> <type> <payload>
 fleet templates                     # List templates
 fleet templates use <name>          # Apply template
 
+# Agent Memory
+fleet memory-store <agent> <key> <value> [--type <type>] [--tags <t1,t2>]
+fleet memory-recall <agent> <key>   # Recall a memory
+fleet memory-search <agent> <query> [--type <type>] [--limit <n>]
+fleet memory-list <agent> [--limit <n>]
+
+# Task Routing
+fleet route <subject> [description] # Classify task complexity
+
+# DAG Operations
+fleet dag-sort <team>               # Topological sort of tasks
+fleet dag-cycles <team>             # Check for dependency cycles
+fleet dag-critical-path <team>      # Find critical path
+fleet dag-ready <team>              # Find unblocked tasks
+
+# Natural Language Shell
+fleet lmsh <natural-language>       # Translate to shell command
+
+# Search
+fleet search <query> [--limit <n>]  # Full-text code search
+
 # Audit
 fleet audit                         # Run all quality checks
 fleet audit --verbose               # Verbose output
@@ -262,7 +295,7 @@ fleet audit --verbose               # Verbose output
 
 ## MCP Integration
 
-Claude Fleet exposes 94 tools via Model Context Protocol for direct Claude Code integration:
+Claude Fleet exposes 93 tools via Model Context Protocol for direct Claude Code integration:
 
 ```json
 {

@@ -1812,6 +1812,84 @@ export function createServer(): Server {
         },
       },
 
+      // ============================================================================
+      // Native TeammateTool Aliases
+      // These match the operation names used by Claude Code's native team mode.
+      // When native team mode ships, agents calling these names will hit Fleet.
+      // ============================================================================
+      {
+        name: 'send_message',
+        description: 'Send a message to a teammate (native alias for team_send)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            handle: { type: 'string', description: 'Teammate handle to send to' },
+            message: { type: 'string', description: 'Message text' },
+          },
+          required: ['handle', 'message'],
+        },
+      },
+      {
+        name: 'read_messages',
+        description: 'Read messages from your inbox (native alias for mail_read)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            filter: {
+              type: 'string',
+              enum: ['unread', 'all'],
+              description: 'Filter messages (default: unread)',
+            },
+            mark_read: { type: 'boolean', description: 'Mark as read after retrieval' },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'create_task',
+        description: 'Create a task and optionally assign it to a teammate (native alias for team_assign)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            agent: { type: 'string', description: 'Teammate handle to assign to' },
+            task: { type: 'string', description: 'Task subject/title' },
+            description: { type: 'string', description: 'Detailed task description' },
+          },
+          required: ['agent', 'task'],
+        },
+      },
+      {
+        name: 'update_task',
+        description: 'Update a task status (native alias for team_complete / workitem_update)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task_id: { type: 'string', description: 'Task ID to update' },
+            status: {
+              type: 'string',
+              enum: ['pending', 'in_progress', 'completed', 'blocked'],
+              description: 'New status',
+            },
+          },
+          required: ['task_id', 'status'],
+        },
+      },
+      {
+        name: 'list_tasks',
+        description: 'List tasks for the current team (native alias for team_tasks)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            filter: {
+              type: 'string',
+              enum: ['all', 'mine', 'unassigned'],
+              description: 'Filter tasks',
+            },
+          },
+          required: [],
+        },
+      },
+
     ],
   }));
 
@@ -1850,6 +1928,7 @@ export function createServer(): Server {
         }
 
         // Tasks
+        case 'list_tasks': // Native alias
         case 'team_tasks': {
           const teamName = process.env.CLAUDE_CODE_TEAM_NAME ?? 'default';
           const tasks = await callApi('GET', `/teams/${teamName}/tasks`);
@@ -1870,6 +1949,7 @@ export function createServer(): Server {
           });
         }
 
+        case 'create_task': // Native alias
         case 'team_assign': {
           const permError = checkPermission('assign');
           if (permError) return permError;
@@ -1896,6 +1976,19 @@ export function createServer(): Server {
           return formatResponse(result);
         }
 
+        case 'update_task': {
+          // Native alias: accepts native status names and maps to Fleet status
+          const { task_id, status: nativeStatus } = args as { task_id: string; status?: string };
+          const statusMap: Record<string, string> = {
+            pending: 'open',
+            in_progress: 'in_progress',
+            completed: 'resolved',
+            blocked: 'blocked',
+          };
+          const fleetStatus = statusMap[nativeStatus ?? 'completed'] ?? 'resolved';
+          const updateResult = await callApi('PATCH', `/tasks/${task_id}`, { status: fleetStatus });
+          return formatResponse(updateResult);
+        }
         case 'team_complete': {
           const { task_id } = args as { task_id: string };
           const result = await callApi('PATCH', `/tasks/${task_id}`, {
@@ -1950,6 +2043,7 @@ export function createServer(): Server {
           return formatResponse(workers);
         }
 
+        case 'send_message': // Native alias
         case 'team_send': {
           const { handle, message } = args as { handle: string; message: string };
           const result = await callApi('POST', `/orchestrate/send/${handle}`, {
@@ -2077,6 +2171,7 @@ export function createServer(): Server {
           return formatResponse(result);
         }
 
+        case 'read_messages': // Native alias
         case 'mail_read': {
           const { filter, mark_read } = args as {
             filter?: string;
