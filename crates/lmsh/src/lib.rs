@@ -152,7 +152,7 @@ impl LmshTranslator {
                 confidence: 0.85,
             },
             Pattern {
-                triggers: vec!["search in files", "grep", "find text", "search for text"],
+                triggers: vec!["search in files", "grep", "find text", "search for text", "search for"],
                 command_template: "grep -r '{pattern}' .",
                 explanation: "Search for text in files recursively",
                 confidence: 0.85,

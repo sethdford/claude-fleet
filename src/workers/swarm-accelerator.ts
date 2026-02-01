@@ -296,7 +296,7 @@ class JSSwarmAccelerator implements SwarmAccelerator {
       const winnerRatio = maxVotes / totalWeight;
       switch (method) {
         case 'supermajority':
-          quorumMet = winnerRatio >= 0.667;
+          quorumMet = winnerRatio >= 2 / 3;
           break;
         case 'unanimous':
           quorumMet = winnerRatio >= 1.0;
