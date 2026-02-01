@@ -175,6 +175,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cct-dag"
+version = "3.0.0"
+dependencies = [
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cct-lmsh"
 version = "3.0.0"
 dependencies = [
@@ -185,6 +196,42 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "cct-logstream"
+version = "3.0.0"
+dependencies = [
+ "chrono",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "cct-metrics"
+version = "3.0.0"
+dependencies = [
+ "chrono",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "cct-ringbus"
+version = "3.0.0"
+dependencies = [
+ "chrono",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -206,6 +253,17 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "cct-swarm"
+version = "3.0.0"
+dependencies = [
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

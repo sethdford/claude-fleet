@@ -1,0 +1,19 @@
+[package]
+name = "cct-ringbus"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Topic-based pub/sub message ring buffer for high-throughput inter-agent communication"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi.workspace = true
+napi-derive.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+
+[build-dependencies]
+napi-build.workspace = true
