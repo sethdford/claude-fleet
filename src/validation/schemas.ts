@@ -124,6 +124,15 @@ export type MarkReadInput = z.infer<typeof markReadSchema>;
 // WORKER SCHEMAS
 // ============================================================================
 
+export const registerExternalWorkerSchema = z.object({
+  handle: handleSchema,
+  teamName: teamNameSchema.optional(),
+  workingDir: z.string().max(500).optional(),
+  swarmId: z.string().max(100).optional(),
+});
+
+export type RegisterExternalWorkerInput = z.infer<typeof registerExternalWorkerSchema>;
+
 export const spawnWorkerSchema = z.object({
   handle: handleSchema,
   teamName: teamNameSchema.optional(),

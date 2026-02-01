@@ -26,6 +26,7 @@ import { renderScheduler } from '@/views/scheduler';
 import { renderMail } from '@/views/mail';
 import { renderWorkflows } from '@/views/workflows';
 import { renderHive } from '@/views/hive';
+import { renderConnections } from '@/views/connections';
 
 import type { ActivityType } from '@/types';
 
@@ -385,6 +386,17 @@ function hideTaskModal(): void {
   (document.getElementById('task-form') as HTMLFormElement | null)?.reset();
 }
 
+function showConnectModal(): void {
+  document.getElementById('connect-command-output')?.classList.add('hidden');
+  document.getElementById('connect-modal')?.classList.add('active');
+}
+
+function hideConnectModal(): void {
+  document.getElementById('connect-modal')?.classList.remove('active');
+  (document.getElementById('connect-form') as HTMLFormElement | null)?.reset();
+  document.getElementById('connect-command-output')?.classList.add('hidden');
+}
+
 // ---------------------------------------------------------------------------
 // Route registration
 // ---------------------------------------------------------------------------
@@ -433,6 +445,11 @@ router.register('/workflows', async () => {
 router.register('/hive', async () => {
   el('page-title').textContent = 'Hex Hive';
   return renderHive(el('main-view'));
+});
+
+router.register('/connections', async () => {
+  el('page-title').textContent = 'Connections';
+  return renderConnections(el('main-view'));
 });
 
 router.register('/worker/:handle', async (handle: string) => {
@@ -615,6 +632,88 @@ async function initializeApp(): Promise<void> {
       }
     });
 
+    // Connect modal
+    document.getElementById('connect-modal-close')?.addEventListener('click', hideConnectModal);
+    document.getElementById('connect-cancel')?.addEventListener('click', hideConnectModal);
+    document.getElementById('connect-generate')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const handle = (document.getElementById('connect-handle') as HTMLInputElement).value.trim();
+      const teamName = (document.getElementById('connect-team') as HTMLInputElement).value.trim() || 'default';
+      const workingDir = (document.getElementById('connect-workdir') as HTMLInputElement).value.trim() || undefined;
+      const serverOverride = (document.getElementById('connect-server') as HTMLInputElement).value.trim();
+
+      if (!handle) { toast.warning('Agent handle is required'); return; }
+
+      // Validate handle format — must match backend's handleSchema (alphanumeric, hyphens, underscores)
+      const HANDLE_PATTERN = /^[a-zA-Z0-9_-]+$/;
+      if (!HANDLE_PATTERN.test(handle)) {
+        toast.warning('Handle must contain only letters, numbers, hyphens, and underscores');
+        return;
+      }
+      if (handle.length > 50) {
+        toast.warning('Handle must be at most 50 characters');
+        return;
+      }
+
+      // Validate team name with same safe-character constraint
+      if (!HANDLE_PATTERN.test(teamName)) {
+        toast.warning('Team name must contain only letters, numbers, hyphens, and underscores');
+        return;
+      }
+
+      const btn = document.getElementById('connect-generate') as HTMLButtonElement;
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Registering...';
+
+        // Pre-register the external worker via team-lead token
+        await api.registerExternalWorker({ handle, teamName, workingDir });
+
+        // Build the connection command.
+        // handle and teamName are validated as [a-zA-Z0-9_-]+ above,
+        // so they are safe for shell interpolation without escaping.
+        const serverUrl = serverOverride || window.location.origin;
+
+        const command = `# Step 1: Authenticate
+TOKEN=$(curl -s -X POST '${serverUrl}/auth' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"handle":"${handle}","teamName":"${teamName}","agentType":"worker"}' \\
+  | jq -r '.token')
+
+# Step 2: Send heartbeat (run in a loop or from your agent)
+curl -s -X POST '${serverUrl}/orchestrate/workers/${encodeURIComponent(handle)}/output' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"event":{"type":"system","text":"connected"}}'`;
+
+        const pre = document.getElementById('connect-command-pre');
+        const output = document.getElementById('connect-command-output');
+        if (pre) pre.textContent = command;
+        output?.classList.remove('hidden');
+
+        toast.success(`External worker "${handle}" registered`);
+        await fetchWorkers();
+      } catch (err) {
+        toast.error('Failed to register worker: ' + (err instanceof Error ? err.message : String(err)));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Command';
+      }
+    });
+
+    document.getElementById('connect-copy-btn')?.addEventListener('click', () => {
+      const pre = document.getElementById('connect-command-pre');
+      if (!pre?.textContent) {
+        toast.warning('Generate a connection command first');
+        return;
+      }
+      navigator.clipboard.writeText(pre.textContent).then(() => {
+        toast.success('Copied to clipboard');
+      }).catch((err) => {
+        console.error('Clipboard write failed:', err);
+        toast.warning('Failed to copy — select and copy manually');
+      });
+    });
+
     // Global events
     window.addEventListener('auth:logout', () => {
       wsManager.disconnect();
@@ -674,6 +773,7 @@ interface FleetDashboard {
   showSpawnModal: typeof showSpawnModal;
   showSwarmModal: typeof showSwarmModal;
   showTaskModal: typeof showTaskModal;
+  showConnectModal: typeof showConnectModal;
 }
 
 declare global {
@@ -690,4 +790,5 @@ window.fleetDashboard = {
   showSpawnModal,
   showSwarmModal,
   showTaskModal,
+  showConnectModal,
 };

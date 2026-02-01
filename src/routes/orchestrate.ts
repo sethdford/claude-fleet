@@ -11,6 +11,7 @@ import {
   sendToWorkerSchema,
   worktreeCommitSchema,
   worktreePRSchema,
+  registerExternalWorkerSchema,
 } from '../validation/schemas.js';
 import { workerSpawns, workerDismissals } from '../metrics/prometheus.js';
 import type { ErrorResponse } from '../types.js';
@@ -109,6 +110,7 @@ export function createGetWorkersHandler(deps: RouteDependencies) {
       spawnedAt: w.spawnedAt,
       currentTaskId: w.currentTaskId,
       restartCount: w.restartCount,
+      spawnMode: w.spawnMode,
       swarmId: w.swarmId ?? null,
       depthLevel: w.depthLevel ?? 1,
     }));
@@ -140,12 +142,13 @@ export function createGetWorkerOutputHandler(deps: RouteDependencies) {
 
 export function createRegisterExternalWorkerHandler(deps: RouteDependencies, broadcastToAll: BroadcastToAll) {
   return asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { handle, teamName, workingDir, swarmId } = req.body;
-
-    if (!handle || typeof handle !== 'string') {
-      res.status(400).json({ error: 'handle is required' } as ErrorResponse);
+    const validation = validateBody(registerExternalWorkerSchema, req.body);
+    if (!validation.success) {
+      res.status(400).json({ error: validation.error } as ErrorResponse);
       return;
     }
+
+    const { handle, teamName, workingDir, swarmId } = validation.data;
 
     try {
       const worker = deps.workerManager.registerExternalWorker(

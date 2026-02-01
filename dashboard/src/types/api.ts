@@ -23,6 +23,7 @@ export interface WorkerInfo {
   health: 'healthy' | 'degraded' | 'unhealthy';
   spawnedAt: number;
   restartCount: number;
+  spawnMode?: 'process' | 'tmux' | 'external' | 'native';
   swarmId?: string;
   currentTaskId?: string;
   depthLevel?: number;

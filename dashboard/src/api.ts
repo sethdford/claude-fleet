@@ -182,6 +182,36 @@ export async function spawnWorker(
 }
 
 // ---------------------------------------------------------------------------
+// External Workers (Connections)
+// ---------------------------------------------------------------------------
+
+export async function generateConnectionToken(
+  handle: string,
+  teamName: string,
+): Promise<AuthResponse> {
+  return request<AuthResponse>('/auth', {
+    method: 'POST',
+    body: JSON.stringify({ handle, teamName, agentType: 'worker' }),
+  });
+}
+
+export interface RegisterExternalWorkerPayload {
+  handle: string;
+  teamName?: string;
+  workingDir?: string;
+  swarmId?: string;
+}
+
+export async function registerExternalWorker(
+  payload: RegisterExternalWorkerPayload,
+): Promise<unknown> {
+  return request('/orchestrate/workers/register', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Swarms
 // ---------------------------------------------------------------------------
 
