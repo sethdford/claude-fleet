@@ -42,6 +42,7 @@ export interface MockRequest {
   headers: Record<string, string | undefined>;
   params: Record<string, string>;
   body: Record<string, unknown>;
+  query: Record<string, string | undefined>;
   path: string;
   method: string;
   [key: string]: unknown;
@@ -58,12 +59,14 @@ export interface MockRequest {
  *   handler(req as unknown as Request, res as unknown as Response);
  */
 export function createMockReq(overrides?: Partial<MockRequest>): MockRequest {
+  const { query, ...rest } = overrides ?? {};
   return {
     headers: {},
     params: {},
     body: {},
+    query: query ?? {},
     path: '/test',
     method: 'GET',
-    ...overrides,
+    ...rest,
   };
 }

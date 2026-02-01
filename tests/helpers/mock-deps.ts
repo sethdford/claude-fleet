@@ -183,6 +183,8 @@ export function createMockDeps(): RouteDependencies {
       total: 0,
       lastHour: 0,
     }),
+    getAgentMemory: vi.fn().mockReturnValue(null),
+    getRoutingRecommendation: vi.fn().mockReturnValue(null),
   };
 
   const mockLegacyStorage = {

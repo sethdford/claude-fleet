@@ -683,6 +683,7 @@ TOKEN=$(curl -s -X POST '${serverUrl}/auth' \\
 # Step 2: Send heartbeat (run in a loop or from your agent)
 curl -s -X POST '${serverUrl}/orchestrate/workers/${encodeURIComponent(handle)}/output' \\
   -H 'Content-Type: application/json' \\
+  -H "Authorization: Bearer \$TOKEN" \\
   -d '{"event":{"type":"system","text":"connected"}}'`;
 
         const pre = document.getElementById('connect-command-pre');
