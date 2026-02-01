@@ -207,7 +207,7 @@ describe('AgentMemory', () => {
       // Backdate last_accessed to 30 days ago
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const db = ctx.storage.getDatabase();
-      db.prepare('UPDATE agent_memory SET last_accessed = ? WHERE id = ?').run(
+      db.prepare('UPDATE agent_memory_content SET last_accessed = ? WHERE id = ?').run(
         thirtyDaysAgo,
         entry.id
       );
@@ -225,7 +225,7 @@ describe('AgentMemory', () => {
       // Backdate to force heavy decay
       const longAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
       const db = ctx.storage.getDatabase();
-      db.prepare('UPDATE agent_memory SET last_accessed = ? WHERE id = ?').run(
+      db.prepare('UPDATE agent_memory_content SET last_accessed = ? WHERE id = ?').run(
         longAgo,
         entry.id
       );

@@ -25,5 +25,8 @@ anyhow.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [build-dependencies]
 napi-build.workspace = true

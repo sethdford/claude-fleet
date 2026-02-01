@@ -213,6 +213,14 @@ impl SearchIndex {
         Ok(())
     }
 
+    /// Reload the reader to see the latest committed changes
+    #[napi]
+    pub fn reload(&self) -> Result<()> {
+        self.reader.reload().map_err(|e| {
+            Error::new(Status::GenericFailure, format!("Failed to reload reader: {}", e))
+        })
+    }
+
     /// Get index statistics
     #[napi]
     pub fn stats(&self) -> Result<IndexStats> {
@@ -236,4 +244,95 @@ impl SearchIndex {
 #[napi(object)]
 pub struct IndexStats {
     pub document_count: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_index() -> (SearchIndex, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let index = SearchIndex::new(dir.path().to_str().unwrap().to_string()).unwrap();
+        (index, dir)
+    }
+
+    fn make_session(id: &str, content: &str) -> SessionMetadata {
+        SessionMetadata {
+            session_id: id.to_string(),
+            content: content.to_string(),
+            timestamp: 1_700_000_000,
+            model: Some("opus".to_string()),
+            project_path: Some("/tmp/project".to_string()),
+        }
+    }
+
+    #[test]
+    fn test_index_and_search() {
+        let (idx, _dir) = temp_index();
+        idx.index_session(make_session("s1", "fixing authentication bug in login handler")).unwrap();
+        idx.index_session(make_session("s2", "adding unit tests for database layer")).unwrap();
+        idx.commit().unwrap();
+        idx.reload().unwrap();
+
+        let results = idx.search("authentication".to_string(), Some(10)).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].session_id, "s1");
+        assert!(results[0].score > 0.0);
+    }
+
+    #[test]
+    fn test_empty_search() {
+        let (idx, _dir) = temp_index();
+        idx.commit().unwrap();
+        idx.reload().unwrap();
+
+        let results = idx.search("nonexistent".to_string(), None).unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_stats() {
+        let (idx, _dir) = temp_index();
+        idx.index_session(make_session("s1", "content one")).unwrap();
+        idx.index_session(make_session("s2", "content two")).unwrap();
+        idx.commit().unwrap();
+        idx.reload().unwrap();
+
+        let stats = idx.stats().unwrap();
+        assert_eq!(stats.document_count, 2);
+    }
+
+    #[test]
+    fn test_delete_session() {
+        let (idx, _dir) = temp_index();
+        idx.index_session(make_session("del1", "temporary session to delete")).unwrap();
+        idx.commit().unwrap();
+        idx.reload().unwrap();
+
+        let before = idx.stats().unwrap();
+        assert_eq!(before.document_count, 1);
+
+        idx.delete_session("del1".to_string()).unwrap();
+        idx.commit().unwrap();
+        idx.reload().unwrap();
+
+        let after = idx.stats().unwrap();
+        assert_eq!(after.document_count, 0);
+    }
+
+    #[test]
+    fn test_search_limit() {
+        let (idx, _dir) = temp_index();
+        for i in 0..10 {
+            idx.index_session(make_session(
+                &format!("s{}", i),
+                &format!("rust programming session number {}", i),
+            )).unwrap();
+        }
+        idx.commit().unwrap();
+        idx.reload().unwrap();
+
+        let results = idx.search("rust programming".to_string(), Some(3)).unwrap();
+        assert_eq!(results.len(), 3);
+    }
 }

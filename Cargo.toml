@@ -52,6 +52,9 @@ tokio = { version = "1.36", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# Testing
+tempfile = "3.10"
+
 [profile.release]
 lto = true
 codegen-units = 1

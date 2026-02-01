@@ -290,6 +290,277 @@ describe('SQLiteStorage', () => {
     });
   });
 
+  describe('Mail operations', () => {
+    it('inserts and retrieves mail', () => {
+      const id = storage.insertMail({
+        fromHandle: 'alice',
+        toHandle: 'bob',
+        subject: 'Hello',
+        body: 'Hi Bob',
+        readAt: null,
+        createdAt: Math.floor(Date.now() / 1000),
+      });
+
+      expect(id).toBeGreaterThan(0);
+
+      const msg = storage.getMail(id);
+      expect(msg).not.toBeNull();
+      expect(msg!.fromHandle).toBe('alice');
+      expect(msg!.body).toBe('Hi Bob');
+    });
+
+    it('returns null for non-existent mail', () => {
+      expect(storage.getMail(9999)).toBeNull();
+    });
+
+    it('retrieves unread mail', () => {
+      storage.insertMail({ fromHandle: 'a', toHandle: 'bob', subject: null, body: 'msg1', readAt: null, createdAt: Math.floor(Date.now() / 1000) });
+      storage.insertMail({ fromHandle: 'b', toHandle: 'bob', subject: null, body: 'msg2', readAt: null, createdAt: Math.floor(Date.now() / 1000) });
+
+      const unread = storage.getUnreadMail('bob');
+      expect(unread).toHaveLength(2);
+    });
+
+    it('marks mail as read', () => {
+      const id = storage.insertMail({ fromHandle: 'a', toHandle: 'bob', subject: null, body: 'test', readAt: null, createdAt: Math.floor(Date.now() / 1000) });
+      storage.markMailRead(id);
+
+      const unread = storage.getUnreadMail('bob');
+      expect(unread).toHaveLength(0);
+    });
+
+    it('retrieves all mail with limit', () => {
+      for (let i = 0; i < 5; i++) {
+        storage.insertMail({ fromHandle: `sender-${i}`, toHandle: 'bob', subject: null, body: `msg-${i}`, readAt: null, createdAt: Math.floor(Date.now() / 1000) + i });
+      }
+
+      const all = storage.getAllMailTo('bob', 3);
+      expect(all).toHaveLength(3);
+    });
+  });
+
+  describe('Handoff operations', () => {
+    it('inserts and retrieves a handoff', () => {
+      const id = storage.insertHandoff({
+        fromHandle: 'alice',
+        toHandle: 'bob',
+        context: { task: 'deploy' },
+        acceptedAt: null,
+        createdAt: Math.floor(Date.now() / 1000),
+      });
+
+      expect(id).toBeGreaterThan(0);
+
+      const handoff = storage.getHandoff(id);
+      expect(handoff).not.toBeNull();
+      expect(handoff!.fromHandle).toBe('alice');
+      expect(handoff!.context).toEqual({ task: 'deploy' });
+    });
+
+    it('returns pending handoffs', () => {
+      storage.insertHandoff({ fromHandle: 'a', toHandle: 'bob', context: {}, acceptedAt: null, createdAt: Math.floor(Date.now() / 1000) });
+
+      const pending = storage.getPendingHandoffs('bob');
+      expect(pending).toHaveLength(1);
+    });
+
+    it('accepts a handoff', () => {
+      const id = storage.insertHandoff({ fromHandle: 'a', toHandle: 'bob', context: {}, acceptedAt: null, createdAt: Math.floor(Date.now() / 1000) });
+      storage.acceptHandoff(id);
+
+      const pending = storage.getPendingHandoffs('bob');
+      expect(pending).toHaveLength(0);
+    });
+  });
+
+  describe('Agent memory operations', () => {
+    it('inserts and retrieves agent memory', () => {
+      storage.insertAgentMemory({
+        id: 'mem-1',
+        agentId: 'agent-1',
+        key: 'fact-1',
+        value: 'TypeScript is typed',
+        tags: 'lang,ts',
+        memoryType: 'fact',
+        relevance: 1.0,
+        accessCount: 0,
+        createdAt: new Date().toISOString(),
+        lastAccessed: new Date().toISOString(),
+      });
+
+      const result = storage.getAgentMemoryByKey('agent-1', 'fact-1');
+      expect(result).not.toBeNull();
+      expect(result!.value).toBe('TypeScript is typed');
+    });
+
+    it('returns null for missing memory', () => {
+      const result = storage.getAgentMemoryByKey('agent-1', 'nonexistent');
+      expect(result).toBeUndefined();
+    });
+
+    it('retrieves memories by agent with limit', () => {
+      for (let i = 0; i < 5; i++) {
+        storage.insertAgentMemory({
+          id: `mem-${i}`,
+          agentId: 'agent-1',
+          key: `key-${i}`,
+          value: `value-${i}`,
+          tags: null,
+          memoryType: 'fact',
+          relevance: 1.0 - i * 0.1,
+          accessCount: 0,
+          createdAt: new Date().toISOString(),
+          lastAccessed: new Date().toISOString(),
+        });
+      }
+
+      const memories = storage.getAgentMemoriesByAgent('agent-1', 3);
+      expect(memories).toHaveLength(3);
+    });
+
+    it('updates access count', () => {
+      storage.insertAgentMemory({
+        id: 'mem-acc',
+        agentId: 'agent-1',
+        key: 'accessed',
+        value: 'v',
+        tags: null,
+        memoryType: 'fact',
+        relevance: 1.0,
+        accessCount: 0,
+        createdAt: new Date().toISOString(),
+        lastAccessed: new Date().toISOString(),
+      });
+
+      storage.updateAgentMemoryAccess('mem-acc');
+
+      const result = storage.getAgentMemoryByKey('agent-1', 'accessed');
+      expect(result!.access_count).toBe(1);
+    });
+
+    it('deletes agent memory', () => {
+      storage.insertAgentMemory({
+        id: 'mem-del',
+        agentId: 'agent-1',
+        key: 'deleteme',
+        value: 'v',
+        tags: null,
+        memoryType: 'fact',
+        relevance: 1.0,
+        accessCount: 0,
+        createdAt: new Date().toISOString(),
+        lastAccessed: new Date().toISOString(),
+      });
+
+      storage.deleteAgentMemory('mem-del');
+
+      const result = storage.getAgentMemoryByKey('agent-1', 'deleteme');
+      expect(result).toBeUndefined();
+    });
+
+    it('searches agent memory', () => {
+      storage.insertAgentMemory({
+        id: 'mem-search',
+        agentId: 'agent-1',
+        key: 'search-key',
+        value: 'authentication with JWT tokens',
+        tags: 'auth,jwt',
+        memoryType: 'pattern',
+        relevance: 0.9,
+        accessCount: 0,
+        createdAt: new Date().toISOString(),
+        lastAccessed: new Date().toISOString(),
+      });
+
+      const results = storage.searchAgentMemory('agent-1', 'JWT', 10);
+      expect(results.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('Work item operations', () => {
+    it('inserts and retrieves a work item', () => {
+      const item = {
+        id: 'wi-test1',
+        title: 'Test work item',
+        description: 'Description here',
+        status: 'pending' as const,
+        assignedTo: null,
+        batchId: null,
+        createdAt: Math.floor(Date.now() / 1000),
+      };
+
+      storage.insertWorkItem(item);
+      const retrieved = storage.getWorkItem('wi-test1');
+
+      expect(retrieved).not.toBeNull();
+      expect(retrieved!.title).toBe('Test work item');
+    });
+
+    it('returns null for non-existent work item', () => {
+      expect(storage.getWorkItem('wi-zzzzz')).toBeNull();
+    });
+
+    it('returns all work items', () => {
+      storage.insertWorkItem({ id: 'wi-a', title: 'A', description: null, status: 'pending', assignedTo: null, batchId: null, createdAt: Math.floor(Date.now() / 1000) });
+      storage.insertWorkItem({ id: 'wi-b', title: 'B', description: null, status: 'pending', assignedTo: 'w1', batchId: null, createdAt: Math.floor(Date.now() / 1000) });
+
+      const all = storage.getAllWorkItems();
+      expect(all).toHaveLength(2);
+    });
+
+    it('retrieves work items by assignee', () => {
+      storage.insertWorkItem({ id: 'wi-x', title: 'X', description: null, status: 'pending', assignedTo: 'w1', batchId: null, createdAt: Math.floor(Date.now() / 1000) });
+      storage.insertWorkItem({ id: 'wi-y', title: 'Y', description: null, status: 'pending', assignedTo: 'w2', batchId: null, createdAt: Math.floor(Date.now() / 1000) });
+
+      const w1Items = storage.getWorkItemsByAssignee('w1');
+      expect(w1Items).toHaveLength(1);
+      expect(w1Items[0].title).toBe('X');
+    });
+
+    it('updates work item status', () => {
+      storage.insertWorkItem({ id: 'wi-s', title: 'S', description: null, status: 'pending', assignedTo: null, batchId: null, createdAt: Math.floor(Date.now() / 1000) });
+      storage.updateWorkItemStatus('wi-s', 'completed');
+
+      const retrieved = storage.getWorkItem('wi-s');
+      expect(retrieved!.status).toBe('completed');
+    });
+
+    it('assigns a work item', () => {
+      storage.insertWorkItem({ id: 'wi-assign', title: 'Assign', description: null, status: 'pending', assignedTo: null, batchId: null, createdAt: Math.floor(Date.now() / 1000) });
+      storage.assignWorkItem('wi-assign', 'worker-1');
+
+      const retrieved = storage.getWorkItem('wi-assign');
+      expect(retrieved!.assignedTo).toBe('worker-1');
+      expect(retrieved!.status).toBe('in_progress');
+    });
+  });
+
+  describe('Batch operations', () => {
+    it('inserts and retrieves a batch', () => {
+      storage.insertBatch({ id: 'batch-1', name: 'Sprint 1', status: 'open', createdAt: Math.floor(Date.now() / 1000) });
+
+      const batch = storage.getBatch('batch-1');
+      expect(batch).not.toBeNull();
+      expect(batch!.name).toBe('Sprint 1');
+    });
+
+    it('returns all batches', () => {
+      storage.insertBatch({ id: 'b1', name: 'B1', status: 'open', createdAt: Math.floor(Date.now() / 1000) });
+      storage.insertBatch({ id: 'b2', name: 'B2', status: 'open', createdAt: Math.floor(Date.now() / 1000) });
+
+      const all = storage.getAllBatches();
+      expect(all).toHaveLength(2);
+    });
+
+    it('updates batch status', () => {
+      storage.insertBatch({ id: 'b-upd', name: 'Update Me', status: 'open', createdAt: Math.floor(Date.now() / 1000) });
+      storage.updateBatchStatus('b-upd', 'completed');
+
+      const batch = storage.getBatch('b-upd');
+      expect(batch!.status).toBe('completed');
+    });
+  });
+
   describe('Debug info', () => {
     it('returns aggregated debug info', () => {
       // Insert some data

@@ -250,6 +250,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tantivy",
+ "tempfile",
  "thiserror",
  "tokio",
  "tracing",
