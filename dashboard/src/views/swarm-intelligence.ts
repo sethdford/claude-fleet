@@ -643,7 +643,7 @@ export function renderSwarmIntelStats(
 /**
  * Main swarm intelligence view renderer
  */
-export async function renderSwarmIntelligence(container: HTMLElement, swarmId: string): Promise<void> {
+export async function renderSwarmIntelligence(container: HTMLElement, swarmId: string): Promise<() => void> {
   // Show loading state
   container.innerHTML = `
     <div class="loading p-xl text-center">
@@ -748,84 +748,94 @@ export async function renderSwarmIntelligence(container: HTMLElement, swarmId: s
   // Render hot resources chart
   renderHotResources(document.getElementById('hot-resources-chart'), hotResources);
 
-  // Setup event handlers
-  setupSwarmIntelEventHandlers(container, swarmId);
+  // Setup event delegation ONCE — survives innerHTML replacements from vote/close refreshes
+  setupSwarmIntelEventDelegation(container, swarmId);
+
+  return () => {
+    // Event delegation is on the container which gets cleaned up by the view router.
+  };
 }
 
 /**
- * Setup event handlers for swarm intelligence interactions
+ * Refresh proposals section after vote/close — replaces only the proposals HTML.
  */
-function setupSwarmIntelEventHandlers(container: HTMLElement, swarmId: string): void {
-  // Vote buttons
-  container.querySelectorAll('.vote-btn').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const option = (btn as HTMLElement).dataset.option;
-      const proposalItem = (btn as HTMLElement).closest('.proposal-item') as HTMLElement | null;
+async function refreshProposals(container: HTMLElement, swarmId: string): Promise<void> {
+  try {
+    const updatedProposals = await getProposals(swarmId, { limit: 20 }) as ProposalData[] | { proposals?: ProposalData[] };
+    const proposalsList = Array.isArray(updatedProposals) ? updatedProposals : (updatedProposals as { proposals?: ProposalData[] }).proposals || [];
+    const proposalsContainer = container.querySelector('.proposals-list')?.parentElement;
+    if (proposalsContainer) {
+      proposalsContainer.outerHTML = renderProposals(proposalsList);
+    }
+  } catch (e) {
+    toast.error('Failed to refresh proposals: ' + (e as Error).message);
+  }
+}
+
+/**
+ * Event delegation for swarm intelligence interactions.
+ * Attached ONCE to the container — survives innerHTML replacements from vote/close refreshes.
+ */
+function setupSwarmIntelEventDelegation(container: HTMLElement, swarmId: string): void {
+  container.addEventListener('click', async (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+
+    // Vote buttons
+    const voteBtn = target.closest('.vote-btn') as HTMLElement | null;
+    if (voteBtn) {
+      const option = voteBtn.dataset.option;
+      const proposalItem = voteBtn.closest('.proposal-item') as HTMLElement | null;
       const proposalId = proposalItem?.dataset.proposalId;
       if (proposalId && option) {
         try {
           await voteOnProposal(proposalId, option);
-          // Refresh proposals
-          const updatedProposals = await getProposals(swarmId, { limit: 20 }) as ProposalData[] | { proposals?: ProposalData[] };
-          const proposalsList = Array.isArray(updatedProposals) ? updatedProposals : (updatedProposals as { proposals?: ProposalData[] }).proposals || [];
-          const proposalsContainer = container.querySelector('.proposals-list')?.parentElement;
-          if (proposalsContainer) {
-            proposalsContainer.outerHTML = renderProposals(proposalsList);
-            setupSwarmIntelEventHandlers(container, swarmId);
-          }
+          await refreshProposals(container, swarmId);
         } catch (e) {
           toast.error('Failed to vote: ' + (e as Error).message);
         }
       }
-    });
-  });
+      return;
+    }
 
-  // Close proposal buttons
-  container.querySelectorAll('.close-proposal-btn').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const proposalItem = (btn as HTMLElement).closest('.proposal-item') as HTMLElement | null;
+    // Close proposal buttons
+    const closeBtn = target.closest('.close-proposal-btn') as HTMLElement | null;
+    if (closeBtn) {
+      const proposalItem = closeBtn.closest('.proposal-item') as HTMLElement | null;
       const proposalId = proposalItem?.dataset.proposalId;
       if (proposalId) {
         try {
           await closeProposal(proposalId);
-          // Refresh proposals
-          const updatedProposals = await getProposals(swarmId, { limit: 20 }) as ProposalData[] | { proposals?: ProposalData[] };
-          const proposalsList = Array.isArray(updatedProposals) ? updatedProposals : (updatedProposals as { proposals?: ProposalData[] }).proposals || [];
-          const proposalsContainer = container.querySelector('.proposals-list')?.parentElement;
-          if (proposalsContainer) {
-            proposalsContainer.outerHTML = renderProposals(proposalsList);
-            setupSwarmIntelEventHandlers(container, swarmId);
-          }
+          await refreshProposals(container, swarmId);
         } catch (e) {
           toast.error('Failed to close proposal: ' + (e as Error).message);
         }
       }
-    });
-  });
+      return;
+    }
 
-  // Accept bid buttons
-  container.querySelectorAll('.accept-bid-btn').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const bidItem = (btn as HTMLElement).closest('.bid-item') as HTMLElement | null;
+    // Accept bid buttons
+    const acceptBtn = target.closest('.accept-bid-btn') as HTMLElement | null;
+    if (acceptBtn) {
+      const bidItem = acceptBtn.closest('.bid-item') as HTMLElement | null;
       const bidId = bidItem?.dataset.bidId;
       if (bidId) {
         try {
           await acceptBid(bidId);
-          (btn as HTMLButtonElement).textContent = 'Accepted';
-          (btn as HTMLButtonElement).disabled = true;
-          (btn as HTMLElement).classList.remove('btn-primary');
-          (btn as HTMLElement).classList.add('btn-secondary');
+          (acceptBtn as HTMLButtonElement).textContent = 'Accepted';
+          (acceptBtn as HTMLButtonElement).disabled = true;
+          acceptBtn.classList.remove('btn-primary');
+          acceptBtn.classList.add('btn-secondary');
         } catch (e) {
           toast.error('Failed to accept bid: ' + (e as Error).message);
         }
       }
-    });
-  });
+      return;
+    }
 
-  // Run auction buttons
-  container.querySelectorAll('.run-auction-btn').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const taskId = (btn as HTMLElement).dataset.taskId;
+    // Run auction buttons
+    const auctionBtn = target.closest('.run-auction-btn') as HTMLElement | null;
+    if (auctionBtn) {
+      const taskId = auctionBtn.dataset.taskId;
       if (taskId) {
         try {
           const result = await runAuction(taskId) as { winner?: { bidderHandle?: string } };
@@ -834,7 +844,7 @@ function setupSwarmIntelEventHandlers(container: HTMLElement, swarmId: string): 
           toast.error('Failed to run auction: ' + (e as Error).message);
         }
       }
-    });
+    }
   });
 }
 

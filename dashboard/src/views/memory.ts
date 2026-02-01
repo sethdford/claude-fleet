@@ -159,7 +159,11 @@ export async function renderMemory(container: HTMLElement): Promise<(() => void)
       const tagsInput = (document.getElementById('store-tags') as HTMLInputElement).value.trim();
       const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(Boolean) : undefined;
 
-      if (!selectedAgent || !key || !value) return;
+      if (!selectedAgent) {
+        toast.warning('Select an agent first');
+        return;
+      }
+      if (!key || !value) return;
       try {
         await storeMemory(selectedAgent, key, value, memoryType, tags);
         toast.success('Memory stored');
@@ -206,4 +210,9 @@ export async function renderMemory(container: HTMLElement): Promise<(() => void)
 
   // Initial load
   await loadMemories();
+
+  return () => {
+    // No subscriptions or timers to clean up, but returning a cleanup
+    // function satisfies the view lifecycle contract.
+  };
 }

@@ -187,9 +187,10 @@ export async function renderMail(container: HTMLElement): Promise<() => void> {
     }
   });
 
-  // Compose form
-  const composeForm = document.getElementById('mail-compose-form') as HTMLFormElement | null;
-  composeForm?.addEventListener('submit', async (e: Event) => {
+  // Compose form — use event delegation on the compose container so the
+  // handler survives innerHTML replacement when the workers store updates.
+  const composeContainer = document.getElementById('mail-compose');
+  composeContainer?.addEventListener('submit', async (e: Event) => {
     e.preventDefault();
     const toEl = document.getElementById('mail-to') as HTMLSelectElement | null;
     const subjectEl = document.getElementById('mail-subject') as HTMLInputElement | null;
@@ -215,7 +216,8 @@ export async function renderMail(container: HTMLElement): Promise<() => void> {
     }
   });
 
-  // Update compose dropdown when workers change
+  // Update compose dropdown when workers change — the submit handler is on
+  // the parent #mail-compose div, so it survives this innerHTML replacement.
   const unsubWorkers = store.subscribe('workers', (updatedWorkers: WorkerInfo[]) => {
     const compose = document.getElementById('mail-compose');
     if (compose) compose.innerHTML = renderCompose(updatedWorkers);

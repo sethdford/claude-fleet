@@ -510,7 +510,7 @@ export async function renderGraph(container: HTMLElement): Promise<() => void> {
   }
 
   // Add root file handler
-  function addRootFile(): void {
+  async function addRootFile(): Promise<void> {
     const input = document.getElementById('root-file-input') as HTMLInputElement | null;
     const file = input?.value?.trim();
     if (file && !currentRootFiles.includes(file)) {
@@ -519,6 +519,7 @@ export async function renderGraph(container: HTMLElement): Promise<() => void> {
       renderRootFileTags();
       renderSuggestedFiles();
       if (input) input.value = '';
+      await fetchGraphData();
     }
   }
 

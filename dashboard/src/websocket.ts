@@ -12,22 +12,36 @@ class WebSocketManager {
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 10;
   private readonly reconnectDelay = 1000;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Map<string, Set<WsEventCallback>>();
+  private connectionId = 0;
   connected = false;
   authenticated = false;
 
   /** Connect to the WebSocket server. */
   connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
+    // Prevent duplicate connections in any non-closed state
+    if (this.ws) {
+      const state = this.ws.readyState;
+      if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) return;
+      // Clean up closed/closing sockets — remove handlers to prevent stale onclose from firing
+      this.ws.onopen = null;
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.onmessage = null;
+      this.ws = null;
+    }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
 
+    this.connectionId++;
+    const connId = this.connectionId;
     this.ws = new WebSocket(wsUrl);
     this.updateStatus('connecting');
 
     this.ws.onopen = () => {
-      console.log('[WS] Connected');
+      console.log(`[WS] Connected (conn #${connId})`);
       this.connected = true;
       this.reconnectAttempts = 0;
       this.updateStatus('connected');
@@ -38,8 +52,11 @@ class WebSocketManager {
       this.emit('connected');
     };
 
+    // Capture reference to detect stale close events from superseded sockets
+    const currentWs = this.ws;
     this.ws.onclose = () => {
-      console.log('[WS] Disconnected');
+      if (this.ws !== currentWs) return; // Ignore close from a replaced socket
+      console.log(`[WS] Disconnected (conn #${connId})`);
       this.connected = false;
       this.authenticated = false;
       this.updateStatus('disconnected');
@@ -151,10 +168,17 @@ class WebSocketManager {
 
   /** Disconnect from the WebSocket server. */
   disconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.ws) {
+      this.ws.onclose = null; // Prevent reconnect on intentional disconnect
       this.ws.close();
       this.ws = null;
     }
+    this.connected = false;
+    this.authenticated = false;
   }
 
   /** Attempt to reconnect with exponential backoff. */
@@ -164,11 +188,18 @@ class WebSocketManager {
       return;
     }
 
+    // Cancel any existing reconnect timer
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1);
     console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
-    setTimeout(() => {
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
       if (!this.connected && isAuthenticated()) {
         this.connect();
       }

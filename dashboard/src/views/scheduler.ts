@@ -399,31 +399,34 @@ function renderContent(): void {
     </div>
   `;
 
-  attachEventListeners();
 }
 
-function attachEventListeners(): void {
-  // Start/Stop scheduler
-  document.getElementById('sched-start')?.addEventListener('click', startScheduler);
-  document.getElementById('sched-stop')?.addEventListener('click', stopScheduler);
+function attachEventDelegation(): void {
+  if (!containerEl) return;
 
-  // Load defaults
-  document.getElementById('sched-load-defaults')?.addEventListener('click', loadDefaults);
+  containerEl.addEventListener('click', (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
 
-  // Schedule toggle/delete
-  document.querySelectorAll('.schedule-toggle').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const el = btn as HTMLElement;
-      const id = el.dataset.id;
-      const enable = el.dataset.enable === 'true';
+    // Start/Stop scheduler
+    if (target.closest('#sched-start')) { startScheduler(); return; }
+    if (target.closest('#sched-stop')) { stopScheduler(); return; }
+
+    // Load defaults
+    if (target.closest('#sched-load-defaults')) { loadDefaults(); return; }
+
+    // Schedule toggle
+    const toggleBtn = target.closest('.schedule-toggle') as HTMLElement | null;
+    if (toggleBtn) {
+      const id = toggleBtn.dataset.id;
+      const enable = toggleBtn.dataset.enable === 'true';
       if (id) toggleSchedule(id, enable);
-    });
-  });
+      return;
+    }
 
-  document.querySelectorAll('.schedule-delete').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const el = btn as HTMLElement;
-      const id = el.dataset.id;
+    // Schedule delete
+    const deleteBtn = target.closest('.schedule-delete') as HTMLElement | null;
+    if (deleteBtn) {
+      const id = deleteBtn.dataset.id;
       if (!id) return;
       confirmDialog({
         title: 'Delete Schedule',
@@ -433,16 +436,15 @@ function attachEventListeners(): void {
       }).then(confirmed => {
         if (confirmed) deleteSchedule(id);
       });
-    });
-  });
+      return;
+    }
 
-  // Queue cancel
-  document.querySelectorAll('.queue-cancel').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const el = btn as HTMLElement;
-      const id = el.dataset.id;
+    // Queue cancel
+    const cancelBtn = target.closest('.queue-cancel') as HTMLElement | null;
+    if (cancelBtn) {
+      const id = cancelBtn.dataset.id;
       if (id) cancelTask(id);
-    });
+    }
   });
 }
 
@@ -465,6 +467,9 @@ export async function renderScheduler(container: HTMLElement): Promise<() => voi
 
   await fetchAll();
   renderContent();
+
+  // Attach event delegation ONCE — survives innerHTML re-renders from polling
+  attachEventDelegation();
 
   // Poll for updates
   pollTimer = setInterval(async () => {

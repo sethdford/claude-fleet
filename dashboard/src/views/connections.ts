@@ -7,6 +7,7 @@
 import dayjs from 'dayjs';
 import store from '@/store';
 import toast from '@/components/toast';
+import { confirm as confirmDialog } from '@/components/confirm';
 import { escapeHtml } from '@/utils/escape-html';
 import * as api from '@/api';
 import type { WorkerInfo } from '@/types';
@@ -203,7 +204,12 @@ function attachEvents(container: HTMLElement): void {
       const handle = dismissBtn.dataset.handle;
       if (!handle) return;
 
-      const confirmed = confirm(`Dismiss remote agent "${handle}"? This will disconnect it from the server.`);
+      const confirmed = await confirmDialog({
+        title: 'Dismiss Agent',
+        message: `Dismiss remote agent "${handle}"? This will disconnect it from the server.`,
+        confirmText: 'Dismiss',
+        variant: 'danger',
+      });
       if (!confirmed) return;
 
       try {

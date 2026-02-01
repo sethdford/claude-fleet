@@ -270,6 +270,7 @@ export async function renderTasks(container: HTMLElement): Promise<() => void> {
 
     // Create task button
     if (target.closest('#create-task-btn')) {
+      e.stopPropagation();
       window.fleetDashboard?.showTaskModal();
       return;
     }
