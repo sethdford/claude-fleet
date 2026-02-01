@@ -16,6 +16,7 @@ export interface HiveNode {
   currentTool?: string;
   lastActivity?: number;
   workingDir?: string;
+  spawnedAt?: number;
 }
 
 export interface HiveConfig {

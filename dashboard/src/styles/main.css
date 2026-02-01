@@ -153,6 +153,16 @@
     0%, 100% { stroke-opacity: 1; }
     50% { stroke-opacity: 0.3; }
   }
+
+  @keyframes hive-empty-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+  }
+
+  @keyframes hive-bg-breathe {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.5; }
+  }
 }
 
 /* ============================================================================
@@ -1637,12 +1647,16 @@
   }
 
   .hive-legend {
-    @apply absolute flex flex-wrap gap-md bg-overlay;
+    @apply absolute flex flex-wrap gap-md;
     bottom: var(--spacing-md);
     left: var(--spacing-md);
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--radius-md);
     font-size: 11px;
+    background: rgba(22, 27, 34, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(48, 54, 61, 0.5);
   }
 
   .hive-legend-item {
@@ -1653,6 +1667,121 @@
     width: 8px;
     height: 8px;
     @apply rounded-full;
+  }
+
+  /* --- Hive Tooltip ------------------------------------------------------ */
+
+  .hive-tooltip {
+    position: absolute;
+    pointer-events: none;
+    @apply bg-surface-alt text-fg;
+    border: 1px solid var(--color-edge);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 50;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 150ms ease, transform 150ms ease;
+    box-shadow: var(--shadow-md);
+  }
+
+  .hive-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .hive-tooltip-handle {
+    @apply font-semibold text-fg;
+  }
+
+  .hive-tooltip-meta {
+    @apply text-fg-secondary;
+    margin-top: 2px;
+  }
+
+  /* --- Hive Detail Grid -------------------------------------------------- */
+
+  .hive-detail-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--spacing-xs) var(--spacing-sm);
+    font-size: 12px;
+  }
+
+  .hive-detail-grid dt {
+    @apply text-fg-muted;
+    white-space: nowrap;
+  }
+
+  .hive-detail-grid dd {
+    @apply text-fg;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* --- Hive Activity Timeline -------------------------------------------- */
+
+  .hive-timeline {
+    @apply flex flex-col;
+    padding-left: var(--spacing-sm);
+    border-left: 2px solid var(--color-edge-muted);
+  }
+
+  .hive-timeline-item {
+    @apply flex items-center gap-sm;
+    padding: 3px 0 3px var(--spacing-sm);
+    position: relative;
+    font-size: 12px;
+  }
+
+  .hive-timeline-item::before {
+    content: '';
+    position: absolute;
+    left: calc(-1 * var(--spacing-sm) - 5px);
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--color-edge-emphasis);
+  }
+
+  .hive-timeline-tool {
+    @apply font-mono text-yellow;
+  }
+
+  .hive-timeline-time {
+    @apply text-fg-muted ml-auto;
+    font-size: 11px;
+  }
+
+  /* --- Hive Sidebar Close (mobile) --------------------------------------- */
+
+  .hive-sidebar-close {
+    display: none;
+    @apply text-fg-secondary cursor-pointer;
+    background: none;
+    border: none;
+    font-size: 20px;
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+    width: 28px;
+    height: 28px;
+    @apply flex items-center justify-center;
+    border-radius: var(--radius-sm);
+    z-index: 11;
+  }
+
+  .hive-sidebar-close:hover {
+    @apply bg-surface-raised text-fg;
+  }
+
+  /* --- Hive Empty State (SVG) -------------------------------------------- */
+
+  .hive-empty-state text {
+    fill: var(--color-fg-muted);
+    font-family: var(--font-sans);
   }
 
   /* --- Mail View (extracted from mail.ts <style>) ------------------------ */
@@ -1814,6 +1943,35 @@
 
   .hive-grid {
     min-height: 400px;
+  }
+
+  .hive-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 100;
+    background: var(--color-surface-alt);
+    border-left: 1px solid var(--color-edge);
+    transform: translateX(100%);
+    transition: transform var(--transition-normal);
+    overflow-y: auto;
+    padding: var(--spacing-md);
+  }
+
+  .hive-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .hive-sidebar-close {
+    display: flex;
+  }
+}
+
+@media (max-width: 1024px) {
+  .hive-container {
+    grid-template-columns: 1fr 220px;
   }
 }
 

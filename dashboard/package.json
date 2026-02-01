@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@types/d3-drag": "^3.0.0",
+    "@types/d3-ease": "^3.0.2",
     "@types/d3-force": "^3.0.0",
     "@types/d3-selection": "^3.0.0",
     "@types/d3-transition": "^3.0.9",

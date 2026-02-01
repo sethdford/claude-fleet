@@ -6,6 +6,7 @@
 
 import { select } from 'd3-selection';
 import { zoom as d3Zoom, zoomIdentity } from 'd3-zoom';
+import { easeCubicOut } from 'd3-ease';
 import 'd3-transition';
 import type { Selection } from 'd3-selection';
 
@@ -31,14 +32,8 @@ const DEFAULT_CONFIG: HiveConfig = {
 };
 
 const SWARM_COLORS = [
-  '#58a6ff', // Blue (default / no swarm)
-  '#3fb950', // Green
-  '#a371f7', // Purple
-  '#d29922', // Yellow
-  '#f47067', // Red
-  '#39d4d4', // Teal
-  '#f778ba', // Pink
-  '#a3e635', // Lime
+  '#58a6ff', '#3fb950', '#a371f7', '#d29922',
+  '#f47067', '#39d4d4', '#f778ba', '#a3e635',
 ];
 
 const STATE_COLORS: Record<string, string> = {
@@ -47,6 +42,15 @@ const STATE_COLORS: Record<string, string> = {
   working: 'var(--color-green)',
   stopping: 'var(--color-purple)',
   stopped: 'var(--color-fg-muted)',
+};
+
+/** Tiny SVG path glyphs for worker states (12×12 viewBox centered). */
+const STATE_ICONS: Record<string, string> = {
+  working:  'M6 1.5A1.5 1.5 0 007.5 3h0A1.5 1.5 0 006 1.5zM3.8 4.2l1.5 2.5L3 9h2l1-1.5L7 9h2L6.7 6.7l1.5-2.5z', // gear-like
+  ready:    'M2.5 6.5L5 9l4.5-5',                                          // checkmark
+  starting: 'M6 10V3M3 5.5L6 2.5 9 5.5',                                   // up-arrow
+  stopping: 'M6 2v7M3 6.5L6 9.5 9 6.5',                                    // down-arrow
+  stopped:  'M3 6h6',                                                        // dash
 };
 
 // ---------------------------------------------------------------------------
@@ -86,8 +90,64 @@ function buildHiveNodes(
       swarmColor: getSwarmColor(w.swarmId, swarms),
       currentTaskId: w.currentTaskId,
       workingDir: w.workingDir,
+      spawnedAt: w.spawnedAt,
     };
   });
+}
+
+function formatUptime(spawnedAt: number | undefined): string {
+  if (!spawnedAt) return '—';
+  const seconds = Math.floor((Date.now() - spawnedAt) / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
+function relativeTime(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 5) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.floor(minutes / 60)}h ago`;
+}
+
+// ---------------------------------------------------------------------------
+// SVG Defs (gradients)
+// ---------------------------------------------------------------------------
+
+function ensureGradientDefs(
+  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+): void {
+  let defs = svg.select<SVGDefsElement>('defs');
+  if (defs.empty()) {
+    defs = svg.insert('defs', ':first-child');
+  }
+
+  SWARM_COLORS.forEach((color, i) => {
+    const id = `hive-grad-${i}`;
+    if (!defs.select(`#${id}`).empty()) return;
+    const grad = defs.append('linearGradient')
+      .attr('id', id)
+      .attr('x1', '0%').attr('y1', '0%')
+      .attr('x2', '0%').attr('y2', '100%');
+    grad.append('stop')
+      .attr('offset', '0%')
+      .attr('stop-color', color)
+      .attr('stop-opacity', 0.2);
+    grad.append('stop')
+      .attr('offset', '100%')
+      .attr('stop-color', color)
+      .attr('stop-opacity', 0.05);
+  });
+}
+
+function gradientUrl(swarmColor: string): string {
+  const index = SWARM_COLORS.indexOf(swarmColor);
+  return `url(#hive-grad-${index >= 0 ? index : 0})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +159,8 @@ function renderBackgroundGrid(
   config: HiveConfig,
   gridRadius: number,
 ): void {
-  const bgGroup = g.append('g').attr('class', 'hive-bg-grid');
+  const bgGroup = g.append('g').attr('class', 'hive-bg-grid')
+    .style('animation', 'hive-bg-breathe 8s ease-in-out infinite');
 
   for (let q = -gridRadius; q <= gridRadius; q++) {
     for (let r = -gridRadius; r <= gridRadius; r++) {
@@ -115,105 +176,199 @@ function renderBackgroundGrid(
   }
 }
 
+function renderEmptyState(
+  g: Selection<SVGGElement, unknown, null, undefined>,
+  config: HiveConfig,
+): void {
+  g.selectAll('.hive-empty-state').remove();
+
+  const emptyGroup = g.append('g').attr('class', 'hive-empty-state');
+  const radius = 80;
+
+  emptyGroup.append('polygon')
+    .attr('points', hexToPolygonPoints(0, 0, radius))
+    .attr('fill', 'none')
+    .attr('stroke', 'var(--color-edge-emphasis)')
+    .attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '8,6')
+    .style('animation', 'hive-empty-pulse 2s ease-in-out infinite');
+
+  emptyGroup.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('y', -6)
+    .attr('font-size', 15)
+    .attr('font-weight', '600')
+    .text('No Workers Active');
+
+  emptyGroup.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('y', 14)
+    .attr('font-size', 12)
+    .attr('opacity', 0.7)
+    .text('Spawn workers to populate the hive');
+
+  // Add a small hex icon above the text
+  emptyGroup.append('polygon')
+    .attr('points', hexToPolygonPoints(0, -40, config.hexRadius * 0.5))
+    .attr('fill', 'none')
+    .attr('stroke', 'var(--color-edge-emphasis)')
+    .attr('stroke-width', 1)
+    .attr('opacity', 0.5);
+}
+
 function renderHexCells(
   g: Selection<SVGGElement, unknown, null, undefined>,
   nodes: HiveNode[],
   config: HiveConfig,
+  selectedHandle: string | null,
   onSelect: (node: HiveNode | null) => void,
+  tooltip: HTMLElement | null,
+  canvasEl: HTMLElement,
 ): void {
-  // Remove old cells
-  g.selectAll('.hive-cell').remove();
+  const hexPoints = hexToPolygonPoints(0, 0, config.hexRadius * 0.92);
+  const highlightPoints = hexToPolygonPoints(0, 0, config.hexRadius * 0.85);
 
   const cells = g.selectAll<SVGGElement, HiveNode>('.hive-cell')
-    .data(nodes, (d: HiveNode) => d.handle)
-    .join(
-      enter => {
-        const cell = enter.append('g')
-          .attr('class', 'hive-cell')
-          .attr('data-handle', d => d.handle)
-          .attr('transform', d => {
-            const { x, y } = axialToCartesian(d.hex, config.hexRadius, config.spacing);
-            return `translate(${x},${y})`;
-          })
-          .style('cursor', 'pointer')
-          .style('opacity', 0);
+    .data(nodes, (d: HiveNode) => d.handle);
 
-        // Pre-compute hex points (same for every cell since they're centered at 0,0)
-        const hexPoints = hexToPolygonPoints(0, 0, config.hexRadius * 0.92);
+  // EXIT — scale down and fade out, then remove
+  cells.exit<HiveNode>()
+    .transition()
+    .duration(300)
+    .ease(easeCubicOut)
+    .attr('transform', function () {
+      const current = select(this).attr('transform');
+      return current + ' scale(0.3)';
+    })
+    .style('opacity', 0)
+    .remove();
 
-        // Background fill
-        cell.append('polygon')
-          .attr('class', 'hex-bg')
-          .attr('points', hexPoints)
-          .attr('fill', d => d.swarmColor)
-          .attr('opacity', 0.15);
+  // ENTER — create new cells with staggered scale animation
+  const enter = cells.enter()
+    .append('g')
+    .attr('class', 'hive-cell')
+    .attr('data-handle', d => d.handle)
+    .attr('transform', d => {
+      const { x, y } = axialToCartesian(d.hex, config.hexRadius, config.spacing);
+      return `translate(${x},${y}) scale(0.3)`;
+    })
+    .style('cursor', 'pointer')
+    .style('opacity', 0);
 
-        // Border
-        cell.append('polygon')
-          .attr('class', 'hex-border')
-          .attr('points', hexPoints)
-          .attr('fill', 'none')
-          .attr('stroke', d => d.swarmColor)
-          .attr('stroke-width', 1.5)
-          .attr('stroke-dasharray', d => d.health === 'degraded' ? '4,3' : d.health === 'unhealthy' ? '2,2' : 'none');
+  // Gradient background fill
+  enter.append('polygon')
+    .attr('class', 'hex-bg')
+    .attr('points', hexPoints)
+    .attr('fill', d => gradientUrl(d.swarmColor));
 
-        // State dot at top
-        cell.append('circle')
-          .attr('class', 'state-dot')
-          .attr('cx', 0)
-          .attr('cy', -config.hexRadius * 0.55)
-          .attr('r', 4)
-          .attr('fill', d => STATE_COLORS[d.state] ?? 'var(--color-fg-muted)');
+  // Selection highlight ring (inner)
+  enter.append('polygon')
+    .attr('class', 'hex-highlight')
+    .attr('points', highlightPoints)
+    .attr('fill', 'none')
+    .attr('stroke', 'transparent')
+    .attr('stroke-width', 1.5)
+    .style('transition', 'stroke 150ms ease');
 
-        // Handle label
-        cell.append('text')
-          .attr('class', 'hex-label')
-          .attr('text-anchor', 'middle')
-          .attr('y', 2)
-          .attr('font-size', 10)
-          .attr('font-family', 'var(--font-mono)')
-          .attr('fill', 'var(--color-fg)')
-          .style('pointer-events', 'none')
-          .text(d => d.handle.length > 10 ? d.handle.slice(0, 9) + '\u2026' : d.handle);
-
-        // Task subtitle
-        cell.append('text')
-          .attr('class', 'hex-task')
-          .attr('text-anchor', 'middle')
-          .attr('y', 14)
-          .attr('font-size', 8)
-          .attr('fill', 'var(--color-fg-secondary)')
-          .style('pointer-events', 'none')
-          .text(d => d.currentTool ? `\u25B6 ${d.currentTool}` : '');
-
-        // Activity pulse circle (initially hidden)
-        cell.append('circle')
-          .attr('class', 'activity-pulse')
-          .attr('r', 0)
-          .attr('fill', 'none')
-          .attr('stroke', d => d.swarmColor)
-          .attr('stroke-width', 2)
-          .attr('opacity', 0);
-
-        // Enter animation
-        cell.transition()
-          .duration(config.animationDuration)
-          .style('opacity', 1);
-
-        return cell;
-      },
+  // Border
+  enter.append('polygon')
+    .attr('class', 'hex-border')
+    .attr('points', hexPoints)
+    .attr('fill', 'none')
+    .attr('stroke', d => d.swarmColor)
+    .attr('stroke-width', d => d.health === 'unhealthy' ? 2.5 : d.health === 'degraded' ? 2 : 1.5)
+    .attr('stroke-dasharray', d => d.health === 'degraded' ? '4,3' : d.health === 'unhealthy' ? '2,2' : 'none')
+    .style('animation', d =>
+      d.health === 'unhealthy' ? 'hive-pulse-border 1s ease-in-out infinite' :
+      d.health === 'degraded' ? 'hive-pulse-border 2s ease-in-out infinite' : 'none',
     );
 
+  // State icon at top
+  enter.append('path')
+    .attr('class', 'state-icon')
+    .attr('d', d => STATE_ICONS[d.state] ?? STATE_ICONS.stopped)
+    .attr('transform', `translate(-6,${-config.hexRadius * 0.55 - 6}) scale(1)`)
+    .attr('fill', 'none')
+    .attr('stroke', d => STATE_COLORS[d.state] ?? 'var(--color-fg-muted)')
+    .attr('stroke-width', 1.5)
+    .attr('stroke-linecap', 'round')
+    .attr('stroke-linejoin', 'round');
+
+  // Handle label
+  enter.append('text')
+    .attr('class', 'hex-label')
+    .attr('text-anchor', 'middle')
+    .attr('y', 2)
+    .attr('font-size', 10)
+    .attr('font-family', 'var(--font-mono)')
+    .attr('fill', 'var(--color-fg)')
+    .style('pointer-events', 'none')
+    .text(d => d.handle.length > 10 ? d.handle.slice(0, 9) + '\u2026' : d.handle);
+
+  // Task subtitle
+  enter.append('text')
+    .attr('class', 'hex-task')
+    .attr('text-anchor', 'middle')
+    .attr('y', 14)
+    .attr('font-size', 8)
+    .attr('fill', 'var(--color-fg-secondary)')
+    .style('pointer-events', 'none')
+    .text(d => d.currentTool ? `\u25B6 ${d.currentTool}` : '');
+
+  // Activity pulse circle (initially hidden)
+  enter.append('circle')
+    .attr('class', 'activity-pulse')
+    .attr('r', 0)
+    .attr('fill', 'none')
+    .attr('stroke', d => d.swarmColor)
+    .attr('stroke-width', 2)
+    .attr('opacity', 0);
+
+  // Staggered enter animation
+  enter.transition()
+    .delay((_d: HiveNode, i: number) => i * 40)
+    .duration(config.animationDuration)
+    .ease(easeCubicOut)
+    .attr('transform', d => {
+      const { x, y } = axialToCartesian(d.hex, config.hexRadius, config.spacing);
+      return `translate(${x},${y}) scale(1)`;
+    })
+    .style('opacity', 1);
+
+  // MERGE — update existing cells
+  const merged = enter.merge(cells);
+
+  // Update positions, borders, state icons for existing cells
+  merged.select('.hex-border')
+    .attr('stroke', d => d.swarmColor)
+    .attr('stroke-width', d => d.health === 'unhealthy' ? 2.5 : d.health === 'degraded' ? 2 : 1.5)
+    .attr('stroke-dasharray', d => d.health === 'degraded' ? '4,3' : d.health === 'unhealthy' ? '2,2' : 'none')
+    .style('animation', d =>
+      d.health === 'unhealthy' ? 'hive-pulse-border 1s ease-in-out infinite' :
+      d.health === 'degraded' ? 'hive-pulse-border 2s ease-in-out infinite' : 'none',
+    );
+
+  merged.select('.state-icon')
+    .attr('d', d => STATE_ICONS[d.state] ?? STATE_ICONS.stopped)
+    .attr('stroke', d => STATE_COLORS[d.state] ?? 'var(--color-fg-muted)');
+
+  merged.select('.hex-bg')
+    .attr('fill', d => gradientUrl(d.swarmColor));
+
+  // Selection highlight
+  merged.select('.hex-highlight')
+    .attr('stroke', d => d.handle === selectedHandle ? 'rgba(255,255,255,0.8)' : 'transparent');
+
   // Click handler
-  cells.on('click', (_event: unknown, d: HiveNode) => {
+  merged.on('click', (_event: unknown, d: HiveNode) => {
     onSelect(d);
   });
 
-  // Hover effects
-  cells.on('mouseover', function (this: SVGGElement, _event: unknown, d: HiveNode) {
+  // Hover effects with tooltip
+  merged.on('mouseover', function (this: SVGGElement, _event: MouseEvent, d: HiveNode) {
     select(this).select('.hex-bg')
       .transition().duration(150)
-      .attr('opacity', 0.3);
+      .attr('opacity', 1);
 
     // Dim non-swarm hexes
     if (d.swarmId) {
@@ -222,16 +377,37 @@ function renderHexCells(
         .transition().duration(150)
         .style('opacity', 0.4);
     }
+
+    // Show tooltip
+    if (tooltip) {
+      const stateText = d.state.charAt(0).toUpperCase() + d.state.slice(1);
+      const toolText = d.currentTool ? ` \u00B7 ${d.currentTool}` : '';
+      tooltip.innerHTML = `
+        <div class="hive-tooltip-handle">${escapeHtml(d.handle)}</div>
+        <div class="hive-tooltip-meta">${escapeHtml(stateText)}${escapeHtml(toolText)}</div>
+      `;
+      tooltip.classList.add('visible');
+
+      // Position via bounding rect
+      const rect = (this as SVGGElement).getBoundingClientRect();
+      const containerRect = canvasEl.getBoundingClientRect();
+      tooltip.style.left = `${rect.left - containerRect.left + rect.width / 2 - tooltip.offsetWidth / 2}px`;
+      tooltip.style.top = `${rect.top - containerRect.top - tooltip.offsetHeight - 8}px`;
+    }
   });
 
-  cells.on('mouseout', function (this: SVGGElement) {
+  merged.on('mouseout', function (this: SVGGElement) {
     select(this).select('.hex-bg')
       .transition().duration(150)
-      .attr('opacity', 0.15);
+      .attr('opacity', 1);
 
     g.selectAll('.hive-cell')
       .transition().duration(150)
       .style('opacity', 1);
+
+    if (tooltip) {
+      tooltip.classList.remove('visible');
+    }
   });
 }
 
@@ -243,15 +419,34 @@ function pulseHex(
   const cell = g.select(`[data-handle="${handle}"]`);
   if (cell.empty()) return;
 
+  // Phase 1: Border flash
+  cell.select('.hex-border')
+    .transition().duration(100)
+    .attr('stroke-width', 3)
+    .transition().duration(400)
+    .attr('stroke-width', 1.5);
+
+  // Phase 2: Expanding ring
   cell.select('.activity-pulse')
-    .attr('r', 0)
-    .attr('opacity', 0.8)
-    .transition().duration(600)
-    .attr('r', hexRadius * 1.2)
+    .attr('r', hexRadius * 0.5)
+    .attr('opacity', 0.6)
+    .transition().duration(700).ease(easeCubicOut)
+    .attr('r', hexRadius * 1.4)
     .attr('opacity', 0);
+
+  // Phase 3: Background flash
+  cell.select('.hex-bg')
+    .transition().duration(100)
+    .attr('opacity', 2)  // boosted opacity for gradient
+    .transition().duration(500)
+    .attr('opacity', 1);
 }
 
-function renderDetailPanel(container: HTMLElement, node: HiveNode | null, recentActivity: WorkerActivity[]): void {
+function renderDetailPanel(
+  container: HTMLElement,
+  node: HiveNode | null,
+  recentActivity: WorkerActivity[],
+): void {
   const panel = container.querySelector('.hive-detail-content');
   if (!panel) return;
 
@@ -267,63 +462,93 @@ function renderDetailPanel(container: HTMLElement, node: HiveNode | null, recent
 
   const healthClass = node.health === 'healthy' ? 'green' : node.health === 'degraded' ? 'yellow' : 'red';
   const stateClass = node.state === 'working' ? 'green' : node.state === 'ready' ? 'blue' : 'yellow';
+  const initials = node.handle.slice(0, 2).toUpperCase();
   const workerActivities = recentActivity
     .filter(a => a.handle === node.handle)
-    .slice(0, 5);
+    .slice(0, 6);
 
   panel.innerHTML = `
-    <div class="p-md">
+    <div style="border-top: 3px solid ${node.swarmColor}; padding: var(--spacing-md);">
       <div class="flex items-center gap-sm mb-md">
-        <span class="status-dot ${node.health}"></span>
-        <strong class="text-fg text-[16px]">${escapeHtml(node.handle)}</strong>
+        <div class="worker-avatar" style="background: ${node.swarmColor}22; color: ${node.swarmColor};">${escapeHtml(initials)}</div>
+        <div>
+          <strong class="text-fg" style="font-size: 14px;">${escapeHtml(node.handle)}</strong>
+          <div class="flex gap-xs mt-xs">
+            <span class="badge ${stateClass}">${escapeHtml(node.state)}</span>
+            <span class="badge ${healthClass}">${escapeHtml(node.health)}</span>
+          </div>
+        </div>
       </div>
 
-      <div class="flex gap-sm mb-md">
-        <span class="badge ${stateClass}">${escapeHtml(node.state)}</span>
-        <span class="badge ${healthClass}">${escapeHtml(node.health)}</span>
-      </div>
+      <dl class="hive-detail-grid mb-md">
+        ${node.swarmName ? `
+          <dt>Swarm</dt>
+          <dd>
+            <span class="inline-block" style="width:8px;height:8px;border-radius:50%;background:${node.swarmColor};margin-right:4px;vertical-align:middle;"></span>
+            ${escapeHtml(node.swarmName)}
+          </dd>
+        ` : ''}
+        ${node.currentTaskId ? `
+          <dt>Task</dt>
+          <dd><a href="#/tasks" class="font-mono" style="font-size:12px;">${escapeHtml(node.currentTaskId.slice(0, 8))}</a></dd>
+        ` : ''}
+        ${node.workingDir ? `
+          <dt>Directory</dt>
+          <dd class="font-mono" style="font-size:11px;word-break:break-all;">${escapeHtml(node.workingDir)}</dd>
+        ` : ''}
+        <dt>Uptime</dt>
+        <dd>${escapeHtml(formatUptime(node.spawnedAt))}</dd>
+      </dl>
 
-      ${node.swarmName ? `
-        <div class="form-label">Swarm</div>
-        <p class="text-fg mb-md">
-          <span class="inline-block size-2 rounded-full mr-1.5" style="background: ${node.swarmColor};"></span>
-          ${escapeHtml(node.swarmName)}
-        </p>
-      ` : ''}
-
-      ${node.currentTaskId ? `
-        <div class="form-label">Current Task</div>
-        <p class="mb-md">
-          <a href="#/tasks" class="font-mono text-xs">
-            ${escapeHtml(node.currentTaskId.slice(0, 8))}
-          </a>
-        </p>
-      ` : ''}
-
-      ${node.workingDir ? `
-        <div class="form-label">Working Directory</div>
-        <p class="font-mono text-sm text-fg-secondary mb-md break-all">
-          ${escapeHtml(node.workingDir)}
-        </p>
-      ` : ''}
-
-      <div class="form-label">Recent Tools</div>
+      <div class="form-label mb-xs">Activity</div>
       ${workerActivities.length > 0 ? `
-        <div class="flex flex-col gap-xs">
+        <div class="hive-timeline">
           ${workerActivities.map(a => `
-            <div class="flex justify-between items-center text-xs">
-              <span class="font-mono text-yellow">${escapeHtml(a.tool)}</span>
-              <span class="text-fg-muted">${new Date(a.timestamp).toLocaleTimeString()}</span>
+            <div class="hive-timeline-item">
+              <span class="hive-timeline-tool">${escapeHtml(a.tool)}</span>
+              <span class="hive-timeline-time">${escapeHtml(relativeTime(a.timestamp))}</span>
             </div>
           `).join('')}
         </div>
-      ` : '<p class="text-fg-muted text-xs">No recent activity</p>'}
+      ` : '<p class="text-fg-muted" style="font-size:12px;">No recent activity</p>'}
 
-      <div class="mt-lg flex gap-sm">
+      <div style="margin-top: var(--spacing-lg);">
         <a href="#/worker/${encodeURIComponent(node.handle)}" class="btn btn-secondary btn-sm">View Terminal</a>
       </div>
     </div>
   `;
+}
+
+function renderLegend(legendEl: HTMLElement): void {
+  const states: Array<{ label: string; cssClass: string }> = [
+    { label: 'Starting', cssClass: 'bg-yellow' },
+    { label: 'Ready', cssClass: 'bg-blue' },
+    { label: 'Working', cssClass: 'bg-green' },
+    { label: 'Stopping', cssClass: 'bg-purple' },
+    { label: 'Stopped', cssClass: 'bg-fg-muted' },
+  ];
+
+  const miniHexPoints = hexToPolygonPoints(0, 0, 6);
+
+  legendEl.innerHTML = states.map(s => {
+    // Extract color from the CSS class for the mini hex fill
+    const colorMap: Record<string, string> = {
+      'bg-yellow': 'var(--color-yellow)',
+      'bg-blue': 'var(--color-blue)',
+      'bg-green': 'var(--color-green)',
+      'bg-purple': 'var(--color-purple)',
+      'bg-fg-muted': 'var(--color-fg-muted)',
+    };
+    const fill = colorMap[s.cssClass] ?? 'var(--color-fg-muted)';
+    return `
+      <div class="hive-legend-item">
+        <svg width="14" height="14" viewBox="-7 -7 14 14">
+          <polygon points="${miniHexPoints}" fill="${fill}" opacity="0.6" stroke="${fill}" stroke-width="0.8"/>
+        </svg>
+        ${s.label}
+      </div>
+    `;
+  }).join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -355,32 +580,14 @@ export async function renderHive(container: HTMLElement): Promise<() => void> {
           </button>
           <button class="btn btn-secondary btn-sm" id="hive-zoom-reset">Reset</button>
         </div>
-        <div id="hive-canvas" class="w-full h-full"></div>
-        <div class="hive-legend">
-          <div class="hive-legend-item">
-            <span class="hive-legend-dot bg-yellow"></span>
-            Starting
-          </div>
-          <div class="hive-legend-item">
-            <span class="hive-legend-dot bg-blue"></span>
-            Ready
-          </div>
-          <div class="hive-legend-item">
-            <span class="hive-legend-dot bg-green"></span>
-            Working
-          </div>
-          <div class="hive-legend-item">
-            <span class="hive-legend-dot bg-purple"></span>
-            Stopping
-          </div>
-          <div class="hive-legend-item">
-            <span class="hive-legend-dot bg-fg-muted"></span>
-            Stopped
-          </div>
+        <div id="hive-canvas" class="w-full h-full" style="position:relative;">
+          <div class="hive-tooltip" id="hive-tooltip"></div>
         </div>
+        <div class="hive-legend" id="hive-legend"></div>
       </div>
 
-      <div class="hive-sidebar">
+      <div class="hive-sidebar" id="hive-sidebar">
+        <button class="hive-sidebar-close" id="hive-sidebar-close">&times;</button>
         <div class="hive-filter-card">
           <div class="form-label">Filter by Swarm</div>
           <select class="form-input mt-xs" id="hive-swarm-filter">
@@ -399,8 +606,13 @@ export async function renderHive(container: HTMLElement): Promise<() => void> {
     </div>
   `;
 
+  // Render the legend with mini hex SVGs
+  const legendEl = document.getElementById('hive-legend');
+  if (legendEl) renderLegend(legendEl);
+
   // Set up SVG with D3
   const canvasEl = document.getElementById('hive-canvas')!;
+  const tooltip = document.getElementById('hive-tooltip');
   const width = canvasEl.clientWidth || 800;
   const height = canvasEl.clientHeight || 600;
 
@@ -409,6 +621,9 @@ export async function renderHive(container: HTMLElement): Promise<() => void> {
     .attr('width', '100%')
     .attr('height', '100%')
     .attr('viewBox', `${-width / 2} ${-height / 2} ${width} ${height}`);
+
+  // Insert gradient defs
+  ensureGradientDefs(svg as Selection<SVGSVGElement, unknown, null, undefined>);
 
   const g = svg.append('g');
 
@@ -439,16 +654,28 @@ export async function renderHive(container: HTMLElement): Promise<() => void> {
 
     const nodes = buildHiveNodes(workers, swarms, occupancy);
 
-    // Render all cells, then dim non-matching if filtered
-    renderHexCells(g, nodes, config, selectNode);
+    // Show empty state or hex cells
+    if (nodes.length === 0) {
+      g.selectAll('.hive-cell').remove();
+      if (g.select('.hive-empty-state').empty()) {
+        renderEmptyState(g, config);
+      }
+    } else {
+      g.selectAll('.hive-empty-state').remove();
+      renderHexCells(
+        g, nodes, config,
+        selectedNode?.handle ?? null,
+        selectNode, tooltip, canvasEl,
+      );
 
-    if (swarmFilter) {
-      nodes.forEach(n => {
-        if (n.swarmId !== swarmFilter) {
-          g.select(`[data-handle="${n.handle}"]`)
-            .style('opacity', 0.2);
-        }
-      });
+      if (swarmFilter) {
+        nodes.forEach(n => {
+          if (n.swarmId !== swarmFilter) {
+            g.select(`[data-handle="${n.handle}"]`)
+              .style('opacity', 0.2);
+          }
+        });
+      }
     }
 
     // Update swarm filter dropdown
@@ -470,6 +697,19 @@ export async function renderHive(container: HTMLElement): Promise<() => void> {
   function selectNode(node: HiveNode | null): void {
     selectedNode = node;
     renderDetailPanel(container, node, recentActivity);
+
+    // Update highlight rings
+    g.selectAll<SVGGElement, HiveNode>('.hive-cell')
+      .select('.hex-highlight')
+      .attr('stroke', (d: HiveNode) =>
+        d.handle === node?.handle ? 'rgba(255,255,255,0.8)' : 'transparent',
+      );
+
+    // Mobile: open sidebar
+    const sidebar = document.getElementById('hive-sidebar');
+    if (sidebar && node && window.innerWidth < 768) {
+      sidebar.classList.add('open');
+    }
   }
 
   function updateSwarmFilter(swarms: SwarmInfo[]): void {
@@ -499,7 +739,6 @@ export async function renderHive(container: HTMLElement): Promise<() => void> {
   const unsubOutput = wsManager.on('worker:output', (data: unknown) => {
     const { handle, output } = data as { handle: string; output: unknown };
 
-    // Parse tool name from Claude event
     let toolName: string | undefined;
     let event = output;
     if (typeof output === 'string') {
@@ -524,7 +763,7 @@ export async function renderHive(container: HTMLElement): Promise<() => void> {
       recentActivity.unshift({ handle, tool: toolName, timestamp: Date.now() });
       if (recentActivity.length > 100) recentActivity.length = 100;
 
-      // Pulse the hex cell
+      // Triple-phase pulse effect
       pulseHex(g, handle, config.hexRadius);
 
       // Update tool name on hex label
@@ -546,6 +785,11 @@ export async function renderHive(container: HTMLElement): Promise<() => void> {
     const value = (e.target as HTMLSelectElement).value;
     swarmFilter = value || null;
     refresh();
+  });
+
+  // Mobile sidebar close
+  document.getElementById('hive-sidebar-close')?.addEventListener('click', () => {
+    document.getElementById('hive-sidebar')?.classList.remove('open');
   });
 
   // Zoom controls
