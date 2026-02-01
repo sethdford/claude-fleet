@@ -27,6 +27,7 @@ import { renderMail } from '@/views/mail';
 import { renderWorkflows } from '@/views/workflows';
 import { renderHive } from '@/views/hive';
 import { renderConnections } from '@/views/connections';
+import { renderMemory } from '@/views/memory';
 
 import type { ActivityType } from '@/types';
 
@@ -452,6 +453,11 @@ router.register('/connections', async () => {
   return renderConnections(el('main-view'));
 });
 
+router.register('/memory', async () => {
+  el('page-title').textContent = 'Memory & Routing';
+  return renderMemory(el('main-view'));
+});
+
 router.register('/worker/:handle', async (handle: string) => {
   const decoded = decodeURIComponent(handle);
   el('page-title').textContent = `Worker: ${decoded}`;
@@ -683,7 +689,7 @@ TOKEN=$(curl -s -X POST '${serverUrl}/auth' \\
 # Step 2: Send heartbeat (run in a loop or from your agent)
 curl -s -X POST '${serverUrl}/orchestrate/workers/${encodeURIComponent(handle)}/output' \\
   -H 'Content-Type: application/json' \\
-  -H "Authorization: Bearer \$TOKEN" \\
+  -H "Authorization: Bearer $TOKEN" \\
   -d '{"event":{"type":"system","text":"connected"}}'`;
 
         const pre = document.getElementById('connect-command-pre');

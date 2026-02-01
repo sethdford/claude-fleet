@@ -364,7 +364,7 @@ function extractRelevantPayload(event: string, payload: GitHubWebhookPayload): R
  * GET /webhooks/status
  * Check webhook configuration status
  */
-router.get('/status', (req: Request, res: Response) => {
+router.get('/status', (_req: Request, res: Response) => {
   res.json({
     configured: !!WEBHOOK_SECRET,
     endpoint: '/webhooks/github',
@@ -384,7 +384,7 @@ router.get('/status', (req: Request, res: Response) => {
  * GET /webhooks/history
  * Get recent webhook events (for debugging)
  */
-router.get('/history', async (req: Request, res: Response) => {
+router.get('/history', async (_req: Request, res: Response) => {
   const scheduler = AutoScheduler.getInstance();
   const recentTasks = await scheduler.getRecentWebhookTasks(20);
   res.json(recentTasks);

@@ -889,7 +889,7 @@ export class WorkerManager extends EventEmitter {
    * Preferred for long-running agents that need monitoring or human interaction.
    */
   private async spawnTmuxWorker(
-    workerId: string,
+    _workerId: string,
     request: SpawnWorkerRequest,
     role: AgentRole,
     teamName: string

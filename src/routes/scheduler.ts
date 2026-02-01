@@ -43,7 +43,7 @@ scheduler.on('taskFailed', (task) => {
  * GET /scheduler/status
  * Get overall scheduler status
  */
-router.get('/status', (req: Request, res: Response) => {
+router.get('/status', (_req: Request, res: Response) => {
   const status = scheduler.getStatus();
   res.json({
     ...status,
@@ -56,7 +56,7 @@ router.get('/status', (req: Request, res: Response) => {
  * POST /scheduler/start
  * Start the scheduler
  */
-router.post('/start', (req: Request, res: Response) => {
+router.post('/start', (_req: Request, res: Response) => {
   scheduler.start();
   res.json({ message: 'Scheduler started', status: scheduler.getStatus() });
 });
@@ -65,7 +65,7 @@ router.post('/start', (req: Request, res: Response) => {
  * POST /scheduler/stop
  * Stop the scheduler
  */
-router.post('/stop', (req: Request, res: Response) => {
+router.post('/stop', (_req: Request, res: Response) => {
   scheduler.stop();
   res.json({ message: 'Scheduler stopped', status: scheduler.getStatus() });
 });
@@ -78,7 +78,7 @@ router.post('/stop', (req: Request, res: Response) => {
  * GET /scheduler/schedules
  * List all registered schedules
  */
-router.get('/schedules', (req: Request, res: Response) => {
+router.get('/schedules', (_req: Request, res: Response) => {
   const schedules = scheduler.getSchedules();
   res.json(schedules);
 });
@@ -157,7 +157,7 @@ router.patch('/schedules/:id/disable', (req: Request, res: Response) => {
  * POST /scheduler/schedules/load-defaults
  * Load default schedules
  */
-router.post('/schedules/load-defaults', (req: Request, res: Response) => {
+router.post('/schedules/load-defaults', (_req: Request, res: Response) => {
   scheduler.loadSchedulesFromConfig({ schedules: DEFAULT_SCHEDULES });
   res.json({
     message: 'Default schedules loaded',
@@ -173,7 +173,7 @@ router.post('/schedules/load-defaults', (req: Request, res: Response) => {
  * GET /scheduler/queue
  * Get queued tasks
  */
-router.get('/queue', (req: Request, res: Response) => {
+router.get('/queue', (_req: Request, res: Response) => {
   const queue = scheduler.getQueue();
   const running = scheduler.getRunning();
   res.json({
@@ -363,7 +363,7 @@ router.post('/notifications/configure', (req: Request, res: Response) => {
  * POST /scheduler/notifications/test
  * Send a test notification
  */
-router.post('/notifications/test', async (req: Request, res: Response) => {
+router.post('/notifications/test', async (_req: Request, res: Response) => {
   await notifications.send({
     type: 'task_completed',
     title: 'Test Notification',
@@ -382,7 +382,7 @@ router.post('/notifications/test', async (req: Request, res: Response) => {
  * POST /scheduler/notifications/enable
  * Enable notifications
  */
-router.post('/notifications/enable', (req: Request, res: Response) => {
+router.post('/notifications/enable', (_req: Request, res: Response) => {
   notifications.setEnabled(true);
   res.json({ message: 'Notifications enabled' });
 });
@@ -391,7 +391,7 @@ router.post('/notifications/enable', (req: Request, res: Response) => {
  * POST /scheduler/notifications/disable
  * Disable notifications
  */
-router.post('/notifications/disable', (req: Request, res: Response) => {
+router.post('/notifications/disable', (_req: Request, res: Response) => {
   notifications.setEnabled(false);
   res.json({ message: 'Notifications disabled' });
 });

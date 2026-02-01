@@ -29,6 +29,7 @@ const STATIC_COMMANDS: Command[] = [
   { id: 'nav-mail', label: 'Go to Mail', section: 'Navigation', icon: '\u2709', action: () => { window.location.hash = '/mail'; } },
   { id: 'nav-workflows', label: 'Go to Workflows', section: 'Navigation', icon: '\u26A1', action: () => { window.location.hash = '/workflows'; } },
   { id: 'nav-connections', label: 'Go to Connections', section: 'Navigation', icon: '\u{1F517}', action: () => { window.location.hash = '/connections'; } },
+  { id: 'nav-memory', label: 'Go to Memory & Routing', section: 'Navigation', icon: '\u{1F4A1}', action: () => { window.location.hash = '/memory'; } },
   { id: 'act-spawn', label: 'Spawn Worker', section: 'Actions', icon: '+', action: () => { window.fleetDashboard?.showSpawnModal(); } },
   { id: 'act-connect', label: 'Connect Remote Agent', section: 'Actions', icon: '\u{1F310}', action: () => { window.fleetDashboard?.showConnectModal(); } },
   { id: 'act-swarm', label: 'Create Swarm', section: 'Actions', icon: '\u2726', action: () => { window.fleetDashboard?.showSwarmModal(); } },
