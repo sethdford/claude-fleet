@@ -199,6 +199,9 @@ export class CollabServer {
       origin: (origin, callback) => {
         // Allow requests with no origin (mobile apps, curl, etc.)
         if (!origin) return callback(null, true);
+        // Always allow same-origin requests (dashboard served from this server)
+        const serverOrigin = `http://localhost:${this.config.port}`;
+        if (origin === serverOrigin) return callback(null, true);
         if (this.config.corsOrigins.includes(origin) || this.config.corsOrigins.includes('*')) {
           return callback(null, true);
         }
@@ -226,9 +229,12 @@ export class CollabServer {
   }
 
   private rateLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
-    // Skip rate limiting for static files
+    // Skip rate limiting for static files, health checks, and internal worker output
     const staticExtensions = ['.js', '.css', '.html', '.png', '.jpg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.map', '.json'];
     if (staticExtensions.some(ext => req.path.endsWith(ext)) || req.path.startsWith('/dashboard')) {
+      return next();
+    }
+    if (req.path === '/health' || req.path === '/metrics' || req.path.endsWith('/output')) {
       return next();
     }
 
@@ -297,6 +303,8 @@ export class CollabServer {
     this.app.post('/orchestrate/send/:handle', routes.createSendToWorkerHandler(this.deps));
     this.app.get('/orchestrate/workers', routes.createGetWorkersHandler(this.deps));
     this.app.get('/orchestrate/output/:handle', routes.createGetWorkerOutputHandler(this.deps));
+    this.app.post('/orchestrate/workers/register', requireRole('team-lead'), routes.createRegisterExternalWorkerHandler(this.deps, broadcastToAll));
+    this.app.post('/orchestrate/workers/:handle/output', routes.createInjectWorkerOutputHandler(this.deps));
 
     // Worktree routes
     this.app.post('/orchestrate/worktree/:handle/commit', routes.createWorktreeCommitHandler(this.deps));
@@ -483,7 +491,7 @@ export class CollabServer {
     this.app.get('/payoffs/:taskId/calculate', requireRole('team-lead', 'worker'), routes.createCalculatePayoffHandler(this.deps));
 
     // Compound Machine routes (aggregated fleet visualization)
-    this.app.get('/compound/snapshot', routes.createCompoundSnapshotHandler(this.deps));
+    this.app.get('/compound/snapshot', requireRole('team-lead', 'worker'), routes.createCompoundSnapshotHandler(this.deps));
   }
 
   // ============================================================================

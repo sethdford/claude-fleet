@@ -32,12 +32,26 @@ const PUBLIC_ROUTES = new Set([
  */
 const PUBLIC_PREFIXES = [
   '/public/',
+  '/dashboard/',
+  '/compound/',
 ];
+
+/**
+ * API endpoints under public prefixes that still require authentication
+ */
+const PROTECTED_UNDER_PUBLIC = new Set([
+  '/compound/snapshot',
+]);
 
 /**
  * Check if a route is public (no auth required)
  */
 function isPublicRoute(path: string): boolean {
+  // Check if this specific path is protected even under a public prefix
+  if (PROTECTED_UNDER_PUBLIC.has(path)) {
+    return false;
+  }
+
   // Exact matches
   if (PUBLIC_ROUTES.has(path)) {
     return true;

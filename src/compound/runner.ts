@@ -11,7 +11,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, writeFileSync, mkdirSync, rmSync, chmodSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync, rmSync, chmodSync, statSync, openSync, readSync, closeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -68,6 +68,7 @@ export class CompoundRunner {
   private projectDir: string;
   private promptDir = '';
   private signalHandlers: Array<{ signal: NodeJS.Signals; handler: () => void }> = [];
+  private outputWatchers: NodeJS.Timeout[] = [];
 
   constructor(private options: CompoundOptions) {
     // Resolve the project directory for the fleet server itself
@@ -126,9 +127,9 @@ export class CompoundRunner {
       const result = await this.compoundLoop();
 
       // 10. Attach to tmux session for inspection
-      this.log('info', `Compound run complete. Attaching to tmux session...`);
+      this.log('info', 'Compound run complete. Attaching to tmux session...');
       this.log('dim', `Fleet branch: ${this.fleetBranch}`);
-      this.log('dim', `Tip: Press Ctrl+B then D to detach`);
+      this.log('dim', 'Tip: Press Ctrl+B then D to detach');
 
       try {
         execSync(`tmux attach-session -t ${SESSION_NAME}`, { stdio: 'inherit' });
@@ -282,7 +283,7 @@ export class CompoundRunner {
 
       if (this.gates.length === 0) {
         throw new Error(
-          `All quality gate commands are missing.\n` +
+          'All quality gate commands are missing.\n' +
           '  Install the required tools and try again.',
         );
       }
@@ -548,34 +549,9 @@ export class CompoundRunner {
 
     this.log('ok', `Swarm created: ${this.swarmId}`);
 
-    // Create mission with gates
-    const gatesPayload = this.gates.map(g => ({
-      gateType: g.gateType,
-      name: g.name,
-      isRequired: g.isRequired,
-      config: g.config,
-      sortOrder: g.sortOrder,
-    }));
-
-    const missionResponse = await this.apiPost('/missions', {
-      swarmId: this.swarmId,
-      name: 'Compound Quality Check',
-      goal: this.options.objective,
-      goalType: 'quality',
-      maxIterations: this.options.maxIterations,
-      gates: gatesPayload,
-      quorumConfig: { autoApprove: true },
-    });
-    this.missionId = (missionResponse as { id: string }).id;
-
-    if (!this.missionId) {
-      throw new Error('Failed to create mission');
-    }
-
+    // Create local mission (gates are validated locally, not via server)
+    this.missionId = `mission-${Date.now().toString(36)}`;
     this.log('ok', `Mission created with ${this.gates.length} gates`);
-
-    // Start mission
-    await this.apiPost(`/missions/${this.missionId}/start`, {});
     this.log('ok', 'Mission started');
   }
 
@@ -610,7 +586,13 @@ export class CompoundRunner {
 
       this.spawnWorkerInPane(pane, handle, 1, prompt);
       this.log('ok', `Spawned ${handle} (${role})`);
+
+      // Register worker with fleet server for dashboard visibility
+      this.registerWorkerWithServer(handle);
     }
+
+    // Start output watchers for all workers
+    this.startOutputWatchers();
   }
 
   private spawnWorkerInPane(pane: string, handle: string, iteration: number, prompt: string): void {
@@ -653,8 +635,8 @@ export class CompoundRunner {
     const config = {
       mcpServers: {
         'claude-fleet': {
-          command: 'npx',
-          args: ['-y', 'claude-fleet', 'mcp-server'],
+          command: 'node',
+          args: [join(this.projectDir, 'dist', 'cli.js'), 'mcp-server'],
           env: {
             CLAUDE_FLEET_URL: this.options.serverUrl,
             CLAUDE_CODE_AGENT_NAME: handle,
@@ -680,6 +662,8 @@ export class CompoundRunner {
     const filepath = join(this.promptDir, filename);
     const sentinelPath = join(this.promptDir, `${handle}-iter${iteration}.done`);
 
+    const outputPath = join(this.promptDir, `${handle}-iter${iteration}.ndjson`);
+
     const script = [
       '#!/bin/bash',
       `export CLAUDE_CODE_AGENT_NAME=${shellQuote(handle)}`,
@@ -689,16 +673,104 @@ export class CompoundRunner {
       `export CLAUDE_FLEET_URL=${shellQuote(this.options.serverUrl)}`,
       `cd ${shellQuote(this.options.targetDir)}`,
       `cat ${shellQuote(promptPath)} | \\`,
-      `  claude -p --dangerously-skip-permissions \\`,
-      `  --output-format stream-json \\`,
+      '  claude -p --dangerously-skip-permissions \\',
+      '  --output-format stream-json \\',
       `  --mcp-config ${shellQuote(mcpConfigPath)} \\`,
-      `  --strict-mcp-config`,
+      `  --strict-mcp-config 2>&1 | tee ${shellQuote(outputPath)}`,
       `touch ${shellQuote(sentinelPath)}`,
     ].join('\n');
 
     writeFileSync(filepath, script, 'utf-8');
     chmodSync(filepath, 0o755);
     return filepath;
+  }
+
+  // ── Step 6b: Worker Registration & Output Forwarding ───────────────────
+
+  private registerWorkerWithServer(handle: string): void {
+    try {
+      const body = JSON.stringify({
+        handle,
+        teamName: 'compound-team',
+        workingDir: this.options.targetDir,
+        swarmId: this.swarmId,
+      });
+      execSync(
+        `curl -s -X POST ${this.options.serverUrl}/orchestrate/workers/register ` +
+        '-H "Content-Type: application/json" ' +
+        `-H "Authorization: Bearer ${this.token}" ` +
+        `-d '${body}'`,
+        { encoding: 'utf-8', timeout: 5000 },
+      );
+    } catch {
+      this.log('warn', `Failed to register ${handle} with server (non-fatal)`);
+    }
+  }
+
+  private startOutputWatchers(): void {
+    const fileSizes = new Map<string, number>();
+
+    for (let i = 0; i < this.options.numWorkers; i++) {
+      const handle = `scout-${i + 1}`;
+      const outputPath = join(this.promptDir, `${handle}-iter1.ndjson`);
+      fileSizes.set(outputPath, 0);
+
+      const interval = setInterval(() => {
+        try {
+          if (!existsSync(outputPath)) return;
+          const stat = statSync(outputPath);
+          const lastSize = fileSizes.get(outputPath) ?? 0;
+          if (stat.size <= lastSize) return;
+
+          const fd = openSync(outputPath, 'r');
+          const buf = Buffer.alloc(stat.size - lastSize);
+          readSync(fd, buf, 0, buf.length, lastSize);
+          closeSync(fd);
+          fileSizes.set(outputPath, stat.size);
+
+          const newData = buf.toString('utf-8');
+          const lines = newData.split('\n').filter((l: string) => l.trim());
+
+          // Batch: forward all new events in one request
+          const events: unknown[] = [];
+          for (const line of lines) {
+            try {
+              events.push(JSON.parse(line));
+            } catch {
+              // Skip non-JSON lines
+            }
+          }
+          if (events.length > 0) {
+            this.forwardOutputBatch(handle, events);
+          }
+        } catch {
+          // File not ready yet or read error
+        }
+      }, 1500);
+
+      this.outputWatchers.push(interval);
+    }
+  }
+
+  private forwardOutputBatch(handle: string, events: unknown[]): void {
+    fetch(`${this.options.serverUrl}/orchestrate/workers/${handle}/output`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.token}`,
+      },
+      body: JSON.stringify({ events }),
+      signal: AbortSignal.timeout(5000),
+    }).catch(() => {
+      // Non-fatal: output forwarding failure shouldn't stop the run
+    });
+  }
+
+  private stopOutputWatchers(): void {
+    for (const interval of this.outputWatchers) {
+      clearInterval(interval);
+    }
+    this.outputWatchers = [];
   }
 
   // ── Step 7: Dashboard ───────────────────────────────────────────────────
@@ -761,15 +833,17 @@ export class CompoundRunner {
         };
       }
 
-      // Phase C: Trigger validation
+      // Phase C: Run validation gates locally
       this.log('info', 'Triggering validation...');
-      const validateResponse = await this.triggerValidation();
-      await sleep(3000); // Let status settle
+      const { allPassed, feedback } = this.triggerLocalValidation();
 
-      // Phase C: Check mission status
-      const missionStatus = await this.checkMissionStatus();
+      lastGateResults = feedback.gates.map(g => ({
+        name: g.name,
+        status: g.errors.length > 0 ? 'failed' as const : 'error' as const,
+        errorCount: g.errors.length,
+      }));
 
-      if (missionStatus === 'succeeded') {
+      if (allPassed) {
         this.printSuccessBanner();
         return {
           status: 'succeeded',
@@ -779,25 +853,6 @@ export class CompoundRunner {
           gateResults: lastGateResults,
         };
       }
-
-      if (missionStatus === 'failed' || missionStatus === 'cancelled') {
-        this.printFailureBanner(missionStatus);
-        return {
-          status: missionStatus === 'cancelled' ? 'cancelled' : 'failed',
-          iterations: iter,
-          branch: this.fleetBranch,
-          projectType: this.projectType,
-          gateResults: lastGateResults,
-        };
-      }
-
-      // Phase D: Extract feedback
-      const feedback = this.extractFeedbackFromValidation(validateResponse);
-      lastGateResults = feedback.gates.map(g => ({
-        name: g.name,
-        status: g.errors.length > 0 ? 'failed' as const : 'error' as const,
-        errorCount: g.errors.length,
-      }));
 
       if (feedback.gates.length > 0) {
         this.log('warn', `Gates failed in iteration ${iter}:`);
@@ -809,20 +864,6 @@ export class CompoundRunner {
           if (gate.errors.length > 10) {
             this.log('dim', `    ... and ${gate.errors.length - 10} more`);
           }
-        }
-      } else {
-        // Gates passed but mission didn't transition — re-check
-        await sleep(5000);
-        const recheck = await this.checkMissionStatus();
-        if (recheck === 'succeeded') {
-          this.printSuccessBanner();
-          return {
-            status: 'succeeded',
-            iterations: iter,
-            branch: this.fleetBranch,
-            projectType: this.projectType,
-            gateResults: [],
-          };
         }
       }
 
@@ -954,52 +995,40 @@ export class CompoundRunner {
 
   // ── Validation ──────────────────────────────────────────────────────────
 
-  private async triggerValidation(): Promise<unknown[]> {
-    try {
-      const result = await this.apiPost(`/missions/${this.missionId}/validate`, {});
-      return Array.isArray(result) ? result : [];
-    } catch {
-      return [];
-    }
-  }
+  /** Run gate commands locally and return named results. */
+  private runGatesLocally(): Array<{ name: string; status: string; output: string }> {
+    const results: Array<{ name: string; status: string; output: string }> = [];
 
-  private async checkMissionStatus(): Promise<string> {
-    try {
-      const result = await this.apiGet(`/missions/${this.missionId}`);
-      return (result as { status: string }).status ?? 'active';
-    } catch {
-      return 'active';
-    }
-  }
+    for (const gate of this.gates) {
+      const cmd = [gate.config.command, ...gate.config.args].join(' ');
+      this.log('info', `  Running gate: ${gate.name} → ${cmd}`);
 
-  private extractFeedbackFromValidation(results: unknown[]): StructuredFeedback {
-    // Parse the validation response into named results
-    const namedResults: Array<{ name: string; status: string; output: string }> = [];
-
-    // Fetch gate definitions for name mapping
-    let gateNameMap: Map<string, string>;
-    try {
-      const gatesResponse = this.apiGetSync(`/missions/${this.missionId}/gates`);
-      const gates = Array.isArray(gatesResponse) ? gatesResponse : [];
-      gateNameMap = new Map(
-        gates.map((g: { id: string; name: string }) => [g.id, g.name]),
-      );
-    } catch {
-      gateNameMap = new Map();
-    }
-
-    for (const result of results) {
-      const r = result as { gateId?: string; status?: string; output?: string };
-      if (r.status === 'failed') {
-        namedResults.push({
-          name: gateNameMap.get(r.gateId ?? '') ?? (r.gateId ?? 'unknown').slice(0, 8),
-          status: r.status,
-          output: r.output ?? '',
+      try {
+        const output = execSync(cmd, {
+          cwd: gate.config.cwd || this.options.targetDir,
+          encoding: 'utf-8',
+          timeout: 120_000,
+          stdio: ['pipe', 'pipe', 'pipe'],
         });
+        results.push({ name: gate.name, status: 'passed', output });
+        this.log('ok', `  ✓ ${gate.name} passed`);
+      } catch (err: unknown) {
+        const execErr = err as { stdout?: string; stderr?: string; message?: string };
+        const output = (execErr.stdout ?? '') + '\n' + (execErr.stderr ?? '');
+        results.push({ name: gate.name, status: 'failed', output });
+        this.log('error', `  ✗ ${gate.name} failed`);
       }
     }
 
-    return extractFeedbackFromNamedResults(namedResults, this.projectType);
+    return results;
+  }
+
+  /** Trigger local validation and return structured feedback. */
+  private triggerLocalValidation(): { allPassed: boolean; feedback: StructuredFeedback } {
+    const results = this.runGatesLocally();
+    const allPassed = results.every(r => r.status === 'passed');
+    const feedback = extractFeedbackFromNamedResults(results, this.projectType);
+    return { allPassed, feedback };
   }
 
   // ── Re-dispatch ─────────────────────────────────────────────────────────
@@ -1079,31 +1108,6 @@ export class CompoundRunner {
     return response.json();
   }
 
-  private async apiGet(path: string): Promise<unknown> {
-    const headers: Record<string, string> = {};
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
-
-    const response = await fetch(`${this.options.serverUrl}${path}`, { headers });
-
-    if (!response.ok) {
-      throw new Error(`API GET ${path} failed: ${response.status}`);
-    }
-
-    return response.json();
-  }
-
-  /** Synchronous API GET using execSync + curl. Used for feedback extraction. */
-  private apiGetSync(path: string): unknown {
-    const authHeader = this.token ? `-H "Authorization: Bearer ${this.token}"` : '';
-    const result = execSync(
-      `curl -sf ${authHeader} "${this.options.serverUrl}${path}"`,
-      { encoding: 'utf-8', timeout: 10_000 },
-    );
-    return JSON.parse(result);
-  }
-
   // ── Output Formatting ──────────────────────────────────────────────────
 
   private printSuccessBanner(): void {
@@ -1148,6 +1152,7 @@ export class CompoundRunner {
 
   /** Remove temp prompt/script directory. Idempotent — safe to call multiple times. */
   private cleanup(): void {
+    this.stopOutputWatchers();
     if (this.promptDir && existsSync(this.promptDir)) {
       try {
         rmSync(this.promptDir, { recursive: true, force: true });
