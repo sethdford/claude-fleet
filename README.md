@@ -57,7 +57,7 @@ src/
 ├── validation/        # Zod schemas for all API inputs
 ├── metrics/           # Prometheus metrics collection
 ├── scheduler/         # Cron-based autonomous task scheduling
-├── mcp/               # Model Context Protocol bridge (94 tools)
+├── mcp/               # Model Context Protocol bridge (98 tools)
 ├── middleware/         # JWT auth, RBAC, validation middleware
 └── integrations/      # Third-party integrations (Linear)
 ```
@@ -90,7 +90,32 @@ scripts/               # Build, E2E test, and deployment scripts
 - **Zod** — Input validation for all endpoints
 - **prom-client** — Prometheus metrics
 - **@modelcontextprotocol/sdk** — MCP server integration
-- **Rust (NAPI)** — Optional native modules for compound accumulator and full-text search
+- **Rust (NAPI-RS)** — 8 optional native crates for acceleration (compound, search, lmsh, logstream, dag, swarm, metrics, ringbus)
+
+---
+
+## Rust Native Acceleration
+
+Claude Fleet includes an optional Rust acceleration layer. All crates have JS fallback implementations — native binaries are never required.
+
+```
+crates/
+├── compound/    # Ring-buffer accumulator for time-series metrics
+├── search/      # Tantivy-based full-text search engine
+├── lmsh/        # Natural language → shell translator
+├── logstream/   # High-performance log streaming
+├── dag/         # DAG operations (topo sort, critical path, cycle detection)
+├── swarm/       # Swarm coordination primitives
+├── metrics/     # Native Prometheus metrics engine
+└── ringbus/     # Lock-free ring buffer message bus
+```
+
+Build native modules (optional):
+
+```bash
+cargo build --workspace --release
+cargo test --workspace    # 36 Rust tests
+```
 
 ---
 
@@ -222,7 +247,7 @@ fleet wave --repos api,frontend,shared \
 | `POST` | `/lmsh/translate` | Natural language to shell |
 | `POST` | `/search` | Full-text code search |
 
-See `docs/api.md` for the complete API reference.
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the complete API reference.
 
 ---
 
@@ -295,7 +320,7 @@ fleet audit --verbose               # Verbose output
 
 ## MCP Integration
 
-Claude Fleet exposes 93 tools via Model Context Protocol for direct Claude Code integration:
+Claude Fleet exposes 98 tools via Model Context Protocol for direct Claude Code integration:
 
 ```json
 {
@@ -427,6 +452,14 @@ jobs:
             --roles scout,oracle,critic \
             --max-iterations 2
 ```
+
+---
+
+## Documentation
+
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — System architecture, API reference, and data flow
+- [DEPLOYMENT.md](docs/DEPLOYMENT.md) — Production deployment guide
+- [NATIVE-INTEGRATION.md](docs/NATIVE-INTEGRATION.md) — Claude Code native features integration
 
 ---
 

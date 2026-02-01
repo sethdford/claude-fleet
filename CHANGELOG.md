@@ -5,6 +5,31 @@ All notable changes to Claude Fleet will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2025-02-01
+
+### Added
+- **Rust-native acceleration layer** — 8 NAPI-RS crates (compound, search, lmsh, logstream, dag, swarm, metrics, ringbus) with automatic JS fallback for every path
+- **Native Claude Code integration** — TeammateTool aliases, NativeTaskFile protocol, agent color assignment, env var signals
+- **New API endpoints** — Search (`POST /search`, `GET /search/stats`), LMSH (`POST /lmsh/translate`, `GET/POST /lmsh/aliases`), DAG (`POST /dag/sort`, `/dag/cycles`, `/dag/critical-path`, `/dag/ready`)
+- **New TypeScript wrappers** — SwarmAccelerator, NativeMetricsEngine, MessageBus (all with JS fallback)
+- **Dashboard enhancements** — Connections view, Memory view, Hive visualization improvements with animations, gradients, and responsive UX
+- **701 unit tests** (up from 372), 36 Rust tests across 8 crates
+- **E2E native endpoint tests** — new test scripts for Rust-accelerated endpoints
+- **MCP tools expanded to 98** (up from 93) including 5 native TeammateTool aliases
+
+### Changed
+- Package version aligned with Rust workspace (`3.0.0`)
+- Architecture documentation updated with Rust acceleration layer
+- Dashboard rebuilt with TypeScript + Vite, strict unused variable checks enabled
+- Storage layer test coverage expanded to 84% line coverage
+
+### Fixed
+- 11 failing tests resolved across storage and worker modules
+- Search crate test coverage added
+- LMSH trigger detection fixed in native wrapper fallbacks
+- Documentation: corrected stale test counts, tool counts, and legacy "collab" references
+- `.env.example` port corrected from 3000 to 3847
+
 ## [2.2.0] - 2025-01-31
 
 ### Added
@@ -116,6 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 3.0.0 | 2025-02-01 | 8 Rust crates, native Claude Code integration, 98 MCP tools, 701 tests |
 | 2.2.0 | 2025-01-31 | Policy/safety hooks, session lineage, fleet init, doc cleanup |
 | 2.1.0 | 2025-01-28 | Autonomous ops, eval, HITL, knowledge/RAG, memory, streaming |
 | 2.0.2 | 2025-01-24 | Shell completions, workflows, tmux theme |

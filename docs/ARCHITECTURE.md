@@ -1,6 +1,6 @@
 # Architecture
 
-Claude Fleet v2.2 - Enterprise-ready multi-agent orchestration for Claude Code.
+Claude Fleet v3.0 - Enterprise-ready multi-agent orchestration for Claude Code.
 
 ## Overview
 
@@ -9,7 +9,7 @@ Claude Fleet is a TypeScript server that enables team collaboration, task manage
 - **REST API**: Express-based HTTP API for all coordination operations
 - **WebSocket**: Real-time notifications for messages, tasks, and worker events
 - **Worker Orchestration**: Spawn and control Claude Code instances programmatically
-- **MCP Integration**: 94 tools accessible via Model Context Protocol
+- **MCP Integration**: 98 tools accessible via Model Context Protocol
 - **Persistent Storage**: SQLite with optional PostgreSQL, DynamoDB, Firestore, S3 backends
 - **Swarm Intelligence**: Pheromone trails, belief consensus, credit auctions, governance
 - **Knowledge & RAG**: FTS5-powered knowledge base with chunked ingestion and recency scoring
@@ -145,7 +145,7 @@ Persistence layer using better-sqlite3.
 
 Model Context Protocol bridge exposing coordination tools.
 
-**Tool Categories (94 tools):**
+**Tool Categories (98 tools):**
 
 | Category | Count | Tools |
 |----------|-------|-------|
@@ -514,11 +514,58 @@ Agents bid for tasks based on capability:
 
 ---
 
+## Rust Native Acceleration
+
+Claude Fleet v3.0 includes an optional Rust acceleration layer via NAPI-RS. All Rust crates have JS fallback implementations, so native binaries are never required.
+
+### Crate Architecture
+
+```
+crates/
+├── compound/    # Ring-buffer accumulator for time-series metrics
+├── search/      # Tantivy-based full-text search engine
+├── lmsh/        # Natural language → shell command translator
+├── logstream/   # High-performance log streaming and filtering
+├── dag/         # Directed acyclic graph operations (topo sort, critical path)
+├── swarm/       # Swarm coordination primitives (pheromone decay, consensus)
+├── metrics/     # Native Prometheus metrics engine
+└── ringbus/     # Lock-free ring buffer message bus
+```
+
+### How Fallback Works
+
+Each TypeScript wrapper attempts to load the native module at startup:
+
+```typescript
+try {
+  const native = require('@claude-fleet/search');
+  // Use native implementation
+} catch {
+  // Fall back to JS implementation
+}
+```
+
+This means:
+- `npm install` works everywhere (native binaries are optional)
+- CI/CD environments without Rust still run all tests
+- Performance-sensitive hot paths benefit from native speed when available
+
+### Building Native Modules
+
+```bash
+# Build all Rust crates
+cargo build --workspace --release
+
+# Run Rust tests
+cargo test --workspace
+```
+
+---
+
 ## See Also
 
 - [Documentation Index](README.md) - Full documentation overview
 - [README](../README.md) - Quick start and usage
-- [API Reference](api.md) - Complete REST API documentation
 - [DEPLOYMENT](DEPLOYMENT.md) - Production deployment guide
 - [TMUX-AUTOMATION](TMUX-AUTOMATION.md) - Tmux integration for worker panes
 - [NATIVE-INTEGRATION](NATIVE-INTEGRATION.md) - Claude Code native features integration

@@ -1,6 +1,6 @@
 {
   "name": "claude-fleet",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "Multi-agent orchestration server for Claude Code with fleet coordination",
   "type": "module",
   "main": "dist/index.js",

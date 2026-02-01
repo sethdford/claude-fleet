@@ -164,7 +164,7 @@ Create `~/Library/LaunchAgents/com.claude-fleet.server.plist`:
         <key>PORT</key>
         <string>3847</string>
         <key>DB_PATH</key>
-        <string>/var/lib/claude-fleet/collab.db</string>
+        <string>/var/lib/claude-fleet/fleet.db</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
@@ -250,7 +250,7 @@ find $BACKUP_DIR -name "fleet_*.db" -mtime +7 -delete
 Add to crontab:
 
 ```bash
-0 */6 * * * /opt/collab/scripts/backup.sh
+0 */6 * * * /opt/claude-fleet/scripts/backup.sh
 ```
 
 #### Option 2: Copy with WAL Checkpoint
@@ -501,7 +501,7 @@ RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3847/health)
 if [ "$RESPONSE" != "200" ]; then
     echo "Health check failed: HTTP $RESPONSE"
     # Optionally restart the service
-    # systemctl restart collab
+    # systemctl restart claude-fleet
     exit 1
 fi
 
@@ -515,9 +515,9 @@ exit 0
 
 - [Documentation Index](README.md) - Full documentation overview
 - [ARCHITECTURE](ARCHITECTURE.md) - System architecture
-- [API Reference](api.md) - Complete REST API documentation
 - [FEATURE-FLAGS](FEATURE-FLAGS.md) - Environment variables and configuration
 - [TMUX-AUTOMATION](TMUX-AUTOMATION.md) - Tmux integration
+- [NATIVE-INTEGRATION](NATIVE-INTEGRATION.md) - Rust native acceleration
 
 ## Support
 
