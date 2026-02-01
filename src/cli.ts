@@ -1436,6 +1436,174 @@ async function cmdStepComplete(
 }
 
 // ============================================================================
+// COMMANDS: MEMORY
+// ============================================================================
+
+async function cmdMemoryStore(
+  options: CliOptions,
+  agentId: string,
+  key: string,
+  value: string,
+  memoryType?: string,
+  tags?: string
+): Promise<void> {
+  const body: Record<string, unknown> = { agentId, key, value };
+  if (memoryType) body.memoryType = memoryType;
+  if (tags) body.tags = tags.split(',').map(t => t.trim());
+  const data = await request('POST', '/memory/store', options, body);
+  outputResult(data, options);
+}
+
+async function cmdMemoryRecall(
+  options: CliOptions,
+  agentId: string,
+  key: string
+): Promise<void> {
+  const data = await request('GET', `/memory/recall/${encodeURIComponent(agentId)}/${encodeURIComponent(key)}`, options);
+  outputResult(data, options);
+}
+
+async function cmdMemorySearch(
+  options: CliOptions,
+  agentId: string,
+  query: string,
+  memoryType?: string,
+  limit?: string
+): Promise<void> {
+  const body: Record<string, unknown> = { agentId, query };
+  if (memoryType) body.memoryType = memoryType;
+  if (limit) body.limit = parseInt(limit, 10);
+  const data = await request('POST', '/memory/search', options, body);
+  outputResult(data, options);
+}
+
+async function cmdMemoryList(
+  options: CliOptions,
+  agentId: string,
+  limit?: string
+): Promise<void> {
+  const query = limit ? `?limit=${limit}` : '';
+  const data = await request('GET', `/memory/${encodeURIComponent(agentId)}${query}`, options);
+  outputResult(data, options);
+}
+
+// ============================================================================
+// COMMANDS: ROUTING
+// ============================================================================
+
+async function cmdRoute(
+  options: CliOptions,
+  subject: string,
+  description?: string
+): Promise<void> {
+  const body: Record<string, unknown> = { subject };
+  if (description) body.description = description;
+  const data = await request('POST', '/routing/classify', options, body) as {
+    complexity: string;
+    strategy: string;
+    model: string;
+    confidence: number;
+  };
+
+  console.log(`\n  Complexity:  ${data.complexity}`);
+  console.log(`  Strategy:    ${data.strategy}`);
+  console.log(`  Model:       ${data.model}`);
+  console.log(`  Confidence:  ${(data.confidence * 100).toFixed(1)}%\n`);
+}
+
+// ============================================================================
+// COMMANDS: DAG
+// ============================================================================
+
+async function cmdDagSort(options: CliOptions, teamName: string): Promise<void> {
+  validateTeamName(teamName);
+  const tasks = await request('GET', `/teams/${teamName}/tasks`, options) as Array<{
+    id: string;
+    subject: string;
+    blockedBy?: string[];
+  }>;
+  const nodes = tasks.map(t => ({
+    id: t.id,
+    dependsOn: t.blockedBy ?? [],
+  }));
+  const data = await request('POST', '/dag/sort', options, { nodes });
+  outputResult(data, options);
+}
+
+async function cmdDagCycles(options: CliOptions, teamName: string): Promise<void> {
+  validateTeamName(teamName);
+  const tasks = await request('GET', `/teams/${teamName}/tasks`, options) as Array<{
+    id: string;
+    blockedBy?: string[];
+  }>;
+  const nodes = tasks.map(t => ({
+    id: t.id,
+    dependsOn: t.blockedBy ?? [],
+  }));
+  const data = await request('POST', '/dag/cycles', options, { nodes });
+  outputResult(data, options);
+}
+
+async function cmdDagCriticalPath(options: CliOptions, teamName: string): Promise<void> {
+  validateTeamName(teamName);
+  const tasks = await request('GET', `/teams/${teamName}/tasks`, options) as Array<{
+    id: string;
+    blockedBy?: string[];
+  }>;
+  const nodes = tasks.map(t => ({
+    id: t.id,
+    estimatedDuration: 1,
+    dependsOn: t.blockedBy ?? [],
+  }));
+  const data = await request('POST', '/dag/critical-path', options, { nodes });
+  outputResult(data, options);
+}
+
+async function cmdDagReady(options: CliOptions, teamName: string): Promise<void> {
+  validateTeamName(teamName);
+  const tasks = await request('GET', `/teams/${teamName}/tasks`, options) as Array<{
+    id: string;
+    status: string;
+    blockedBy?: string[];
+  }>;
+  const completed = tasks.filter(t => t.status === 'resolved').map(t => t.id);
+  const nodes = tasks.map(t => ({
+    id: t.id,
+    dependsOn: t.blockedBy ?? [],
+  }));
+  const data = await request('POST', '/dag/ready', options, { nodes, completed });
+  outputResult(data, options);
+}
+
+// ============================================================================
+// COMMANDS: LMSH & SEARCH
+// ============================================================================
+
+async function cmdLmsh(options: CliOptions, input: string): Promise<void> {
+  const data = await request('POST', '/lmsh/translate', options, { input }) as {
+    command: string;
+    confidence: number;
+    alternatives: string[];
+    explanation: string;
+  };
+
+  console.log(`\n  Command:     ${data.command || '(no match)'}`);
+  console.log(`  Confidence:  ${(data.confidence * 100).toFixed(0)}%`);
+  console.log(`  Explanation: ${data.explanation}`);
+  if (data.alternatives.length > 0) {
+    console.log(`  Alternatives: ${data.alternatives.join(', ')}`);
+  }
+  console.log('');
+}
+
+async function cmdSearch(options: CliOptions, query: string, limit?: string): Promise<void> {
+  const body: Record<string, unknown> = { query };
+  if (limit) body.limit = parseInt(limit, 10);
+  const data = await request('POST', '/search', options, body);
+  outputResult(data, options);
+}
+
+// ============================================================================
 // HELP
 // ============================================================================
 
@@ -1557,6 +1725,27 @@ WORKFLOW COMMANDS
   step-retry <id>                     Retry failed step [team-lead]
   step-complete <id> [output]         Manually complete step
 
+MEMORY COMMANDS
+  memory-store <agentId> <key> <value> [--type <type>] [--tags <t1,t2>]
+                                      Store agent memory
+  memory-recall <agentId> <key>       Recall a specific memory
+  memory-search <agentId> <query> [--type <type>] [--limit <n>]
+                                      Search agent memories
+  memory-list <agentId> [--limit <n>] List all memories for agent
+
+ROUTING COMMANDS
+  route <subject> [description]       Classify task complexity/strategy
+
+DAG COMMANDS
+  dag-sort <teamName>                 Topological sort of team tasks
+  dag-cycles <teamName>               Detect dependency cycles
+  dag-critical-path <teamName>        Find critical path in task graph
+  dag-ready <teamName>                Get tasks ready to execute
+
+SHELL & SEARCH COMMANDS
+  lmsh <natural-language>             Translate natural language to shell
+  search <query> [--limit <n>]        Search indexed sessions
+
 COMPOUND COMMANDS
   compound [options]                  Run autonomous compound iteration loop
     --target-dir <dir>               Target codebase (default: cwd)
@@ -1635,6 +1824,10 @@ async function main(): Promise<void> {
       template: { type: 'boolean', default: false },
       // Spawn mode flag
       'spawn-mode': { type: 'string' },
+      // Memory/search flags
+      type: { type: 'string' },
+      tags: { type: 'string' },
+      limit: { type: 'string' },
       // Compound command flags
       'target-dir': { type: 'string' },
       'max-iterations': { type: 'string' },
@@ -2188,6 +2381,99 @@ async function main(): Promise<void> {
         break;
       case 'migrate-check':
         await cmdMigrateCheck(options);
+        break;
+
+      // Memory Commands
+      case 'memory-store':
+        if (args.length < 3) {
+          console.error('Usage: fleet memory-store <agentId> <key> <value> [--type <type>] [--tags <t1,t2>]');
+          process.exit(1);
+        }
+        await cmdMemoryStore(
+          options, args[0], args[1], args.slice(2).join(' '),
+          values.type as string | undefined,
+          values.tags as string | undefined
+        );
+        break;
+      case 'memory-recall':
+        if (args.length < 2) {
+          console.error('Usage: fleet memory-recall <agentId> <key>');
+          process.exit(1);
+        }
+        await cmdMemoryRecall(options, args[0], args[1]);
+        break;
+      case 'memory-search':
+        if (args.length < 2) {
+          console.error('Usage: fleet memory-search <agentId> <query> [--type <type>] [--limit <n>]');
+          process.exit(1);
+        }
+        await cmdMemorySearch(
+          options, args[0], args.slice(1).join(' '),
+          values.type as string | undefined,
+          values.limit as string | undefined
+        );
+        break;
+      case 'memory-list':
+        if (args.length < 1) {
+          console.error('Usage: fleet memory-list <agentId> [--limit <n>]');
+          process.exit(1);
+        }
+        await cmdMemoryList(options, args[0], values.limit as string | undefined);
+        break;
+
+      // Routing Commands
+      case 'route':
+        if (args.length < 1) {
+          console.error('Usage: fleet route <subject> [description]');
+          process.exit(1);
+        }
+        await cmdRoute(options, args[0], args.slice(1).join(' ') || undefined);
+        break;
+
+      // DAG Commands
+      case 'dag-sort':
+        if (args.length < 1) {
+          console.error('Usage: fleet dag-sort <teamName>');
+          process.exit(1);
+        }
+        await cmdDagSort(options, args[0]);
+        break;
+      case 'dag-cycles':
+        if (args.length < 1) {
+          console.error('Usage: fleet dag-cycles <teamName>');
+          process.exit(1);
+        }
+        await cmdDagCycles(options, args[0]);
+        break;
+      case 'dag-critical-path':
+        if (args.length < 1) {
+          console.error('Usage: fleet dag-critical-path <teamName>');
+          process.exit(1);
+        }
+        await cmdDagCriticalPath(options, args[0]);
+        break;
+      case 'dag-ready':
+        if (args.length < 1) {
+          console.error('Usage: fleet dag-ready <teamName>');
+          process.exit(1);
+        }
+        await cmdDagReady(options, args[0]);
+        break;
+
+      // LMSH & Search Commands
+      case 'lmsh':
+        if (args.length < 1) {
+          console.error('Usage: fleet lmsh <natural-language>');
+          process.exit(1);
+        }
+        await cmdLmsh(options, args.join(' '));
+        break;
+      case 'search':
+        if (args.length < 1) {
+          console.error('Usage: fleet search <query> [--limit <n>]');
+          process.exit(1);
+        }
+        await cmdSearch(options, args.join(' '), values.limit as string | undefined);
         break;
 
       // Compound Runner

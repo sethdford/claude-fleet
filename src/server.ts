@@ -630,6 +630,15 @@ export class CollabServer {
     this.app.post('/dag/critical-path', requireRole('team-lead', 'worker'), routes.createDagCriticalPathHandler(this.deps));
     this.app.post('/dag/ready', requireRole('team-lead', 'worker'), routes.createDagReadyHandler(this.deps));
 
+    // Memory routes (agent persistent memory)
+    this.app.post('/memory/store', requireRole('team-lead', 'worker'), routes.createMemoryStoreHandler(this.deps));
+    this.app.get('/memory/recall/:agentId/:key', requireRole('team-lead', 'worker'), routes.createMemoryRecallHandler(this.deps));
+    this.app.post('/memory/search', requireRole('team-lead', 'worker'), routes.createMemorySearchHandler(this.deps));
+    this.app.get('/memory/:agentId', requireRole('team-lead', 'worker'), routes.createMemoryListHandler(this.deps));
+
+    // Routing routes (task complexity classification)
+    this.app.post('/routing/classify', requireRole('team-lead', 'worker'), routes.createRoutingClassifyHandler(this.deps));
+
     // Coordination status (native integration introspection)
     this.app.get('/coordination/status', requireRole('team-lead', 'worker'), (_req: Request, res: Response) => {
       const nativeStatus = this.workerManager.getNativeStatus();

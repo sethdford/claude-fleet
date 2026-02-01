@@ -244,3 +244,16 @@ export {
   createDagCriticalPathHandler,
   createDagReadyHandler,
 } from './dag.js';
+
+// Memory routes (agent persistent memory)
+export {
+  createMemoryStoreHandler,
+  createMemoryRecallHandler,
+  createMemorySearchHandler,
+  createMemoryListHandler,
+} from './memory.js';
+
+// Routing routes (task complexity classification)
+export {
+  createRoutingClassifyHandler,
+} from './routing.js';
