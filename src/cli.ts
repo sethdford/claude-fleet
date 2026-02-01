@@ -1498,17 +1498,8 @@ async function cmdRoute(
 ): Promise<void> {
   const body: Record<string, unknown> = { subject };
   if (description) body.description = description;
-  const data = await request('POST', '/routing/classify', options, body) as {
-    complexity: string;
-    strategy: string;
-    model: string;
-    confidence: number;
-  };
-
-  console.log(`\n  Complexity:  ${data.complexity}`);
-  console.log(`  Strategy:    ${data.strategy}`);
-  console.log(`  Model:       ${data.model}`);
-  console.log(`  Confidence:  ${(data.confidence * 100).toFixed(1)}%\n`);
+  const data = await request('POST', '/routing/classify', options, body);
+  outputResult(data, options);
 }
 
 // ============================================================================
@@ -1580,20 +1571,8 @@ async function cmdDagReady(options: CliOptions, teamName: string): Promise<void>
 // ============================================================================
 
 async function cmdLmsh(options: CliOptions, input: string): Promise<void> {
-  const data = await request('POST', '/lmsh/translate', options, { input }) as {
-    command: string;
-    confidence: number;
-    alternatives: string[];
-    explanation: string;
-  };
-
-  console.log(`\n  Command:     ${data.command || '(no match)'}`);
-  console.log(`  Confidence:  ${(data.confidence * 100).toFixed(0)}%`);
-  console.log(`  Explanation: ${data.explanation}`);
-  if (data.alternatives.length > 0) {
-    console.log(`  Alternatives: ${data.alternatives.join(', ')}`);
-  }
-  console.log('');
+  const data = await request('POST', '/lmsh/translate', options, { input });
+  outputResult(data, options);
 }
 
 async function cmdSearch(options: CliOptions, query: string, limit?: string): Promise<void> {
