@@ -58,8 +58,10 @@ json_field() {
 }
 
 # Configuration
+PORT=${PORT:-4792}
+BASE_URL="http://localhost:$PORT"
+export CLAUDE_FLEET_URL="$BASE_URL"
 CLI="npx tsx src/cli.ts"
-BASE_URL="http://localhost:3847"
 TEAM="test-team-$$"  # Unique team per run
 
 # Server management
@@ -73,7 +75,16 @@ start_server() {
   DB_FILE=$(mktemp /tmp/fleet-test-XXXXXX.db)
 
   # Start server in background
-  FLEET_DB_PATH="$DB_FILE" PORT=3847 npm run start > /tmp/fleet-test-server.log 2>&1 &
+  # Kill any stale process on our port
+  local stale_pid
+  stale_pid=$(lsof -ti :$PORT 2>/dev/null) || true
+  if [ -n "$stale_pid" ]; then
+    echo "Killing stale process $stale_pid on port $PORT"
+    kill "$stale_pid" 2>/dev/null || true
+    sleep 1
+  fi
+
+  DB_PATH="$DB_FILE" PORT=$PORT npm run start > /tmp/fleet-test-server.log 2>&1 &
   SERVER_PID=$!
 
   # Wait for server to be ready
@@ -137,12 +148,12 @@ else
   fail "metrics - unexpected response" "$OUTPUT"
 fi
 
-# debug
+# debug (requires auth - test without token should get auth error)
 OUTPUT=$($CLI debug 2>&1) || true
-if echo "$OUTPUT" | grep -q '"version"\|"workers"'; then
-  pass "debug - returns debug info"
+if echo "$OUTPUT" | grep -q '"version"\|"workers"\|Authentication required'; then
+  pass "debug - endpoint responds (auth required before login)"
 else
-  fail "debug - expected version or workers field" "$OUTPUT"
+  fail "debug - expected version/workers or auth error" "$OUTPUT"
 fi
 
 # auth - team-lead

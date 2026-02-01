@@ -6,12 +6,24 @@
 
 import { Registry, Counter, Histogram, Gauge, collectDefaultMetrics } from 'prom-client';
 import type { Request, Response, NextFunction } from 'express';
+import { createNativeMetricsEngine } from './native-metrics.js';
+import type { NativeMetricsEngine } from './native-metrics.js';
 
 // Create a new registry
 export const register = new Registry();
 
 // Add default metrics (CPU, memory, event loop, etc.)
 collectDefaultMetrics({ register });
+
+// Native metrics engine for high-throughput internal observations
+export const nativeMetrics: NativeMetricsEngine = createNativeMetricsEngine();
+
+// Initialize native histograms for hot-path tracking
+nativeMetrics.createHistogram('http_request_duration_native');
+nativeMetrics.createHistogram('worker_event_latency');
+nativeMetrics.createHistogram('task_completion_time');
+nativeMetrics.createCounter('http_requests_native', 60, 60);
+nativeMetrics.createCounter('ws_messages_native', 60, 60);
 
 // ============================================================================
 // HTTP METRICS
@@ -225,6 +237,10 @@ export function metricsMiddleware(req: Request, res: Response, next: NextFunctio
       },
       duration
     );
+
+    // Also record in native engine for fast percentile computation
+    nativeMetrics.observeHistogram('http_request_duration_native', duration);
+    nativeMetrics.incrementCounter('http_requests_native');
   });
 
   next();

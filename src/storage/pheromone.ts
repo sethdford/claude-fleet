@@ -13,6 +13,8 @@ import type {
   PheromoneResourceType,
   PheromoneTrailType,
 } from '../types.js';
+import { createSwarmAccelerator } from '../workers/swarm-accelerator.js';
+import type { SwarmAccelerator } from '../workers/swarm-accelerator.js';
 
 // ============================================================================
 // INTERFACES
@@ -75,9 +77,11 @@ interface PheromoneRow {
 
 export class PheromoneStorage {
   private storage: SQLiteStorage;
+  private accelerator: SwarmAccelerator;
 
   constructor(storage: SQLiteStorage) {
     this.storage = storage;
+    this.accelerator = createSwarmAccelerator();
   }
 
   /**
@@ -234,47 +238,43 @@ export class PheromoneStorage {
 
   /**
    * Process decay for all trails
-   * Reduces intensity and marks fully decayed trails
+   * Reduces intensity and marks fully decayed trails.
+   * Uses native Rust accelerator for batch decay computation when available.
    */
   processDecay(swarmId?: string, decayRate = 0.1, minIntensity = 0.01): DecayResult {
     const db = this.storage.getDatabase();
     const now = Date.now();
 
-    // Decay active trails
-    let decaySql = `
-      UPDATE pheromone_trails
-      SET intensity = intensity * (1 - ?)
-      WHERE decayed_at IS NULL
-    `;
-    const decayParams: (string | number)[] = [decayRate];
-
+    // Read active trails for native batch computation
+    let selectSql = 'SELECT id, intensity, created_at FROM pheromone_trails WHERE decayed_at IS NULL';
+    const selectParams: (string | number)[] = [];
     if (swarmId) {
-      decaySql += ' AND swarm_id = ?';
-      decayParams.push(swarmId);
+      selectSql += ' AND swarm_id = ?';
+      selectParams.push(swarmId);
     }
+    const selectStmt = db.prepare(selectSql);
+    const rows = selectStmt.all(...selectParams) as Array<{ id: string; intensity: number; created_at: number }>;
 
-    const decayStmt = db.prepare(decaySql);
-    const decayResult = decayStmt.run(...decayParams);
+    // Compute decay in native/JS accelerator
+    const decayInput = rows.map((r) => ({ id: r.id, intensity: r.intensity, createdAt: r.created_at }));
+    const result = this.accelerator.processDecay(decayInput, decayRate, minIntensity);
+
+    // Write back decayed intensities
+    const updateStmt = db.prepare('UPDATE pheromone_trails SET intensity = ? WHERE id = ?');
+    for (const trail of result.trails) {
+      updateStmt.run(trail.intensity, trail.id);
+    }
 
     // Mark trails below minimum as decayed
-    let markSql = `
-      UPDATE pheromone_trails
-      SET decayed_at = ?
-      WHERE intensity < ? AND decayed_at IS NULL
-    `;
-    const markParams: (string | number)[] = [now, minIntensity];
-
-    if (swarmId) {
-      markSql += ' AND swarm_id = ?';
-      markParams.push(swarmId);
+    if (result.removedIds.length > 0) {
+      const placeholders = result.removedIds.map(() => '?').join(',');
+      const markStmt = db.prepare(`UPDATE pheromone_trails SET decayed_at = ? WHERE id IN (${placeholders})`);
+      markStmt.run(now, ...result.removedIds);
     }
 
-    const markStmt = db.prepare(markSql);
-    const markResult = markStmt.run(...markParams);
-
     return {
-      decayed: decayResult.changes,
-      removed: markResult.changes,
+      decayed: rows.length,
+      removed: result.removedCount,
     };
   }
 

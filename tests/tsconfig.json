@@ -17,8 +17,7 @@
       "@cct/storage": ["../packages/storage/src/index.ts"],
       "@cct/session": ["../packages/session/src/index.ts"],
       "@cct/fleet": ["../packages/fleet/src/index.ts"],
-      "@cct/safety": ["../packages/safety/src/index.ts"],
-      "@cct/mcp": ["../packages/mcp/src/index.ts"]
+      "@cct/safety": ["../packages/safety/src/index.ts"]
     }
   },
   "include": ["**/*.ts"],
@@ -27,7 +26,6 @@
     { "path": "../packages/storage" },
     { "path": "../packages/session" },
     { "path": "../packages/fleet" },
-    { "path": "../packages/safety" },
-    { "path": "../packages/mcp" }
+    { "path": "../packages/safety" }
   ]
 }

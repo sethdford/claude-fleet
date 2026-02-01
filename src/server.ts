@@ -36,6 +36,10 @@ import type {
 } from './types.js';
 import type { RouteDependencies, BroadcastToChat, BroadcastToAll } from './routes/types.js';
 import * as routes from './routes/index.js';
+import { TaskSyncBridge } from './workers/task-sync.js';
+import { InboxBridge } from './workers/inbox-bridge.js';
+import type { MessageReceivedEvent } from './workers/inbox-bridge.js';
+import type { AgentDiscoveredEvent } from './workers/native-bridge.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,6 +67,7 @@ export function getConfig(): ServerConfig {
     rateLimitWindow: 60000,
     rateLimitMax: 100,
     corsOrigins: process.env.CORS_ORIGINS?.split(',').map(s => s.trim()) ?? ['http://localhost:3847'],
+    nativeOnly: process.env.FLEET_NATIVE_ONLY === 'true',
   };
 }
 
@@ -86,6 +91,9 @@ export class CollabServer {
   private startTime = Date.now();
   private swarms = new Map<string, { id: string; name: string; description?: string; maxAgents: number; createdAt: number }>();
   private deps!: RouteDependencies;
+  private taskSyncBridge: TaskSyncBridge | null = null;
+  private inboxBridge: InboxBridge | null = null;
+  private watchedTeams = new Set<string>(['default']);
   private initialized = false;
 
   constructor(config?: Partial<ServerConfig>) {
@@ -135,13 +143,93 @@ export class CollabServer {
       serverUrl: `http://localhost:${this.config.port}`,
       storage: this.legacyStorage,
       injectMail: true,
-      useWorktrees: true,
+      useWorktrees: !this.config.nativeOnly, // Skip worktrees in native-only mode
+      nativeOnly: this.config.nativeOnly,
     });
 
     // Connect SpawnController to WorkerManager
     // Use the abstracted storage interface for spawn queue
     this.spawnController.initialize(this.storage.spawnQueue, this.workerManager);
     this.workerManager.setSpawnController(this.spawnController);
+
+    // Initialize TaskSyncBridge for native mode integration
+    // Watches ~/.claude/tasks/ for changes from native TeammateTool agents
+    this.taskSyncBridge = new TaskSyncBridge(this.legacyStorage);
+    this.taskSyncBridge.start(['default']);
+
+    // Run full sync on startup to catch changes while Fleet was offline
+    this.taskSyncBridge.fullSync('default').then(({ synced, errors }) => {
+      if (synced > 0 || errors > 0) {
+        console.log(`[SERVER] TaskSyncBridge startup sync: ${synced} synced, ${errors} errors`);
+      }
+    }).catch(() => { /* best-effort */ });
+
+    console.log('[SERVER] TaskSyncBridge initialized');
+
+    // Initialize InboxBridge for live message watching
+    this.inboxBridge = this.workerManager.getInboxBridge();
+    if (this.inboxBridge) {
+      this.inboxBridge.startWatching('default');
+
+      // Wire message events → WebSocket broadcast
+      this.inboxBridge.on('message:received', (event: MessageReceivedEvent) => {
+        console.log(`[INBOX] Message from ${event.message.from} in session ${event.sessionId.slice(0, 8)}...`);
+        this.broadcastToAll({
+          type: 'native_message',
+          teamName: event.teamName,
+          sessionId: event.sessionId,
+          from: event.message.from,
+          text: event.message.text,
+          timestamp: event.message.timestamp,
+        });
+      });
+
+      console.log('[SERVER] InboxBridge live watching initialized');
+    }
+
+    // Wire NativeBridge discovery → WebSocket broadcast + auto-register
+    const nativeBridge = this.workerManager.getNativeBridge();
+    if (nativeBridge) {
+      nativeBridge.startDiscovery('default');
+
+      nativeBridge.on('agent:discovered', (event: AgentDiscoveredEvent) => {
+        console.log(`[SERVER] Agent discovered: ${event.teamName}/${event.agentId}`);
+
+        // Broadcast discovery to all connected dashboard clients
+        this.broadcastToAll({
+          type: 'agent_discovered',
+          teamName: event.teamName,
+          agentId: event.agentId,
+          path: event.path,
+          timestamp: new Date().toISOString(),
+        });
+      });
+
+      console.log('[SERVER] NativeBridge auto-discovery initialized');
+    }
+
+    // Wire TaskSyncBridge events → WebSocket broadcast
+    if (this.taskSyncBridge) {
+      this.taskSyncBridge.on('sync:native-to-fleet', ({ taskId, teamName }: { taskId: string; teamName: string }) => {
+        this.broadcastToAll({
+          type: 'task_synced',
+          direction: 'native_to_fleet',
+          taskId,
+          teamName,
+          timestamp: new Date().toISOString(),
+        });
+      });
+
+      this.taskSyncBridge.on('sync:fleet-to-native', ({ taskId, teamName }: { taskId: string; teamName: string }) => {
+        this.broadcastToAll({
+          type: 'task_synced',
+          direction: 'fleet_to_native',
+          taskId,
+          teamName,
+          timestamp: new Date().toISOString(),
+        });
+      });
+    }
 
     // Initialize workflow engine with abstracted storage interfaces
     this.workflowEngine = new WorkflowEngine({
@@ -162,6 +250,7 @@ export class CollabServer {
       swarms: this.swarms,
       startTime: this.startTime,
       broadcastToAll: this.broadcastToAll.bind(this),
+      onTeamRegistered: this.ensureTeamWatching.bind(this),
     };
 
     this.setupMiddleware();
@@ -174,6 +263,38 @@ export class CollabServer {
   }
 
   // ============================================================================
+  // DYNAMIC TEAM WATCHING
+  // ============================================================================
+
+  /**
+   * Start watching a team's native resources (tasks, inbox, discovery).
+   * Called when a new team registers via /auth. Safe to call multiple times.
+   */
+  private ensureTeamWatching(teamName: string): void {
+    if (this.watchedTeams.has(teamName)) return;
+    this.watchedTeams.add(teamName);
+
+    console.log(`[SERVER] Starting native watching for team "${teamName}"`);
+
+    // Start task sync for the new team
+    if (this.taskSyncBridge) {
+      this.taskSyncBridge.watchTeam(teamName);
+      this.taskSyncBridge.fullSync(teamName).catch(() => { /* best-effort */ });
+    }
+
+    // Start inbox watching for the new team
+    if (this.inboxBridge) {
+      this.inboxBridge.startWatching(teamName);
+    }
+
+    // Start agent discovery for the new team
+    const nativeBridge = this.workerManager.getNativeBridge();
+    if (nativeBridge) {
+      nativeBridge.startDiscovery(teamName);
+    }
+  }
+
+  // ============================================================================
   // MIDDLEWARE
   // ============================================================================
 
@@ -183,12 +304,11 @@ export class CollabServer {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ['\'self\''],
-          // Allow jsdelivr CDN for dashboard libraries (d3, chart.js, xterm)
-          scriptSrc: ['\'self\'', '\'unsafe-inline\'', 'https://cdn.jsdelivr.net'],
-          styleSrc: ['\'self\'', '\'unsafe-inline\'', 'https://cdn.jsdelivr.net'],
+          scriptSrc: ['\'self\'', '\'unsafe-inline\''],
+          styleSrc: ['\'self\'', '\'unsafe-inline\''],
           imgSrc: ['\'self\'', 'data:'],
           connectSrc: ['\'self\'', 'ws:', 'wss:'],
-          fontSrc: ['\'self\'', 'https://cdn.jsdelivr.net'],
+          fontSrc: ['\'self\''],
         },
       },
       crossOriginEmbedderPolicy: false, // Allow loading resources
@@ -492,6 +612,131 @@ export class CollabServer {
 
     // Compound Machine routes (aggregated fleet visualization)
     this.app.get('/compound/snapshot', requireRole('team-lead', 'worker'), routes.createCompoundSnapshotHandler(this.deps));
+
+    // Search routes (Tantivy native / SQLite FTS5 fallback)
+    this.app.post('/search', requireRole('team-lead', 'worker'), routes.createSearchHandler(this.deps));
+    this.app.post('/search/index', requireRole('team-lead', 'worker'), routes.createSearchIndexHandler(this.deps));
+    this.app.get('/search/stats', requireRole('team-lead', 'worker'), routes.createSearchStatsHandler(this.deps));
+    this.app.delete('/search/:sessionId', requireRole('team-lead'), routes.createSearchDeleteHandler(this.deps));
+
+    // LMSH routes (natural language → shell translation)
+    this.app.post('/lmsh/translate', requireRole('team-lead', 'worker'), routes.createLmshTranslateHandler(this.deps));
+    this.app.get('/lmsh/aliases', requireRole('team-lead', 'worker'), routes.createLmshGetAliasesHandler(this.deps));
+    this.app.post('/lmsh/aliases', requireRole('team-lead', 'worker'), routes.createLmshAddAliasHandler(this.deps));
+
+    // DAG routes (task dependency solver)
+    this.app.post('/dag/sort', requireRole('team-lead', 'worker'), routes.createDagSortHandler(this.deps));
+    this.app.post('/dag/cycles', requireRole('team-lead', 'worker'), routes.createDagCyclesHandler(this.deps));
+    this.app.post('/dag/critical-path', requireRole('team-lead', 'worker'), routes.createDagCriticalPathHandler(this.deps));
+    this.app.post('/dag/ready', requireRole('team-lead', 'worker'), routes.createDagReadyHandler(this.deps));
+
+    // Coordination status (native integration introspection)
+    this.app.get('/coordination/status', requireRole('team-lead', 'worker'), (_req: Request, res: Response) => {
+      const nativeStatus = this.workerManager.getNativeStatus();
+      const taskSyncActive = this.taskSyncBridge !== null;
+      const inboxWatching = this.inboxBridge !== null;
+      const nativeBridge = this.workerManager.getNativeBridge();
+      const discoveryActive = nativeBridge !== null;
+      const knownAgents = nativeBridge?.getKnownAgents('default') ?? [];
+
+      res.json({
+        coordination: {
+          activeAdapter: 'native',
+          defaultSpawnMode: nativeStatus.defaultSpawnMode,
+          native: {
+            isAvailable: nativeStatus.isAvailable,
+            claudeBinary: nativeStatus.claudeBinary,
+            taskSyncActive,
+            inboxWatching,
+            discoveryActive,
+            knownAgents,
+          },
+          spawnModes: ['native', 'tmux', 'external'],
+          deprecatedModes: ['process'],
+        },
+      });
+    });
+
+    // System health check — verifies all native integration subsystems are operational
+    this.app.get('/coordination/health', requireRole('team-lead'), (_req: Request, res: Response) => {
+      const nativeStatus = this.workerManager.getNativeStatus();
+      const workers = this.workerManager.getWorkers();
+      const taskSyncActive = this.taskSyncBridge !== null;
+      const inboxWatching = this.inboxBridge !== null;
+      const nativeBridge = this.workerManager.getNativeBridge();
+      const discoveryActive = nativeBridge !== null;
+
+      const checks: Array<{ name: string; passed: boolean; detail: string }> = [];
+
+      // Check 1: Native binary available
+      checks.push({
+        name: 'native_binary',
+        passed: nativeStatus.isAvailable,
+        detail: nativeStatus.isAvailable
+          ? `Claude binary found: ${nativeStatus.claudeBinary}`
+          : 'No Claude binary found — install Claude Code',
+      });
+
+      // Check 2: TaskSyncBridge operational
+      checks.push({
+        name: 'task_sync',
+        passed: taskSyncActive,
+        detail: taskSyncActive
+          ? 'TaskSyncBridge is active and watching ~/.claude/tasks/'
+          : 'TaskSyncBridge not initialized',
+      });
+
+      // Check 3: InboxBridge watching messages
+      checks.push({
+        name: 'inbox_watching',
+        passed: inboxWatching,
+        detail: inboxWatching
+          ? 'InboxBridge watching ~/.claude/teams/*/messages/ for live messages'
+          : 'InboxBridge not initialized',
+      });
+
+      // Check 4: Auto-discovery active
+      checks.push({
+        name: 'discovery_active',
+        passed: discoveryActive,
+        detail: discoveryActive
+          ? `Auto-discovery active — ${nativeBridge?.getKnownAgents('default').length ?? 0} known agents`
+          : 'Agent auto-discovery not initialized',
+      });
+
+      // Check 5: Active workers
+      const activeWorkers = workers.filter(w => w.state !== 'stopped');
+      checks.push({
+        name: 'active_workers',
+        passed: true,
+        detail: `${activeWorkers.length} active workers (${workers.length} total)`,
+      });
+
+      const allPassed = checks.every((c) => c.passed);
+
+      // Collect subsystem stats
+      const watchedTeamsList = Array.from(this.watchedTeams);
+
+      const agentMemory = this.workerManager.getAgentMemory();
+      const memoryStats = agentMemory ? { available: true } : { available: false };
+
+      const taskRouter = this.workerManager.getTaskRouter();
+      const routerStats = taskRouter ? { available: true } : { available: false };
+
+      res.json({
+        healthy: allPassed,
+        adapter: 'native',
+        checks,
+        watchedTeams: watchedTeamsList,
+        subsystems: {
+          taskSync: taskSyncActive,
+          inboxBridge: inboxWatching,
+          nativeDiscovery: discoveryActive,
+          agentMemory: memoryStats,
+          taskRouter: routerStats,
+        },
+      });
+    });
   }
 
   // ============================================================================
@@ -625,6 +870,9 @@ export class CollabServer {
     // Graceful shutdown
     process.on('SIGINT', () => {
       console.log('\nShutting down...');
+      this.inboxBridge?.stopWatching();
+      this.workerManager.getNativeBridge()?.stopDiscovery();
+      this.taskSyncBridge?.shutdown();
       this.workerManager.dismissAll().then(() => {
         this.storage.close();
         process.exit(0);

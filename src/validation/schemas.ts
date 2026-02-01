@@ -132,7 +132,7 @@ export const spawnWorkerSchema = z.object({
   sessionId: z.string().max(100).optional(),
   swarmId: z.string().max(100).optional(),
   depthLevel: z.number().int().min(0).max(10).optional(),
-  spawnMode: z.enum(['process', 'tmux']).optional(),
+  spawnMode: z.enum(['process', 'tmux', 'native']).optional(),
   model: z.string().max(50).optional(),
 });
 
@@ -954,6 +954,317 @@ export const acceptBidSchema = z.object({
 });
 
 export type AcceptBidInput = z.infer<typeof acceptBidSchema>;
+
+// ============================================================================
+// POLICY / SAFETY HOOKS SCHEMAS (Phase 8)
+// ============================================================================
+
+export const policyTargetSchema = z.enum(['command', 'file_read', 'file_write', 'network', 'eval', 'custom']);
+export const policyDecisionSchema = z.enum(['allow', 'block', 'ask']);
+
+export const createPolicyRuleSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  name: z.string().min(1).max(100),
+  target: policyTargetSchema,
+  pattern: z.string().min(1).max(500),
+  decision: policyDecisionSchema,
+  reason: z.string().min(1).max(500),
+  priority: z.number().int().min(0).max(10000).optional().default(100),
+  isEnabled: z.boolean().optional().default(true),
+});
+
+export type CreatePolicyRuleInput = z.infer<typeof createPolicyRuleSchema>;
+
+export const updatePolicyRuleSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  target: policyTargetSchema.optional(),
+  pattern: z.string().min(1).max(500).optional(),
+  decision: policyDecisionSchema.optional(),
+  reason: z.string().min(1).max(500).optional(),
+  priority: z.number().int().min(0).max(10000).optional(),
+  isEnabled: z.boolean().optional(),
+});
+
+export type UpdatePolicyRuleInput = z.infer<typeof updatePolicyRuleSchema>;
+
+export const evaluatePolicySchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  agentHandle: handleSchema,
+  target: policyTargetSchema,
+  operation: z.string().min(1).max(10000),
+});
+
+export type EvaluatePolicyInput = z.infer<typeof evaluatePolicySchema>;
+
+export const listPolicyRulesQuerySchema = z.object({
+  swarmId: z.string().max(100).optional(),
+  target: policyTargetSchema.optional(),
+  isEnabled: z.enum(['true', 'false']).optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
+});
+
+export type ListPolicyRulesQuery = z.infer<typeof listPolicyRulesQuerySchema>;
+
+export const listPolicyViolationsQuerySchema = z.object({
+  swarmId: z.string().max(100).optional(),
+  ruleId: z.string().uuid().optional(),
+  agentHandle: handleSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
+});
+
+export type ListPolicyViolationsQuery = z.infer<typeof listPolicyViolationsQuerySchema>;
+
+// ============================================================================
+// SESSION LINEAGE SCHEMAS (Phase 8)
+// ============================================================================
+
+export const sessionStatusSchema = z.enum(['active', 'trimmed', 'completed']);
+export const sessionDerivationTypeSchema = z.enum(['root', 'trimmed', 'continued']);
+
+export const createSessionSchema = z.object({
+  workerId: z.string().min(1).max(100),
+  parentSessionId: z.string().uuid().optional(),
+  derivationType: sessionDerivationTypeSchema.optional().default('root'),
+  tokenCount: z.number().int().min(0).optional().default(0),
+  summaryText: z.string().max(50000).optional(),
+});
+
+export type CreateSessionInput = z.infer<typeof createSessionSchema>;
+
+export const listWorkerSessionsQuerySchema = z.object({
+  status: sessionStatusSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
+});
+
+export type ListWorkerSessionsQuery = z.infer<typeof listWorkerSessionsQuerySchema>;
+
+export const searchSessionsSchema = z.object({
+  query: z.string().min(1).max(1000),
+  workerHandle: handleSchema.optional(),
+  swarmId: z.string().max(100).optional(),
+  maxResults: z.number().int().min(1).max(100).optional().default(10),
+  afterTimestamp: z.number().int().positive().optional(),
+  beforeTimestamp: z.number().int().positive().optional(),
+  recencyHalfLifeHours: z.number().positive().optional(),
+});
+
+export type SearchSessionsInput = z.infer<typeof searchSessionsSchema>;
+
+export const indexSessionSchema = z.object({
+  content: z.string().min(1).max(500000),
+  workerHandle: handleSchema.optional(),
+  swarmId: z.string().max(100).optional(),
+});
+
+export type IndexSessionInput = z.infer<typeof indexSessionSchema>;
+
+// ============================================================================
+// PHASE 9: SWARM INTELLIGENCE V2 SCHEMAS
+// ============================================================================
+
+// --- File Reservations ---
+
+export const reserveSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  agentHandle: handleSchema,
+  pathPattern: z.string().min(1).max(500),
+  isExclusive: z.boolean().optional().default(true),
+  expiryMs: z.number().int().positive().max(86400000).optional(), // max 24h
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type ReserveInput = z.infer<typeof reserveSchema>;
+
+export const checkReservationSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  pathPattern: z.string().min(1).max(500),
+  excludeAgent: handleSchema.optional(),
+});
+
+export type CheckReservationInput = z.infer<typeof checkReservationSchema>;
+
+// --- Event Sourcing ---
+
+export const emitEventSchema = z.object({
+  eventType: z.string().min(1).max(100),
+  actor: z.string().min(1).max(100),
+  entityType: z.string().min(1).max(100),
+  entityId: z.string().min(1).max(200),
+  payload: z.record(z.string(), z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type EmitEventInput = z.infer<typeof emitEventSchema>;
+
+export const queryEventsSchema = z.object({
+  eventType: z.string().max(100).optional(),
+  actor: z.string().max(100).optional(),
+  entityType: z.string().max(100).optional(),
+  entityId: z.string().max(200).optional(),
+  afterTimestamp: z.coerce.number().int().positive().optional(),
+  beforeTimestamp: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
+});
+
+export type QueryEventsInput = z.infer<typeof queryEventsSchema>;
+
+export const pruneEventsSchema = z.object({
+  beforeTimestamp: z.number().int().positive(),
+});
+
+export type PruneEventsInput = z.infer<typeof pruneEventsSchema>;
+
+// --- Outcome Learning ---
+
+export const recordOutcomeSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  agentHandle: handleSchema,
+  taskType: z.string().min(1).max(100),
+  strategy: z.string().min(1).max(200),
+  isSuccess: z.boolean(),
+  durationMs: z.number().int().min(0).optional(),
+  filesTouched: z.array(z.string().max(500)).max(100).optional(),
+  errorSummary: z.string().max(2000).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type RecordOutcomeInput = z.infer<typeof recordOutcomeSchema>;
+
+export const listOutcomesQuerySchema = z.object({
+  swarmId: z.string().max(100).optional(),
+  agentHandle: handleSchema.optional(),
+  taskType: z.string().max(100).optional(),
+  isSuccess: z.enum(['true', 'false']).optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
+});
+
+export type ListOutcomesQuery = z.infer<typeof listOutcomesQuerySchema>;
+
+// --- Topology ---
+
+export const topologyTypeSchema = z.enum(['pipeline', 'mesh', 'hierarchical', 'ring', 'star']);
+
+export const topologyConfigSchema = z.object({
+  type: topologyTypeSchema,
+  agents: z.array(z.string().min(1).max(50)).min(1).max(100),
+  leader: z.string().max(50).optional(),
+  rings: z.array(z.array(z.string().max(50))).optional(),
+  stars: z.array(z.object({
+    center: z.string().min(1).max(50),
+    satellites: z.array(z.string().min(1).max(50)).min(1),
+  })).optional(),
+});
+
+export type TopologyConfigInput = z.infer<typeof topologyConfigSchema>;
+
+// --- Cost-Tier Routing ---
+
+export const modelTierSchema = z.enum(['fast', 'balanced', 'powerful']);
+
+export const suggestTierSchema = z.object({
+  taskDescription: z.string().min(1).max(5000),
+  swarmId: z.string().max(100).optional(),
+});
+
+export type SuggestTierInput = z.infer<typeof suggestTierSchema>;
+
+export const routingRuleSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  taskPattern: z.string().min(1).max(200),
+  recommendedTier: modelTierSchema,
+  minTier: modelTierSchema.optional(),
+  maxCost: z.number().min(0).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type RoutingRuleInput = z.infer<typeof routingRuleSchema>;
+
+export const recordRoutingSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  taskId: z.string().min(1).max(200),
+  agentHandle: handleSchema,
+  tierUsed: modelTierSchema,
+  tokensUsed: z.number().int().min(0).optional(),
+  durationMs: z.number().int().min(0).optional(),
+  isSuccess: z.boolean().optional(),
+});
+
+export type RecordRoutingInput = z.infer<typeof recordRoutingSchema>;
+
+export const routingHistoryQuerySchema = z.object({
+  swarmId: z.string().max(100).optional(),
+  taskId: z.string().max(200).optional(),
+  agentHandle: handleSchema.optional(),
+  tierUsed: modelTierSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
+});
+
+export type RoutingHistoryQuery = z.infer<typeof routingHistoryQuerySchema>;
+
+// ============================================================================
+// MISSION SCHEMAS (Phase 10 - Goal-Oriented Mission Loop)
+// ============================================================================
+
+export const missionStatusSchema = z.enum(['pending', 'active', 'paused', 'succeeded', 'failed', 'cancelled']);
+export const iterationStatusSchema = z.enum(['running', 'validating', 'voting', 'passed', 'failed']);
+export const gateTypeSchema = z.enum(['script', 'typecheck', 'lint', 'test', 'build', 'coverage', 'eval', 'custom']);
+
+export const gateDefinitionSchema = z.object({
+  gateType: gateTypeSchema,
+  name: z.string().min(1).max(200),
+  config: z.record(z.string(), z.unknown()).optional(),
+  isRequired: z.boolean().optional().default(true),
+  weight: z.number().min(0).max(100).optional().default(1.0),
+  sortOrder: z.number().int().min(0).max(1000).optional().default(0),
+});
+
+export const missionQuorumConfigSchema = z.object({
+  autoApprove: z.boolean().optional().default(true),
+  minVoters: z.number().int().min(1).max(100).optional(),
+  votingMethod: votingMethodSchema.optional(),
+  deadlineMs: z.number().int().positive().optional(),
+});
+
+export const createMissionSchema = z.object({
+  swarmId: z.string().min(1).max(100),
+  name: z.string().min(1).max(200),
+  goal: z.string().min(1).max(10000),
+  goalType: z.string().min(1).max(100).optional().default('custom'),
+  maxIterations: z.number().int().min(1).max(1000).optional().default(50),
+  gates: z.array(gateDefinitionSchema).max(50).optional(),
+  strategy: z.record(z.string(), z.unknown()).optional(),
+  quorumConfig: missionQuorumConfigSchema.optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type CreateMissionInput = z.infer<typeof createMissionSchema>;
+
+export const addGateSchema = z.object({
+  gateType: gateTypeSchema,
+  name: z.string().min(1).max(200),
+  config: z.record(z.string(), z.unknown()).optional(),
+  isRequired: z.boolean().optional().default(true),
+  weight: z.number().min(0).max(100).optional().default(1.0),
+  sortOrder: z.number().int().min(0).max(1000).optional().default(0),
+});
+
+export type AddGateInput = z.infer<typeof addGateSchema>;
+
+export const castMissionVoteSchema = z.object({
+  agentHandle: handleSchema,
+  vote: z.enum(['approve', 'reject']),
+  rationale: z.string().max(2000).optional(),
+});
+
+export type CastMissionVoteInput = z.infer<typeof castMissionVoteSchema>;
+
+export const listMissionsQuerySchema = z.object({
+  swarmId: z.string().max(100).optional(),
+  status: missionStatusSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export type ListMissionsQuery = z.infer<typeof listMissionsQuerySchema>;
 
 // ============================================================================
 // VALIDATION HELPER

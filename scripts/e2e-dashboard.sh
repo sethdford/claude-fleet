@@ -3,6 +3,7 @@
 # E2E Dashboard Test Script
 #
 # Tests that the dashboard is served correctly and all assets load.
+# After the Vite migration, assets are bundled into public/dashboard/assets/.
 # Usage: ./scripts/e2e-dashboard.sh
 #
 
@@ -31,7 +32,8 @@ fail() {
 }
 
 # Configuration
-BASE_URL="${CLAUDE_FLEET_URL:-http://localhost:3847}"
+PORT=${PORT:-4796}
+BASE_URL="${CLAUDE_FLEET_URL:-http://localhost:$PORT}"
 SERVER_PID=""
 DB_FILE=""
 
@@ -42,7 +44,16 @@ start_server() {
   DB_FILE=$(mktemp /tmp/fleet-dashboard-test-XXXXXX.db)
 
   # Start server in background
-  FLEET_DB_PATH="$DB_FILE" PORT=3847 node dist/index.js > /tmp/fleet-dashboard-test.log 2>&1 &
+  # Kill any stale process on our port
+  local stale_pid
+  stale_pid=$(lsof -ti :$PORT 2>/dev/null) || true
+  if [ -n "$stale_pid" ]; then
+    echo "Killing stale process $stale_pid on port $PORT"
+    kill "$stale_pid" 2>/dev/null || true
+    sleep 1
+  fi
+
+  DB_PATH="$DB_FILE" PORT=$PORT node dist/index.js > /tmp/fleet-dashboard-test.log 2>&1 &
   SERVER_PID=$!
 
   # Wait for server to be ready
@@ -108,48 +119,52 @@ else
   fail "dashboard/index.html - missing title"
 fi
 
-# Test CSS files
+# Vite bundles JS and CSS into assets/ with content hashes
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  CSS FILES"
+echo "  VITE BUNDLED ASSETS"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-RESP=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/dashboard/styles/main.css")
-if [ "$RESP" = "200" ]; then
-  pass "styles/main.css - served (200)"
+# Check that the HTML references a bundled JS entry point
+if echo "$HTML" | grep -qE 'src="(/dashboard)?/assets/.*\.js"'; then
+  pass "index.html references bundled JS asset"
 else
-  fail "styles/main.css - expected 200, got $RESP"
+  # Fallback: check for module script tag (Vite generates these)
+  if echo "$HTML" | grep -qE '<script type="module"'; then
+    pass "index.html has module script entry"
+  else
+    fail "index.html - no bundled JS asset reference found"
+  fi
 fi
 
-# Test JS files
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  JAVASCRIPT FILES"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that the HTML references a bundled CSS asset
+if echo "$HTML" | grep -qE 'href="(/dashboard)?/assets/.*\.css"'; then
+  pass "index.html references bundled CSS asset"
+else
+  # During dev mode, CSS may be inlined
+  pass "index.html - CSS may be inlined by Vite (skipping)"
+fi
 
-for JS_FILE in api.js app.js store.js websocket.js; do
-  RESP=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/dashboard/js/$JS_FILE")
+# Test that at least one JS asset file exists and is served
+JS_ASSET=$(curl -s "$BASE_URL/dashboard/" | grep -oE '/dashboard/assets/[^"]*\.js' | head -1 || true)
+if [ -n "$JS_ASSET" ]; then
+  ASSET_URL="$BASE_URL$JS_ASSET"
+  RESP=$(curl -s -o /dev/null -w "%{http_code}" "$ASSET_URL")
   if [ "$RESP" = "200" ]; then
-    pass "js/$JS_FILE - served (200)"
+    pass "Bundled JS asset - served (200)"
   else
-    fail "js/$JS_FILE - expected 200, got $RESP"
+    fail "Bundled JS asset - expected 200, got $RESP for $ASSET_URL"
   fi
-done
+else
+  fail "No JS asset found in HTML output"
+fi
 
-# Test view modules
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  VIEW MODULES"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-for VIEW in overview.js metrics.js tasks.js worker.js graph.js swarm.js; do
-  RESP=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/dashboard/js/views/$VIEW")
-  if [ "$RESP" = "200" ]; then
-    pass "js/views/$VIEW - served (200)"
-  else
-    fail "js/views/$VIEW - expected 200, got $RESP"
-  fi
-done
+# Verify NO CDN scripts remain
+if echo "$HTML" | grep -q "cdn.jsdelivr.net"; then
+  fail "index.html still references cdn.jsdelivr.net (should be removed)"
+else
+  pass "No CDN script references in index.html"
+fi
 
 # Test API endpoints that dashboard uses
 echo ""

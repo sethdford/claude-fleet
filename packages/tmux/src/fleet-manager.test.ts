@@ -39,7 +39,7 @@ vi.mock('./controller.js', () => {
         completed: true,
         duration: 100,
       });
-      waitForIdle = vi.fn().mockResolvedValue(true);
+      waitForIdle = vi.fn().mockResolvedValue({ idle: true, content: '$ ', duration: 100 });
       waitForPattern = vi.fn().mockResolvedValue(true);
       killPane = vi.fn().mockReturnValue(true);
       killSession = vi.fn().mockReturnValue(true);
@@ -195,9 +195,11 @@ describe('FleetTmuxManager', () => {
     });
 
     it('waits for worker idle', async () => {
-      const idle = await manager.waitForWorkerIdle('alice');
+      const result = await manager.waitForWorkerIdle('alice');
 
-      expect(idle).toBe(true);
+      expect(result.idle).toBe(true);
+      expect(result.content).toBe('$ ');
+      expect(result.duration).toBe(100);
     });
 
     it('waits for worker pattern', async () => {

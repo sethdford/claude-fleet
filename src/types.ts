@@ -147,8 +147,15 @@ export interface BroadcastRequest {
 
 export type WorkerState = 'starting' | 'ready' | 'working' | 'stopping' | 'stopped';
 
-/** How the worker process was spawned */
-export type SpawnMode = 'process' | 'tmux';
+/**
+ * How the worker process was spawned.
+ *
+ * - `'native'`   — Preferred for batch tasks. TeammateTool env vars + file-based coordination.
+ * - `'tmux'`     — Preferred for interactive/persistent agents. Visible terminal pane + live monitoring.
+ * - `'external'` — For compound runners and externally-managed workers.
+ * - `'process'`  — DEPRECATED: Raw child_process.spawn without visibility. Use native or tmux instead.
+ */
+export type SpawnMode = 'process' | 'tmux' | 'external' | 'native';
 
 export interface WorkerProcess {
   /** Unique worker ID */
@@ -339,6 +346,7 @@ export interface TeamStorage {
   getTask(taskId: string): TeamTask | null;
   getTasksByTeam(teamName: string): TeamTask[];
   updateTaskStatus(taskId: string, status: TaskStatus, updatedAt: string): void;
+  updateTaskAssignment(taskId: string, ownerHandle: string | null, blockedBy: string[], status: TaskStatus, updatedAt: string): void;
 
   // Debug
   getDebugInfo(): {
@@ -363,6 +371,12 @@ export interface ServerConfig {
   rateLimitWindow: number;
   rateLimitMax: number;
   corsOrigins: string[];
+  /**
+   * When true, reject all non-native spawn modes and use NativeAdapter directly.
+   * Set via FLEET_NATIVE_ONLY=true env var. This is the switchover mechanism
+   * for when TeammateTool is officially released.
+   */
+  nativeOnly: boolean;
 }
 
 // ============================================================================

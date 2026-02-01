@@ -23,6 +23,15 @@ import { MailStorage } from '../storage/mail.js';
 import type { SpawnController } from './spawn-controller.js';
 import type { FleetAgentRole } from './agent-roles.js';
 import { getSystemPromptForRole } from './agent-roles.js';
+import { NativeBridge } from './native-bridge.js';
+import { TaskRouter } from './task-router.js';
+import { NativeAdapter } from './coordination-adapter.js';
+import type { CoordinationAdapter } from './coordination-adapter.js';
+import { InboxBridge } from './inbox-bridge.js';
+import { createLogParser } from './log-parser.js';
+import type { LogParser } from './log-parser.js';
+import { TaskSyncBridge } from './task-sync.js';
+import { AgentMemory } from '../storage/agent-memory.js';
 // Optional tmux support - gracefully handle when not available
 let TmuxWorkerAdapter: typeof import('@claude-fleet/tmux').TmuxWorkerAdapter | null = null;
 let ContextManager: typeof import('@claude-fleet/tmux').ContextManager | null = null;
@@ -62,6 +71,12 @@ export interface WorkerManagerOptions {
   injectMail?: boolean;
   spawnController?: SpawnController;
   defaultSpawnMode?: SpawnMode;
+  /**
+   * When true, reject all non-native spawn modes and use NativeAdapter directly.
+   * Enables clean switchover to native TeammateTool once officially released.
+   * Set via FLEET_NATIVE_ONLY=true.
+   */
+  nativeOnly?: boolean;
 }
 
 export class WorkerManager extends EventEmitter {
@@ -84,6 +99,12 @@ export class WorkerManager extends EventEmitter {
   private contextManager: any = null;
   private defaultSpawnMode: SpawnMode;
   private contextRolloverThreshold: number;
+  private nativeBridge: NativeBridge | null = null;
+  private taskRouter: TaskRouter | null = null;
+  private coordinationAdapter: NativeAdapter | null = null;
+  private inboxBridge: InboxBridge | null = null;
+  private agentMemory: AgentMemory | null = null;
+  private readonly nativeOnly: boolean;
 
   constructor(options: WorkerManagerOptions = {}) {
     super();
@@ -97,6 +118,7 @@ export class WorkerManager extends EventEmitter {
     this.injectMail = options.injectMail ?? true;
     this.spawnController = options.spawnController ?? null;
     this.defaultSpawnMode = options.defaultSpawnMode ?? 'process';
+    this.nativeOnly = options.nativeOnly ?? false;
 
     if (this.useWorktrees) {
       this.worktreeManager = new WorktreeManager({
@@ -104,12 +126,14 @@ export class WorkerManager extends EventEmitter {
       });
     }
 
-    // Initialize mail storage if storage is available
+    // Initialize mail storage and agent memory if storage is available
     if (this.storage) {
       this.mailStorage = new MailStorage(this.storage);
+      this.agentMemory = new AgentMemory(this.storage);
     }
 
-    // Initialize tmux adapter if available
+    // Initialize tmux adapter if available (tmux is kept even in native-only mode
+    // since it provides interactive terminals — only process mode is deprecated)
     if (TmuxWorkerAdapter !== null) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.tmuxAdapter = new (TmuxWorkerAdapter as any)();
@@ -128,6 +152,48 @@ export class WorkerManager extends EventEmitter {
     } else {
       console.log('[WORKER] @claude-fleet/tmux not installed, tmux features disabled');
     }
+
+    // Initialize task router for intelligent spawn decisions
+    this.taskRouter = new TaskRouter(this.storage);
+
+    // Initialize native bridge for native spawn mode
+    this.nativeBridge = new NativeBridge();
+    const nativeAvailability = this.nativeBridge.checkAvailability();
+    if (nativeAvailability.isAvailable) {
+      console.log(`[WORKER] Native spawning available (binary: ${nativeAvailability.claudeBinary})`);
+
+      // Auto-promote to native mode if no explicit mode was requested
+      if (!options.defaultSpawnMode) {
+        this.defaultSpawnMode = 'native';
+        console.log('[WORKER] Default spawn mode auto-promoted to "native"');
+      }
+    } else if (this.nativeOnly) {
+      console.error('[WORKER] FLEET_NATIVE_ONLY=true but no Claude binary found!');
+      console.error('[WORKER] Install Claude Code or set FLEET_NATIVE_ONLY=false');
+    } else {
+      console.log('[WORKER] Native features not available, native spawn mode will fall back to process');
+    }
+
+    // In native-only mode, force native as the default and disable process mode
+    if (this.nativeOnly) {
+      this.defaultSpawnMode = 'native';
+      console.log('[WORKER] FLEET_NATIVE_ONLY=true — process spawn mode disabled, native+tmux available');
+    }
+
+    // Initialize inbox bridge for file-based messaging
+    this.inboxBridge = new InboxBridge();
+
+    // Initialize coordination adapter (native file-based coordination)
+    // Pass a connected TaskSyncBridge so task assignments from native agents propagate to Fleet
+    const taskSyncForAdapter = new TaskSyncBridge(this.storage);
+    this.coordinationAdapter = new NativeAdapter(
+      this.defaultTeamName,
+      this.nativeBridge ?? undefined,
+      taskSyncForAdapter,
+      this.inboxBridge
+    );
+    console.log(`[WORKER] Coordination: adapter=native defaultMode=${this.defaultSpawnMode} nativeOnly=${this.nativeOnly}`);
+
 
     // Context rollover threshold (default 70%)
     this.contextRolloverThreshold = 0.7;
@@ -320,8 +386,8 @@ export class WorkerManager extends EventEmitter {
             reason: `No activity for ${Math.round(timeSinceHeartbeat / 1000)}s`,
           });
 
-          // Auto-restart if enabled
-          if (this.autoRestart && worker.restartCount < MAX_RESTART_ATTEMPTS) {
+          // Auto-restart if enabled (skip external workers — they're managed externally)
+          if (this.autoRestart && worker.spawnMode !== 'external' && worker.restartCount < MAX_RESTART_ATTEMPTS) {
             this.restartWorker(worker.id);
           }
         }
@@ -450,6 +516,106 @@ export class WorkerManager extends EventEmitter {
   }
 
   /**
+   * Register an externally-managed worker (e.g., compound runner tmux workers).
+   * Creates a WorkerProcess entry without spawning a real process.
+   */
+  registerExternalWorker(
+    handle: string,
+    teamName: string,
+    workingDir: string,
+    swarmId?: string,
+  ): SpawnWorkerResponse {
+    const existingWorker = this.getWorkerByHandle(handle);
+    if (existingWorker) {
+      return {
+        id: existingWorker.id,
+        handle: existingWorker.handle,
+        teamName: existingWorker.teamName,
+        workingDir: existingWorker.workingDir,
+        state: existingWorker.state,
+        spawnedAt: existingWorker.spawnedAt,
+        spawnMode: existingWorker.spawnMode,
+      };
+    }
+
+    const workerId = uuidv4();
+    const now = Date.now();
+
+    const worker: WorkerProcess = {
+      id: workerId,
+      handle,
+      teamName,
+      process: null as unknown as WorkerProcess['process'],
+      sessionId: null,
+      workingDir,
+      state: 'ready',
+      health: 'healthy',
+      spawnedAt: now,
+      lastHeartbeat: now,
+      recentOutput: [],
+      currentTaskId: null,
+      restartCount: 0,
+      spawnMode: 'external',
+      swarmId,
+    };
+
+    this.workers.set(workerId, worker);
+
+    if (this.storage) {
+      this.storage.insertWorker({
+        id: workerId,
+        handle,
+        status: 'ready',
+        worktreePath: null,
+        worktreeBranch: null,
+        pid: null,
+        sessionId: null,
+        initialPrompt: null,
+        lastHeartbeat: now,
+        restartCount: 0,
+        role: 'worker',
+        swarmId: swarmId ?? null,
+        depthLevel: 1,
+        spawnMode: 'external',
+        paneId: null,
+        createdAt: now,
+        dismissedAt: null,
+      });
+    }
+
+    this.emit('worker:ready', { workerId, handle, sessionId: null });
+
+    return {
+      id: workerId,
+      handle,
+      teamName,
+      workingDir,
+      state: 'ready',
+      spawnedAt: now,
+      spawnMode: 'external',
+    };
+  }
+
+  /**
+   * Inject output from an externally-managed worker.
+   * Updates heartbeat and emits worker:output event for WebSocket broadcast.
+   */
+  injectWorkerOutput(handle: string, event: ClaudeEvent): void {
+    const worker = this.getWorkerByHandle(handle);
+    if (!worker) return;
+
+    worker.lastHeartbeat = Date.now();
+    worker.health = 'healthy';
+
+    worker.recentOutput.push(JSON.stringify(event));
+    if (worker.recentOutput.length > MAX_OUTPUT_LINES) {
+      worker.recentOutput.shift();
+    }
+
+    this.emit('worker:output', { workerId: worker.id, handle, event });
+  }
+
+  /**
    * Spawn a new Claude Code worker instance
    */
   async spawnWorker(
@@ -523,17 +689,42 @@ export class WorkerManager extends EventEmitter {
     const teamName = request.teamName ?? this.defaultTeamName;
     const spawnMode: SpawnMode = request.spawnMode ?? this.defaultSpawnMode;
 
+    // FLEET_NATIVE_ONLY enforcement: reject deprecated process spawn mode
+    if (this.nativeOnly && spawnMode === 'process') {
+      throw new Error(
+        'Spawn mode \'process\' is not allowed in native-only mode (FLEET_NATIVE_ONLY=true). ' +
+        'Use \'native\', \'tmux\', or \'external\' instead.'
+      );
+    }
+
     // Delegate to tmux adapter if spawn mode is 'tmux' and adapter is available
     if (spawnMode === 'tmux' && this.tmuxAdapter) {
       return this.spawnTmuxWorker(workerId, request, role, teamName);
+    }
+
+    // Delegate to native bridge if spawn mode is 'native'
+    if (spawnMode === 'native') {
+      if (this.nativeBridge && !this.nativeBridge.shouldFallback()) {
+        return this.spawnNativeWorker(workerId, request, role, teamName, restartCount, isRestore, swarmId, depthLevel);
+      }
+      // Fall back to process mode (only allowed when not in native-only mode)
+      if (this.nativeOnly) {
+        throw new Error('Native mode required (FLEET_NATIVE_ONLY=true) but Claude binary not found');
+      }
+      console.log('[WORKER] Native mode unavailable, falling back to process mode');
     }
 
     let workingDir = request.workingDir ?? process.cwd();
     let worktreePath: string | null = null;
     let worktreeBranch: string | null = null;
 
-    // Create worktree if enabled (skip on restore - worktree already exists)
-    if (this.useWorktrees && this.worktreeManager && !isRestore) {
+    // Only create worktrees when no explicit workingDir was provided.
+    // External repos should be used directly — worktrees only make sense
+    // for the Fleet project's own git repo.
+    const hasExplicitWorkingDir = Boolean(request.workingDir);
+
+    // Create worktree if enabled (skip on restore or explicit workingDir)
+    if (this.useWorktrees && this.worktreeManager && !isRestore && !hasExplicitWorkingDir) {
       try {
         const worktree = await this.worktreeManager.create(workerId);
         workingDir = worktree.path;
@@ -584,6 +775,15 @@ export class WorkerManager extends EventEmitter {
     } else {
       // Fallback to basic role context
       fullPrompt += `You are a ${role} agent. Your handle is "${request.handle}".\n\n`;
+    }
+
+    // Inject agent memories from previous sessions
+    if (this.agentMemory) {
+      const memories = this.agentMemory.getAll(request.handle, 10);
+      if (memories.length > 0) {
+        const formatted = memories.map((m) => `- [${m.memoryType}] ${m.key}: ${m.value}`).join('\n');
+        fullPrompt += `# Agent Memory\n\n${formatted}\n\n---\n\n`;
+      }
     }
 
     // Add initial prompt if provided
@@ -684,8 +884,9 @@ export class WorkerManager extends EventEmitter {
   }
 
   /**
-   * Spawn a worker using the tmux adapter
-   * Creates a visible tmux pane with Claude Code running
+   * Spawn a worker using the tmux adapter.
+   * Creates a visible tmux pane with Claude Code running interactively.
+   * Preferred for long-running agents that need monitoring or human interaction.
    */
   private async spawnTmuxWorker(
     workerId: string,
@@ -699,6 +900,11 @@ export class WorkerManager extends EventEmitter {
 
     const workingDir = request.workingDir ?? process.cwd();
 
+    // Build native env vars so tmux workers also participate in file-based coordination
+    const nativeEnv = this.nativeBridge
+      ? this.nativeBridge.buildNativeEnv(request.handle, teamName, role)
+      : {};
+
     // Spawn via tmux adapter
     const tmuxResult = await this.tmuxAdapter.spawnWorker({
       handle: request.handle,
@@ -707,6 +913,7 @@ export class WorkerManager extends EventEmitter {
       initialPrompt: request.initialPrompt,
       role,
       model: request.model,
+      env: nativeEnv,
     });
 
     const now = Date.now();
@@ -774,20 +981,226 @@ export class WorkerManager extends EventEmitter {
   }
 
   /**
+   * Spawn a worker using the native bridge.
+   * Uses Claude Code's built-in TeammateTool env vars and monitors
+   * ~/.claude/tasks/ for task status changes.
+   */
+  private async spawnNativeWorker(
+    workerId: string,
+    request: SpawnWorkerRequest,
+    role: AgentRole,
+    teamName: string,
+    restartCount: number,
+    isRestore: boolean,
+    swarmId?: string,
+    depthLevel = 1
+  ): Promise<SpawnWorkerResponse> {
+    if (!this.nativeBridge) {
+      throw new Error('Native bridge not initialized');
+    }
+
+    this.nativeBridge.prepareForSpawn(teamName);
+
+    const workingDir = request.workingDir ?? process.cwd();
+    const nativeEnv = this.nativeBridge.buildNativeEnv(request.handle, teamName, role);
+
+    // Build prompt with team context
+    let fullPrompt = '';
+
+    // Inject pending mail if enabled
+    if (this.injectMail && this.mailStorage) {
+      const pendingContext = this.mailStorage.formatAllPendingForInjection(request.handle);
+      if (pendingContext) {
+        fullPrompt += `# Pending Communications\n\n${pendingContext}\n\n---\n\n`;
+      }
+    }
+
+    // Add role-specific system prompt
+    const fleetRole = role as FleetAgentRole;
+    const rolePrompt = getSystemPromptForRole(fleetRole);
+    if (rolePrompt) {
+      fullPrompt += `${rolePrompt}\n\n---\n\n`;
+    } else {
+      fullPrompt += `You are a ${role} agent. Your handle is "${request.handle}".\n\n`;
+    }
+
+    // Add team context for native mode
+    fullPrompt += `# Team Context\n\nTeam: ${teamName} | Agent ID: ${nativeEnv.CLAUDE_CODE_AGENT_ID}\n\n`;
+
+    // Inject agent memories from previous sessions
+    if (this.agentMemory) {
+      const memories = this.agentMemory.getAll(request.handle, 10);
+      if (memories.length > 0) {
+        const formatted = memories.map((m) => `- [${m.memoryType}] ${m.key}: ${m.value}`).join('\n');
+        fullPrompt += `# Agent Memory\n\n${formatted}\n\n---\n\n`;
+      }
+    }
+
+    if (request.initialPrompt) {
+      fullPrompt += `# Your Task\n\n${request.initialPrompt}`;
+    }
+
+    // Build Claude args
+    const claudeBinary = this.nativeBridge.getClaudeBinary();
+    const claudeArgs = ['--print', '--output-format', 'stream-json', '--dangerously-skip-permissions'];
+
+    if (isRestore && request.sessionId) {
+      claudeArgs.push('--resume', request.sessionId);
+    }
+
+    const escapedPrompt = fullPrompt.replace(/'/g, "'\\''");
+    const argsStr = claudeArgs.join(' ');
+    const shellCmd = `echo '${escapedPrompt}' | ${claudeBinary} ${argsStr}`;
+
+    const proc = spawn('sh', ['-c', shellCmd], {
+      cwd: workingDir,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        FORCE_COLOR: '0',
+        ...nativeEnv,
+      },
+    });
+
+    const now = Date.now();
+    const worker: WorkerProcess = {
+      id: workerId,
+      handle: request.handle,
+      teamName,
+      process: proc,
+      sessionId: request.sessionId ?? null,
+      workingDir,
+      state: 'starting',
+      recentOutput: [],
+      spawnedAt: now,
+      currentTaskId: null,
+      lastHeartbeat: now,
+      restartCount,
+      health: 'healthy',
+      swarmId,
+      depthLevel,
+      spawnMode: 'native',
+    };
+
+    this.workers.set(workerId, worker);
+    this.setupProcessHandlers(worker);
+
+    // Persist to storage
+    if (this.storage && !isRestore) {
+      const persistentWorker: PersistentWorker = {
+        id: workerId,
+        handle: request.handle,
+        status: 'pending',
+        worktreePath: null,
+        worktreeBranch: null,
+        pid: proc.pid ?? null,
+        sessionId: request.sessionId ?? null,
+        initialPrompt: request.initialPrompt ?? null,
+        lastHeartbeat: now,
+        restartCount,
+        role,
+        swarmId: swarmId ?? null,
+        depthLevel,
+        spawnMode: 'native',
+        paneId: null,
+        createdAt: Math.floor(now / 1000),
+        dismissedAt: null,
+      };
+      this.storage.insertWorker(persistentWorker);
+    } else if (this.storage && isRestore) {
+      this.storage.updateWorkerPid(workerId, proc.pid ?? 0, request.sessionId ?? null);
+      this.storage.updateWorkerStatus(workerId, 'pending');
+    }
+
+    if (this.spawnController && proc.pid) {
+      this.spawnController.registerSpawn(proc.pid, request.handle, workerId);
+    }
+
+    console.log(`[WORKER] Spawned native worker ${request.handle} (${workerId.slice(0, 8)}...) role=${role}`);
+
+    return {
+      id: workerId,
+      handle: request.handle,
+      teamName,
+      workingDir,
+      state: 'starting',
+      spawnedAt: now,
+      spawnMode: 'native',
+    };
+  }
+
+  /**
    * Set up event handlers for a worker process
    */
   private setupProcessHandlers(worker: WorkerProcess): void {
-    let outputBuffer = '';
+    // Native log parser with ring buffer (falls back to JS if Rust not compiled)
+    const logParser: LogParser = createLogParser();
 
-    // Handle stdout (NDJSON events)
+    // Handle stdout (NDJSON events) — delegate to native batch parser
     worker.process.stdout?.on('data', (data: Buffer) => {
-      outputBuffer += data.toString();
-      const lines = outputBuffer.split('\n');
-      outputBuffer = lines.pop() ?? '';
+      const events = logParser.parseBatch(data.toString());
 
-      for (const line of lines) {
-        if (line.trim()) {
-          this.parseNdjsonLine(worker, line);
+      for (const event of events) {
+        this.updateHeartbeat(worker);
+
+        // Track session ID from init
+        if (event.eventType === 'system' && event.subtype === 'init' && event.sessionId) {
+          worker.sessionId = event.sessionId;
+          worker.state = 'ready';
+          console.log(`[WORKER] ${worker.handle} event: system:init`);
+
+          if (this.storage) {
+            this.storage.updateWorkerPid(worker.id, worker.process?.pid ?? 0, event.sessionId);
+            this.storage.updateWorkerStatus(worker.id, 'ready');
+          }
+
+          console.log(`[WORKER] ${worker.handle} ready (session: ${event.sessionId.slice(0, 8)}...)`);
+          this.emit('worker:ready', {
+            workerId: worker.id,
+            handle: worker.handle,
+            sessionId: worker.sessionId,
+          });
+        }
+
+        // Track working state + extract text
+        if (event.eventType === 'assistant') {
+          worker.state = 'working';
+          if (event.text) {
+            this.addOutput(worker, event.text);
+          }
+        }
+
+        // Track completion
+        if (event.eventType === 'result') {
+          worker.state = 'ready';
+          if (event.text) {
+            this.addOutput(worker, `[result] ${event.text}`);
+          }
+          this.emit('worker:result', {
+            workerId: worker.id,
+            handle: worker.handle,
+            result: event.text ?? '',
+          });
+        }
+
+        // Emit general output event (reconstruct ClaudeEvent shape for compatibility)
+        this.emit('worker:output', {
+          workerId: worker.id,
+          handle: worker.handle,
+          event: {
+            type: event.eventType,
+            subtype: event.subtype,
+            session_id: event.sessionId,
+          },
+        });
+      }
+
+      // Non-JSON lines are captured by logParser internally;
+      // sync output from the native parser for this chunk
+      const recentNonJson = logParser.getRecentOutput(10);
+      for (const line of recentNonJson) {
+        if (!worker.recentOutput.includes(line)) {
+          this.addOutput(worker, line);
         }
       }
     });
@@ -851,94 +1264,18 @@ export class WorkerManager extends EventEmitter {
   }
 
   /**
-   * Parse a single NDJSON line from Claude Code output
-   */
-  private parseNdjsonLine(worker: WorkerProcess, line: string): void {
-    try {
-      const event = JSON.parse(line) as ClaudeEvent;
-      // Debug: log event type
-      if (event.type === 'system' && event.subtype) {
-        console.log(`[WORKER] ${worker.handle} event: ${event.type}:${event.subtype}`);
-      }
-      this.handleClaudeEvent(worker, event);
-    } catch {
-      // Not JSON, treat as plain text output
-      if (line.length > 0) {
-        console.log(`[WORKER] ${worker.handle} non-JSON output: ${line.slice(0, 100)}`);
-      }
-      this.addOutput(worker, line);
-    }
-  }
-
-  /**
-   * Handle a Claude Code event
-   */
-  private handleClaudeEvent(worker: WorkerProcess, event: ClaudeEvent): void {
-    // Update heartbeat on any event
-    this.updateHeartbeat(worker);
-
-    // Track session ID from init
-    if (event.type === 'system' && event.subtype === 'init' && event.session_id) {
-      worker.sessionId = event.session_id;
-      worker.state = 'ready';
-
-      // Persist session ID and update status to 'ready'
-      if (this.storage) {
-        this.storage.updateWorkerPid(worker.id, worker.process.pid ?? 0, event.session_id);
-        this.storage.updateWorkerStatus(worker.id, 'ready');
-      }
-
-      console.log(`[WORKER] ${worker.handle} ready (session: ${event.session_id.slice(0, 8)}...)`);
-      this.emit('worker:ready', {
-        workerId: worker.id,
-        handle: worker.handle,
-        sessionId: worker.sessionId,
-      });
-    }
-
-    // Track working state
-    if (event.type === 'assistant') {
-      worker.state = 'working';
-
-      // Extract text content for output
-      if (event.message?.content) {
-        for (const content of event.message.content) {
-          if (content.type === 'text' && content.text) {
-            this.addOutput(worker, content.text);
-          }
-        }
-      }
-    }
-
-    // Track completion
-    if (event.type === 'result') {
-      worker.state = 'ready';
-      if (event.result) {
-        this.addOutput(worker, `[result] ${event.result}`);
-      }
-      this.emit('worker:result', {
-        workerId: worker.id,
-        handle: worker.handle,
-        result: event.result ?? '',
-        durationMs: event.duration_ms,
-      });
-    }
-
-    // Emit general output event
-    this.emit('worker:output', {
-      workerId: worker.id,
-      handle: worker.handle,
-      event,
-    });
-  }
-
-  /**
-   * Add output line to worker's recent output buffer
+   * Add output line to worker's recent output buffer.
+   * Uses a ring buffer approach: when full, overwrites oldest entry
+   * instead of Array.shift() which is O(n).
    */
   private addOutput(worker: WorkerProcess, line: string): void {
-    worker.recentOutput.push(line);
-    if (worker.recentOutput.length > MAX_OUTPUT_LINES) {
-      worker.recentOutput.shift();
+    if (worker.recentOutput.length < MAX_OUTPUT_LINES) {
+      worker.recentOutput.push(line);
+    } else {
+      // Ring buffer: track head index on the array object
+      const head = (worker.recentOutput as unknown as { __head?: number }).__head ?? 0;
+      worker.recentOutput[head] = line;
+      (worker.recentOutput as unknown as { __head: number }).__head = (head + 1) % MAX_OUTPUT_LINES;
     }
   }
 
@@ -959,6 +1296,12 @@ export class WorkerManager extends EventEmitter {
         this.addOutput(worker, `[user] ${message}`);
       }
       return success;
+    }
+
+    // External workers don't have a process stdin
+    if (worker.spawnMode === 'external' || !worker.process) {
+      this.addOutput(worker, `[user] ${message}`);
+      return false;
     }
 
     // Send plain text - Claude accepts plain text input with --print mode
@@ -1029,13 +1372,21 @@ Please work on this task. When complete, include "TASK COMPLETE" in your respons
     worker.state = 'stopping';
 
     // Unregister from spawn controller
-    if (this.spawnController && worker.process.pid) {
+    if (this.spawnController && worker.process?.pid) {
       this.spawnController.unregisterSpawn(worker.process.pid, worker.handle);
     }
 
     // Update storage
     if (this.storage) {
       this.storage.dismissWorker(workerId);
+    }
+
+    // External workers have no process to kill — just mark stopped
+    if (worker.spawnMode === 'external' || !worker.process) {
+      worker.state = 'stopped';
+      this.workers.delete(workerId);
+      this.emit('worker:exit', { workerId, handle: worker.handle, code: 0 });
+      return;
     }
 
     // Close stdin to signal end
@@ -1124,6 +1475,32 @@ Please work on this task. When complete, include "TASK COMPLETE" in your respons
   }
 
   /**
+   * Get a routing recommendation for a task.
+   * Returns complexity, strategy, and model suggestion.
+   */
+  getRoutingRecommendation(task: {
+    subject: string;
+    description?: string | null;
+    blockedBy?: string[];
+  }): { complexity: string; strategy: string; model: string; confidence: number } | null {
+    if (!this.taskRouter) return null;
+    const decision = this.taskRouter.classify(task);
+    return {
+      complexity: decision.complexity,
+      strategy: decision.strategy,
+      model: decision.model,
+      confidence: decision.confidence,
+    };
+  }
+
+  /**
+   * Get the task router instance (for direct access).
+   */
+  getTaskRouter(): TaskRouter | null {
+    return this.taskRouter;
+  }
+
+  /**
    * Get worker health statistics
    */
   getHealthStats(): { total: number; healthy: number; degraded: number; unhealthy: number } {
@@ -1177,5 +1554,60 @@ Please work on this task. When complete, include "TASK COMPLETE" in your respons
   getPersistedWorkers(): PersistentWorker[] {
     if (!this.storage) return [];
     return this.storage.getAllWorkers();
+  }
+
+  /**
+   * Get the coordination adapter for external use (message routing, task assignment).
+   */
+  getCoordinationAdapter(): CoordinationAdapter | null {
+    return this.coordinationAdapter;
+  }
+
+  /**
+   * Get native integration status for introspection.
+   */
+  getNativeStatus(): {
+    isAvailable: boolean;
+    claudeBinary: string | null;
+    activeAdapter: string;
+    defaultSpawnMode: SpawnMode;
+    nativeOnly: boolean;
+  } {
+    const availability = this.nativeBridge?.checkAvailability();
+    return {
+      isAvailable: availability?.isAvailable ?? false,
+      claudeBinary: availability?.claudeBinary ?? null,
+      activeAdapter: this.coordinationAdapter?.getActiveAdapterName() ?? 'http',
+      defaultSpawnMode: this.defaultSpawnMode,
+      nativeOnly: this.nativeOnly,
+    };
+  }
+
+  /**
+   * Get the native bridge for direct access (task file I/O).
+   */
+  getNativeBridge(): NativeBridge | null {
+    return this.nativeBridge;
+  }
+
+  /**
+   * Set the auth token on the coordination adapter (no-op for native).
+   */
+  setCoordinationAuthToken(token: string): void {
+    this.coordinationAdapter?.setAuthToken(token);
+  }
+
+  /**
+   * Get the inbox bridge for direct access (message watching).
+   */
+  getInboxBridge(): InboxBridge | null {
+    return this.inboxBridge;
+  }
+
+  /**
+   * Get the agent memory instance for introspection/stats.
+   */
+  getAgentMemory(): AgentMemory | null {
+    return this.agentMemory;
   }
 }

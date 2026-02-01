@@ -146,11 +146,11 @@ Add workflow pause/resume functionality
 
 ### Code Style
 
-We use ESLint and Prettier. Run before committing:
+We use ESLint for linting. Run before committing:
 
 ```bash
 npm run lint
-npm run format
+npm run typecheck
 ```
 
 ### File Organization

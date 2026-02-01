@@ -14,7 +14,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@claude-fleet/common": "workspace:*"
+    "@claude-fleet/common": "file:../common"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

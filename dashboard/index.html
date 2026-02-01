@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Fleet Dashboard</title>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+          <span>Claude Fleet</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">Overview</div>
+          <a href="#/" class="nav-item active" data-route="/">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"/>
+              <rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            Dashboard
+          </a>
+          <a href="#/metrics" class="nav-item" data-route="/metrics">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 20V10"/>
+              <path d="M12 20V4"/>
+              <path d="M6 20v-6"/>
+            </svg>
+            Metrics
+          </a>
+          <a href="#/graph" class="nav-item" data-route="/graph">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="2"/>
+              <circle cx="6" cy="6" r="2"/>
+              <circle cx="18" cy="6" r="2"/>
+              <circle cx="6" cy="18" r="2"/>
+              <circle cx="18" cy="18" r="2"/>
+              <path d="M12 10V8M10 12H8M14 12h2M12 14v2"/>
+            </svg>
+            Dependency Graph
+          </a>
+          <a href="#/hive" class="nav-item" data-route="/hive">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/>
+            </svg>
+            Hex Hive
+          </a>
+          <a href="#/scheduler" class="nav-item" data-route="/scheduler">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Scheduler
+          </a>
+          <a href="#/mail" class="nav-item" data-route="/mail">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            Mail
+          </a>
+          <a href="#/workflows" class="nav-item" data-route="/workflows">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+            Workflows
+          </a>
+          <a href="/compound/" class="nav-item" target="_blank">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+            Compounding Machine
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Swarms</div>
+          <div id="swarm-nav-list">
+            <div class="nav-item text-fg-muted">No swarms active</div>
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Workers</div>
+          <a href="#/tasks" class="nav-item" data-route="/tasks">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4"/>
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+            </svg>
+            Tasks
+            <span class="nav-badge" id="task-count">0</span>
+          </a>
+          <div id="worker-nav-list">
+            <div class="nav-item text-fg-muted">No workers active</div>
+          </div>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="connection-status disconnected" id="connection-status">
+          <span class="status-dot"></span>
+          <span id="connection-text">Disconnected</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="main-header">
+        <h1 class="page-title" id="page-title">Fleet Overview</h1>
+        <div class="header-actions">
+          <button class="btn btn-primary btn-sm" id="spawn-btn">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Spawn Worker
+          </button>
+          <button class="btn btn-secondary btn-sm font-mono" id="cmd-palette-btn" title="Command Palette (⌘K)" style="font-size: 11px; gap: 4px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <kbd class="bg-surface border border-edge rounded-sm" style="font-size: 10px; padding: 1px 4px;">⌘K</kbd>
+          </button>
+          <button class="btn btn-secondary btn-sm" id="refresh-btn">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6M1 20v-6h6"/>
+              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+            </svg>
+            Refresh
+          </button>
+          <div id="user-info" class="hidden">
+            <span class="badge blue" id="user-handle"></span>
+            <button class="btn btn-secondary btn-sm" id="logout-btn" title="Logout">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Logout
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div class="main-view" id="main-view">
+        <div class="loading">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Login Modal -->
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Login to Fleet</h2>
+      </div>
+      <div class="modal-body">
+        <form id="login-form">
+          <div class="form-group">
+            <label class="form-label" for="handle">Handle</label>
+            <input type="text" class="form-input" id="handle" placeholder="e.g., lead-agent" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="team">Team Name</label>
+            <input type="text" class="form-input" id="team" placeholder="e.g., my-team" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="agent-type">Role</label>
+            <select class="form-input" id="agent-type">
+              <option value="team-lead">Team Lead</option>
+              <option value="worker">Worker</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="login-submit">Login</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spawn Worker Modal -->
+  <div class="modal-overlay" id="spawn-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Spawn Worker</h2>
+        <button class="modal-close" id="spawn-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="spawn-form">
+          <div class="form-group">
+            <label class="form-label" for="spawn-handle">Handle *</label>
+            <input type="text" class="form-input" id="spawn-handle" placeholder="e.g., scout-1, kraken-2" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="spawn-prompt">Initial Prompt</label>
+            <textarea class="form-input" id="spawn-prompt" rows="4" placeholder="Optional: Initial task for the worker"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="spawn-swarm">Swarm ID</label>
+            <select class="form-input" id="spawn-swarm">
+              <option value="">None</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="spawn-workdir">Working Directory</label>
+            <input type="text" class="form-input" id="spawn-workdir" placeholder="Optional: /path/to/project">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="spawn-cancel">Cancel</button>
+        <button class="btn btn-primary" id="spawn-submit">Spawn</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Swarm Modal -->
+  <div class="modal-overlay" id="swarm-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Create Swarm</h2>
+        <button class="modal-close" id="swarm-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="swarm-form">
+          <div class="form-group">
+            <label class="form-label" for="swarm-name">Name *</label>
+            <input type="text" class="form-input" id="swarm-name" placeholder="e.g., feature-auth" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="swarm-description">Description</label>
+            <textarea class="form-input" id="swarm-description" rows="2" placeholder="Optional: Description of swarm purpose"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="swarm-max-agents">Max Agents</label>
+            <input type="number" class="form-input" id="swarm-max-agents" value="10" min="1" max="100">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="swarm-cancel">Cancel</button>
+        <button class="btn btn-primary" id="swarm-submit">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Task Modal -->
+  <div class="modal-overlay" id="task-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Create Task</h2>
+        <button class="modal-close" id="task-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="task-form">
+          <div class="form-group">
+            <label class="form-label" for="task-subject">Subject *</label>
+            <input type="text" class="form-input" id="task-subject" placeholder="e.g., Implement login flow" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="task-description">Description</label>
+            <textarea class="form-input" id="task-description" rows="3" placeholder="Optional: Detailed task description"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="task-assignee">Assign To *</label>
+            <select class="form-input" id="task-assignee" required>
+              <option value="">Select worker...</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="task-cancel">Cancel</button>
+        <button class="btn btn-primary" id="task-submit">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vite entry point — replaces all CDN scripts -->
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

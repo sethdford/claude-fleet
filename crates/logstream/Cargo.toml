@@ -1,0 +1,19 @@
+[package]
+name = "cct-logstream"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "High-performance NDJSON worker log parser with ring buffer and health signal extraction"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi.workspace = true
+napi-derive.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+
+[build-dependencies]
+napi-build.workspace = true

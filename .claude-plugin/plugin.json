@@ -1,7 +1,7 @@
 {
   "name": "claude-fleet",
   "version": "2.2.0",
-  "description": "Multi-agent orchestration for Claude Code with 82 MCP tools for team coordination, swarm intelligence, and workflow automation",
+  "description": "Multi-agent orchestration for Claude Code with 94 MCP tools for team coordination, swarm intelligence, and workflow automation",
   "author": {
     "name": "Seth Ford",
     "email": "seth@example.com"

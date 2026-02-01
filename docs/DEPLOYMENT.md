@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide covers deploying Claude Code Collab in production environments.
+This guide covers deploying Claude Fleet in production environments.
 
 ## Table of Contents
 
@@ -42,7 +42,7 @@ PORT=3847                              # Server port (default: 3847)
 NODE_ENV=production                    # Environment mode
 
 # Database
-DB_PATH=/var/lib/collab/collab.db     # SQLite database path
+DB_PATH=/var/lib/claude-fleet/fleet.db     # SQLite database path
 
 # Authentication
 JWT_SECRET=your-secure-random-secret   # REQUIRED in production
@@ -104,27 +104,27 @@ NODE_ENV=production node dist/index.js
 
 ### systemd (Linux)
 
-Create `/etc/systemd/system/collab.service`:
+Create `/etc/systemd/system/claude-fleet.service`:
 
 ```ini
 [Unit]
-Description=Claude Code Collab Server
+Description=Claude Fleet Server
 After=network.target
 
 [Service]
 Type=simple
-User=collab
-Group=collab
-WorkingDirectory=/opt/collab
-ExecStart=/usr/bin/node /opt/collab/dist/index.js
+User=claude-fleet
+Group=claude-fleet
+WorkingDirectory=/opt/claude-fleet
+ExecStart=/usr/bin/node /opt/claude-fleet/dist/index.js
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
 Environment=NODE_ENV=production
 Environment=PORT=3847
-Environment=DB_PATH=/var/lib/collab/collab.db
-EnvironmentFile=-/etc/collab/env
+Environment=DB_PATH=/var/lib/claude-fleet/fleet.db
+EnvironmentFile=-/etc/claude-fleet/env
 
 [Install]
 WantedBy=multi-user.target
@@ -134,14 +134,14 @@ Enable and start:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable collab
-sudo systemctl start collab
-sudo systemctl status collab
+sudo systemctl enable claude-fleet
+sudo systemctl start claude-fleet
+sudo systemctl status claude-fleet
 ```
 
 ### launchd (macOS)
 
-Create `~/Library/LaunchAgents/com.collab.server.plist`:
+Create `~/Library/LaunchAgents/com.claude-fleet.server.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -149,14 +149,14 @@ Create `~/Library/LaunchAgents/com.collab.server.plist`:
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.collab.server</string>
+    <string>com.claude-fleet.server</string>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/node</string>
-        <string>/opt/collab/dist/index.js</string>
+        <string>/opt/claude-fleet/dist/index.js</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>/opt/collab</string>
+    <string>/opt/claude-fleet</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>NODE_ENV</key>
@@ -164,16 +164,16 @@ Create `~/Library/LaunchAgents/com.collab.server.plist`:
         <key>PORT</key>
         <string>3847</string>
         <key>DB_PATH</key>
-        <string>/var/lib/collab/collab.db</string>
+        <string>/var/lib/claude-fleet/collab.db</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/var/log/collab/stdout.log</string>
+    <string>/var/log/claude-fleet/stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/collab/stderr.log</string>
+    <string>/var/log/claude-fleet/stderr.log</string>
 </dict>
 </plist>
 ```
@@ -181,7 +181,7 @@ Create `~/Library/LaunchAgents/com.collab.server.plist`:
 Load the service:
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.collab.server.plist
+launchctl load ~/Library/LaunchAgents/com.claude-fleet.server.plist
 ```
 
 ### Docker
@@ -213,14 +213,14 @@ CMD ["node", "dist/index.js"]
 Build and run:
 
 ```bash
-docker build -t collab-server .
+docker build -t claude-fleet .
 docker run -d \
-  --name collab \
+  --name claude-fleet \
   -p 3847:3847 \
-  -v collab-data:/app/data \
+  -v fleet-data:/app/data \
   -e JWT_SECRET=your-secret \
-  -e DB_PATH=/app/data/collab.db \
-  collab-server
+  -e DB_PATH=/app/data/fleet.db \
+  claude-fleet
 ```
 
 ---
@@ -236,15 +236,15 @@ SQLite databases should be backed up regularly. Since we use WAL mode, use the b
 ```bash
 #!/bin/bash
 # backup.sh
-BACKUP_DIR=/var/backups/collab
-DB_PATH=/var/lib/collab/collab.db
+BACKUP_DIR=/var/backups/claude-fleet
+DB_PATH=/var/lib/claude-fleet/fleet.db
 DATE=$(date +%Y%m%d_%H%M%S)
 
 mkdir -p $BACKUP_DIR
-sqlite3 $DB_PATH ".backup '$BACKUP_DIR/collab_$DATE.db'"
+sqlite3 $DB_PATH ".backup '$BACKUP_DIR/fleet_$DATE.db'"
 
 # Keep last 7 days of backups
-find $BACKUP_DIR -name "collab_*.db" -mtime +7 -delete
+find $BACKUP_DIR -name "fleet_*.db" -mtime +7 -delete
 ```
 
 Add to crontab:
@@ -257,7 +257,7 @@ Add to crontab:
 
 ```bash
 sqlite3 $DB_PATH "PRAGMA wal_checkpoint(TRUNCATE);"
-cp $DB_PATH $BACKUP_DIR/collab_$DATE.db
+cp $DB_PATH $BACKUP_DIR/fleet_$DATE.db
 ```
 
 ### Migrations
@@ -270,7 +270,7 @@ Run migrations on startup or manually:
 node -e "
 const Database = require('better-sqlite3');
 const { getMigrationStatus } = require('./dist/storage/migrations.js');
-const db = new Database(process.env.DB_PATH || './collab.db');
+const db = new Database(process.env.DB_PATH || './fleet.db');
 console.log(getMigrationStatus(db));
 "
 ```
@@ -301,7 +301,7 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "persistence": "sqlite",
   "agents": 5,
   "chats": 12,
@@ -324,11 +324,11 @@ Key metrics:
 |--------|-------------|
 | `http_requests_total` | Total HTTP requests by method/path/status |
 | `http_request_duration_seconds` | Request latency histogram |
-| `collab_workers_total` | Total worker count |
-| `collab_workers_healthy` | Healthy worker count |
-| `collab_tasks_by_status` | Tasks by status |
-| `collab_messages_sent_total` | Messages sent |
-| `collab_auth_failures_total` | Authentication failures |
+| `fleet_workers_total` | Total worker count |
+| `fleet_workers_healthy` | Healthy worker count |
+| `fleet_tasks_by_status` | Tasks by status |
+| `fleet_messages_sent_total` | Messages sent |
+| `fleet_auth_failures_total` | Authentication failures |
 
 ### Prometheus Configuration
 
@@ -336,7 +336,7 @@ Add to `prometheus.yml`:
 
 ```yaml
 scrape_configs:
-  - job_name: 'collab'
+  - job_name: 'claude-fleet'
     static_configs:
       - targets: ['localhost:3847']
     metrics_path: '/metrics'
@@ -359,18 +359,18 @@ Example Prometheus alerting rules:
 
 ```yaml
 groups:
-  - name: collab
+  - name: claude-fleet
     rules:
-      - alert: CollabServerDown
-        expr: up{job="collab"} == 0
+      - alert: FleetServerDown
+        expr: up{job="claude-fleet"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Collab server is down"
+          summary: "Fleet server is down"
 
       - alert: HighErrorRate
-        expr: rate(collab_errors_total[5m]) > 0.1
+        expr: rate(fleet_errors_total[5m]) > 0.1
         for: 5m
         labels:
           severity: warning
@@ -378,7 +378,7 @@ groups:
           summary: "High error rate detected"
 
       - alert: WorkersUnhealthy
-        expr: collab_workers_healthy / collab_workers_total < 0.5
+        expr: fleet_workers_healthy / fleet_workers_total < 0.5
         for: 5m
         labels:
           severity: warning
@@ -401,10 +401,10 @@ groups:
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name collab.example.com;
+    server_name fleet.example.com;
 
-    ssl_certificate /etc/letsencrypt/live/collab.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/collab.example.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/fleet.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fleet.example.com/privkey.pem;
 
     location / {
         proxy_pass http://127.0.0.1:3847;
@@ -446,14 +446,14 @@ Default: 100 requests per minute per IP. Adjust for your use case.
 
 ```bash
 # Check logs
-journalctl -u collab -f
+journalctl -u claude-fleet -f
 
 # Common causes:
 # 1. Port already in use
 lsof -i :3847
 
 # 2. Database permissions
-ls -la /var/lib/collab/
+ls -la /var/lib/claude-fleet/
 
 # 3. Missing dependencies
 npm ci
@@ -476,7 +476,7 @@ echo $MAX_WORKERS
 
 ```bash
 # Check for stale WAL files
-ls -la /var/lib/collab/*.db*
+ls -la /var/lib/claude-fleet/*.db*
 
 # Force checkpoint
 sqlite3 $DB_PATH "PRAGMA wal_checkpoint(TRUNCATE);"
@@ -511,7 +511,15 @@ exit 0
 
 ---
 
+## See Also
+
+- [Documentation Index](README.md) - Full documentation overview
+- [ARCHITECTURE](ARCHITECTURE.md) - System architecture
+- [API Reference](api.md) - Complete REST API documentation
+- [FEATURE-FLAGS](FEATURE-FLAGS.md) - Environment variables and configuration
+- [TMUX-AUTOMATION](TMUX-AUTOMATION.md) - Tmux integration
+
 ## Support
 
-- GitHub Issues: https://github.com/sethdford/claude-code-collab/issues
-- Documentation: See README.md for API reference
+- GitHub Issues: https://github.com/sethdford/claude-fleet/issues
+- Documentation: https://sethdford.github.io/claude-fleet

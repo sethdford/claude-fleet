@@ -11,351 +11,258 @@
 <p align="center">
   <a href="https://github.com/sethdford/claude-fleet/actions/workflows/ci.yml"><img src="https://github.com/sethdford/claude-fleet/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.npmjs.com/package/claude-fleet"><img src="https://img.shields.io/npm/v/claude-fleet" alt="NPM Version"></a>
-  <a href="https://www.npmjs.com/package/claude-fleet"><img src="https://img.shields.io/npm/dm/claude-fleet" alt="NPM Downloads"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.3-blue" alt="TypeScript"></a>
 </p>
 
-<p align="center">
-  <a href="https://sethdford.github.io/claude-fleet/">Website</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#key-features">Features</a> •
-  <a href="#agent-roles">Agent Roles</a> •
-  <a href="#cli-reference">CLI Reference</a> •
-  <a href="https://github.com/sethdford/claude-fleet/issues">Issues</a>
-</p>
-
 ---
 
-Deploy specialized agent fleets across multiple repositories. Run iterative waves until objectives are achieved. TMUX or headless mode for full CI/CD integration.
+Multi-agent orchestration server for Claude Code. Deploy specialized agent fleets, run iterative waves across repositories, and coordinate swarms via a REST API, CLI, and MCP integration. Supports TMUX visual mode or headless mode for CI/CD.
 
 ```bash
 # Launch a wave across multiple repos
-$ claude-fleet wave --repos api,frontend,shared --objective "Add rate limiting"
+$ fleet wave --repos api,frontend,shared --objective "Add rate limiting"
 
 Wave 1: Spawning scouts...
-  ✓ Scout[api]      Mapped 47 endpoints
-  ✓ Scout[frontend] Found 12 API calls
-  ✓ Scout[shared]   Identified rate-limit types
+  Scout[api]      Mapped 47 endpoints
+  Scout[frontend] Found 12 API calls
+  Scout[shared]   Identified rate-limit types
 
 Wave 2: Architect designing...
-  ✓ Architect       Proposed middleware approach
+  Architect       Proposed middleware approach
 
 Wave 3: Implementation...
-  ✓ Worker[api]     Added middleware + config
-  ✓ Kraken[api]     22 tests passing
+  Worker[api]     Added middleware + config
+  Kraken[api]     22 tests passing
 
 Wave 4: Review...
-  ✓ Critic          Approved. Creating PRs...
+  Critic          Approved. Creating PRs...
 
-✓ Objective achieved in 4 waves. 3 PRs created.
+3 PRs created. Objective achieved in 4 waves.
 ```
-
-<p align="center">
-  <img src="docs/images/fleet-tmux-demo.svg" alt="Claude Fleet TMUX Demo" width="900">
-</p>
-
-<p align="center"><em>Watch agents spawn, collaborate, and complete objectives in real-time</em></p>
 
 ---
 
-## Key Features
+## Architecture
 
-| Feature | Description |
-|---------|-------------|
-| **Wave Orchestration** | Phased execution with dependencies. Parallel within waves, sequential across phases. Iterate until objectives are met. |
-| **7 Specialized Agents** | Lead, Scout, Kraken (TDD), Oracle, Critic, Architect, Worker - each with distinct capabilities. |
-| **Multi-Repository Ops** | Parallel operations across repos. Auto-branching, auto-commit, auto-PR. Atomic commits with rollback. |
-| **TMUX & Headless Mode** | Visual TMUX sessions or headless for CI/CD. Context monitoring with auto-rollover. |
-| **Swarm Intelligence** | Blackboard-based coordination. Workers post discoveries, others subscribe. |
-| **24/7 Autonomous Ops** | Cron scheduling, webhook triggers, alert-driven tasks. Priority queues with retry logic. |
-| **E2E Audit Loops** | Continuous quality enforcement across your pipeline. Pattern detection and automatic retries. |
+```
+src/
+├── index.ts           # Entry point — starts CollabServer
+├── server.ts          # Express HTTP + WebSocket server
+├── types.ts           # All type definitions (centralized)
+├── cli.ts             # CLI commands (fleet binary)
+├── storage/           # Data layer (SQLite default, DynamoDB/Firestore/PostgreSQL optional)
+├── workers/           # Worker process management & agent roles
+├── routes/            # HTTP route handlers (core, waves, swarm, tasks, etc.)
+├── validation/        # Zod schemas for all API inputs
+├── metrics/           # Prometheus metrics collection
+├── scheduler/         # Cron-based autonomous task scheduling
+├── mcp/               # Model Context Protocol bridge (94 tools)
+├── middleware/         # JWT auth, RBAC, validation middleware
+└── integrations/      # Third-party integrations (Linear)
+```
+
+**Layer dependency rules:**
+
+| Layer | Can Import From |
+|-------|-----------------|
+| `types.ts` | Nothing |
+| `storage/` | `types.ts` |
+| `workers/` | `storage/`, `types.ts` |
+| `routes/` | `workers/`, `storage/`, `validation/`, `types.ts` |
+| `server.ts` | All layers |
+
+Additional directories:
+
+```
+crates/                # Rust crates (compound accumulator, search engine, lmsh)
+packages/              # Monorepo packages (common, fleet, mcp, tmux, session, storage)
+apps/cli/              # CLI app package
+public/                # Dashboard UI & compound machine frontend
+scripts/               # Build, E2E test, and deployment scripts
+```
+
+### Key Technologies
+
+- **Express + WebSocket (ws)** — HTTP API and real-time events
+- **better-sqlite3** — Default embedded database (with umzug migrations)
+- **jsonwebtoken** — JWT authentication
+- **Zod** — Input validation for all endpoints
+- **prom-client** — Prometheus metrics
+- **@modelcontextprotocol/sdk** — MCP server integration
+- **Rust (NAPI)** — Optional native modules for compound accumulator and full-text search
 
 ---
 
 ## Agent Roles
 
-Claude Fleet provides 7 specialized agent roles:
+7 specialized agent roles with role-based access control:
 
-| Role | Description | Capabilities |
-|------|-------------|--------------|
-| **Lead** | Orchestrates the fleet, delegates tasks, monitors progress | Can spawn other agents |
-| **Worker** | General-purpose implementation, executes assigned tasks | Code changes, commits |
-| **Scout** | Explores codebases, maps dependencies, gathers intel | Read-only exploration |
-| **Kraken** | TDD specialist - red-green-refactor cycle | Test-first development |
-| **Oracle** | Research and analysis, investigates patterns | Deep code analysis |
-| **Critic** | Code review, quality gates, security checks | Review and approve |
-| **Architect** | System design, API contracts, architecture decisions | Can spawn workers |
+| Role | Purpose | Key Capability |
+|------|---------|----------------|
+| **Lead** | Orchestrates the fleet, delegates tasks | Can spawn other agents |
+| **Worker** | General-purpose implementation | Code changes, commits |
+| **Scout** | Explores codebases, maps dependencies | Read-only exploration |
+| **Kraken** | TDD specialist — red-green-refactor | Test-first development |
+| **Oracle** | Research and analysis | Deep code analysis |
+| **Critic** | Code review, quality gates | Review and approve |
+| **Architect** | System design, API contracts | Can spawn workers |
 
-### Wave Flow Example
+Each role has a custom system prompt, allowed tool list, maximum spawn depth, and default task priority.
+
+### Wave Flow
 
 ```
 Wave 1 (parallel):  Scout ─────── Oracle
-                         ╲       ╱
-                          ╲     ╱
+                         \       /
+                          \     /
 Wave 2 (sequential):       Architect
-                              │
-                              ▼
+                              |
 Wave 3 (parallel):    Worker ───── Kraken
-                         ╲       ╱
-                          ╲     ╱
+                         \       /
+                          \     /
 Wave 4 (quality gate):     Critic
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │ Loop if needed  │
-                    └─────────────────┘
+                              |
+                    [ Loop if needed ]
 ```
 
 ---
 
 ## Quick Start
 
+### Prerequisites
+
+- Node.js >= 18.0.0
+- An `ANTHROPIC_API_KEY` for Claude API access
+
 ### Installation
 
 ```bash
-# Install globally via NPM
 npm install -g claude-fleet
-
-# Start the fleet server
-claude-fleet
-
-# In another terminal, use the CLI
-fleet health
 ```
 
-### Your First Wave
+### Start the Server
 
 ```bash
-# 1. Start the server
+# Start the fleet server (default port 3847)
 claude-fleet
 
-# 2. Authenticate as team lead
-fleet auth my-lead my-team team-lead
-export FLEET_TOKEN="<token from above>"
+# Or in development mode with hot reload
+npm run dev
+```
 
-# 3. Launch a wave
+### Authenticate and Use
+
+```bash
+# Register as team lead
+fleet auth my-lead my-team team-lead
+export FLEET_TOKEN="<token>"
+
+# Launch a wave
 fleet wave --objective "Add input validation to all API endpoints"
 
-# 4. Monitor progress
+# Monitor workers
 fleet workers --table
 
-# 5. View the dashboard
+# View the dashboard
 open http://localhost:3847/dashboard/
 ```
 
 ### Multi-Repository Setup
 
 ```bash
-# Configure repositories
 fleet repos add api ./repos/api-service
 fleet repos add frontend ./repos/web-client
 fleet repos add shared ./repos/shared-types
 
-# Launch cross-repo wave
 fleet wave --repos api,frontend,shared \
   --objective "Implement rate limiting across all services"
 ```
 
 ---
 
-## Wave Orchestration
+## API Overview
 
-Execute complex multi-phase workflows with automatic dependency management:
+### Public Endpoints (no auth)
 
-```typescript
-import { WaveOrchestrator } from 'claude-fleet';
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Server health check |
+| `GET` | `/metrics` | Prometheus metrics |
+| `POST` | `/auth` | Get JWT token |
 
-const orchestrator = new WaveOrchestrator({
-  fleetName: 'feature-implementation',
-  remote: true, // headless mode for CI/CD
-});
+### Core Endpoints (JWT required)
 
-// Wave 1: Discovery (parallel)
-orchestrator.addWave({
-  name: 'discovery',
-  workers: [
-    { handle: 'scout-1', role: 'scout', prompt: 'Map the authentication module' },
-    { handle: 'oracle-1', role: 'oracle', prompt: 'Research OAuth2 patterns' },
-  ],
-});
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/tasks` | Create task |
+| `GET` | `/tasks/:id` | Get task details |
+| `PUT` | `/tasks/:id` | Update task status |
+| `POST` | `/orchestrate/spawn` | Spawn a worker |
+| `POST` | `/orchestrate/dismiss/:handle` | Dismiss a worker |
+| `GET` | `/orchestrate/workers` | List all workers |
+| `POST` | `/waves/execute` | Launch a wave |
+| `GET` | `/waves/:id` | Wave status |
+| `POST` | `/waves/:id/cancel` | Cancel a wave |
+| `POST` | `/multi-repo/execute` | Multi-repo wave |
+| `POST` | `/swarms` | Create swarm |
+| `POST` | `/swarms/:id/blackboard` | Post to blackboard |
+| `GET` | `/swarms/:id/blackboard` | Read blackboard |
+| `POST` | `/teams/:name/broadcast` | Broadcast to team (lead only) |
 
-// Wave 2: Design (depends on discovery)
-orchestrator.addWave({
-  name: 'design',
-  workers: [
-    { handle: 'architect-1', role: 'architect', prompt: 'Design the auth flow' },
-  ],
-  afterWaves: ['discovery'],
-});
-
-// Wave 3: Implementation (parallel, depends on design)
-orchestrator.addWave({
-  name: 'implementation',
-  workers: [
-    { handle: 'worker-1', role: 'worker', prompt: 'Implement auth middleware' },
-    { handle: 'kraken-1', role: 'kraken', prompt: 'Write auth tests (TDD)' },
-  ],
-  afterWaves: ['design'],
-});
-
-// Wave 4: Review (depends on implementation)
-orchestrator.addWave({
-  name: 'review',
-  workers: [
-    { handle: 'critic-1', role: 'critic', prompt: 'Review implementation' },
-  ],
-  afterWaves: ['implementation'],
-  continueOnFailure: false, // Quality gate
-});
-
-// Execute with iteration until success
-const results = await orchestrator.execute({
-  maxIterations: 3,
-  successCriteria: (results) => results.every(r => r.success),
-});
-```
-
----
-
-## Multi-Repository Operations
-
-Coordinate work across multiple repositories with atomic commits:
-
-```typescript
-import { MultiRepoOrchestrator } from 'claude-fleet';
-
-const multiRepo = new MultiRepoOrchestrator({
-  fleetName: 'cross-repo-update',
-  repositories: [
-    { name: 'api', path: './repos/api', tags: ['backend'] },
-    { name: 'frontend', path: './repos/web', tags: ['frontend'] },
-    { name: 'shared', path: './repos/shared', tags: ['common'] },
-  ],
-  maxParallel: 3,
-  remote: true,
-});
-
-// Run task across all repos
-await multiRepo.runTask({
-  name: 'update-dependencies',
-  prompt: 'Update all npm dependencies to latest versions',
-  createBranch: true,
-  branchPattern: 'chore/update-deps-{{repo}}',
-  autoCommit: true,
-  createPR: true,
-  prTitlePattern: 'chore({{repo}}): Update dependencies',
-});
-```
-
----
-
-## CI/CD Integration
-
-### Headless Mode
-
-Run fleets in CI/CD pipelines without TMUX:
-
-```yaml
-# .github/workflows/fleet-audit.yml
-name: Fleet Audit
-on: [push]
-
-jobs:
-  audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Claude Fleet
-        run: npm install -g claude-fleet
-
-      - name: Run Audit Wave
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          claude-fleet --headless wave \
-            --objective "Audit codebase for security vulnerabilities" \
-            --roles scout,oracle,critic \
-            --max-iterations 2
-```
-
-### Webhook Triggers
-
-```bash
-# Configure webhook endpoint
-fleet webhook create --event pull_request --action "Run review wave"
-
-# Fleet responds to GitHub webhooks automatically
-```
+See `docs/api.md` for the complete API reference.
 
 ---
 
 ## CLI Reference
 
-### Core Commands
-
 ```bash
-fleet health                    # Check server health
-fleet metrics                   # Get server metrics
-fleet auth <handle> <team> [type]  # Authenticate (team-lead|worker)
-```
+# Server
+fleet health                        # Check server health
+fleet metrics                       # Get Prometheus metrics
 
-### Wave Operations
+# Authentication
+fleet auth <handle> <team> [type]   # Register (team-lead|worker)
 
-```bash
-fleet wave --objective <text>   # Launch a new wave
-fleet wave --repos a,b,c        # Target specific repos
-fleet wave --roles scout,critic # Use specific roles
-fleet wave-status               # Check wave progress
-fleet wave-cancel <id>          # Cancel running wave
-```
+# Workers
+fleet workers                       # List workers
+fleet workers --table               # Table output
+fleet spawn <handle> <prompt>       # Spawn worker
+fleet dismiss <handle>              # Dismiss worker
+fleet output <handle>               # Get worker output
 
-### Worker Management
+# Waves
+fleet wave --objective <text>       # Launch wave
+fleet wave --repos a,b,c            # Target repos
+fleet wave --roles scout,critic     # Specific roles
+fleet wave-status [id]              # Check progress
+fleet wave-cancel <id>              # Cancel wave
 
-```bash
-fleet workers                   # List all workers
-fleet workers --table           # Formatted table output
-fleet spawn <handle> <prompt>   # Spawn individual worker
-fleet dismiss <handle>          # Dismiss a worker
-fleet output <handle>           # Get worker output
-```
+# Repositories
+fleet repos                         # List repos
+fleet repos add <name> <path>       # Add repo
+fleet repos remove <name>           # Remove repo
+fleet repos sync                    # Sync all
 
-### Repository Management
-
-```bash
-fleet repos                     # List configured repos
-fleet repos add <name> <path>   # Add repository
-fleet repos remove <name>       # Remove repository
-fleet repos sync                # Sync all repos
-```
-
-### Swarm Operations
-
-```bash
-fleet swarms                    # List all swarms
-fleet blackboard <swarmId>      # Read blackboard messages
+# Swarm
+fleet swarms                        # List swarms
+fleet blackboard <swarmId>          # Read blackboard
 fleet blackboard-post <swarm> <sender> <type> <payload>
+
+# Templates
+fleet templates                     # List templates
+fleet templates use <name>          # Apply template
+
+# Audit
+fleet audit                         # Run all quality checks
+fleet audit --verbose               # Verbose output
 ```
-
----
-
-## Dashboard
-
-Access the real-time dashboard at `http://localhost:3847/dashboard/`
-
-Features:
-- **Wave Progress** - Visual wave execution status
-- **Workers** - Real-time worker status and output
-- **Repositories** - Multi-repo status overview
-- **Blackboard** - Swarm communication messages
-- **Metrics** - Performance and health monitoring
 
 ---
 
 ## MCP Integration
 
-Claude Fleet exposes 40+ tools via Model Context Protocol:
+Claude Fleet exposes 94 tools via Model Context Protocol for direct Claude Code integration:
 
 ```json
 {
@@ -372,12 +279,20 @@ Claude Fleet exposes 40+ tools via Model Context Protocol:
 }
 ```
 
-Key MCP tools:
-- `wave_launch` - Start a new wave
-- `wave_status` - Check wave progress
-- `team_spawn` - Spawn individual workers
-- `repo_add` - Add repository to fleet
-- `blackboard_post` - Post to swarm blackboard
+Key MCP tools: `wave_launch`, `wave_status`, `team_spawn`, `repo_add`, `blackboard_post`.
+
+---
+
+## Swarm Intelligence
+
+Agents coordinate through a blackboard pattern:
+
+- **Blackboard** — Shared message board with typed entries (directive, report, query, discovery)
+- **Pheromone trails** — Path optimization markers left by agents
+- **Beliefs** — Agent knowledge base entries
+- **Credits** — Agent reward and resource system
+- **Priority routing** — Critical, high, normal, low message priorities
+- **Read tracking** — Know which agents have seen which messages
 
 ---
 
@@ -388,98 +303,111 @@ Key MCP tools:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3847` | Server port |
-| `HOST` | `0.0.0.0` | Server host |
-| `MAX_WORKERS` | `5` | Maximum concurrent workers |
-| `ANTHROPIC_API_KEY` | - | API key for Claude |
-| `FLEET_MODE` | `tmux` | Mode: `tmux` or `headless` |
-| `STORAGE_BACKEND` | `sqlite` | Storage: `sqlite`, `postgresql` |
+| `HOST` | `0.0.0.0` | Bind address |
+| `NODE_ENV` | `development` | Environment |
+| `JWT_SECRET` | auto-generated | **Required in production** |
+| `MAX_WORKERS` | `5` | Max concurrent workers |
+| `ANTHROPIC_API_KEY` | — | Claude API key |
+| `FLEET_MODE` | `tmux` | `tmux` or `headless` |
+| `STORAGE_BACKEND` | `sqlite` | `sqlite`, `dynamodb`, `firestore`, `postgresql` |
+| `DB_PATH` | — | SQLite database location |
 
-### Fleet Configuration File
+### Storage Backends
 
-```yaml
-# fleet.config.yaml
-fleet:
-  name: my-project
-  maxWorkers: 8
-  mode: headless
+The storage factory (`src/storage/factory.ts`) supports pluggable backends:
 
-repositories:
-  - name: api
-    path: ./services/api
-    defaultBranch: main
-  - name: frontend
-    path: ./apps/web
-    defaultBranch: main
+- **SQLite** (default) — Embedded, zero-config
+- **DynamoDB** — AWS serverless (optional dependency)
+- **Firestore** — Google Cloud (optional dependency)
+- **PostgreSQL** — Traditional SQL (optional dependency)
+- **S3** — Blob storage for large artifacts (optional dependency)
 
-waves:
-  defaultRoles: [scout, worker, critic]
-  maxIterations: 3
+---
 
-scheduling:
-  enabled: true
-  timezone: America/New_York
-  tasks:
-    - name: nightly-audit
-      cron: "0 2 * * *"
-      objective: "Run security audit"
+## Building & Testing
+
+### Build
+
+```bash
+npm run build         # Compile TypeScript to dist/
+npm run typecheck     # Type check only (no emit)
+npm run lint          # ESLint
+npm run lint:fix      # Auto-fix lint issues
+```
+
+### Test
+
+```bash
+npm test              # Run unit tests (Vitest)
+npm run test:watch    # Watch mode
+npm run test:coverage # Coverage report (60% threshold)
+```
+
+### E2E Tests
+
+```bash
+npm run e2e           # Core (auth, tasks, chat)
+npm run e2e:phase2-3  # Work items, mail
+npm run e2e:cli       # CLI commands
+npm run e2e:dashboard # Dashboard UI
+npm run e2e:compound  # Compound machine
+npm run e2e:all       # All suites
+```
+
+### Full Verification
+
+```bash
+npm run verify        # typecheck + lint + test + e2e:all
+```
+
+### Audit Loop
+
+Continuous improvement loop that runs until the codebase passes all quality gates:
+
+```bash
+npm run audit         # Run until all checks pass
+npm run audit:dry     # Dry run (no changes)
 ```
 
 ---
 
-## Architecture
+## CI/CD (Headless Mode)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Wave Orchestrator                           │
-│              (phases, dependencies, iterations)                 │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │
-          ┌───────────────┼───────────────┐
-          ▼               ▼               ▼
-    ┌──────────┐    ┌──────────┐    ┌──────────┐
-    │  Scout   │    │  Oracle  │    │ Architect│
-    │ (explore)│    │(research)│    │ (design) │
-    └────┬─────┘    └────┬─────┘    └────┬─────┘
-         │               │               │
-         └───────────────┼───────────────┘
-                         │
-    ┌────────────────────┼────────────────────┐
-    │                    │                    │
-    ▼                    ▼                    ▼
-┌────────┐         ┌──────────┐         ┌──────────┐
-│ Worker │         │  Kraken  │         │  Critic  │
-│(implem)│         │  (TDD)   │         │ (review) │
-└────────┘         └──────────┘         └──────────┘
-         ╲               │               ╱
-          ╲              ▼              ╱
-           └──────► Blackboard ◄──────┘
-                   (coordination)
+```yaml
+# .github/workflows/fleet-audit.yml
+name: Fleet Audit
+on: [push]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Claude Fleet
+        run: npm install -g claude-fleet
+      - name: Run Audit Wave
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude-fleet --headless wave \
+            --objective "Audit codebase for security vulnerabilities" \
+            --roles scout,oracle,critic \
+            --max-iterations 2
 ```
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ```bash
-# Development
-npm run dev          # Start with hot reload
-npm test             # Run unit tests
-npm run e2e          # Run E2E tests
-npm run lint         # Lint code
+npm run dev       # Start with hot reload
+npm test          # Unit tests
+npm run e2e       # E2E tests
+npm run lint      # Lint
 ```
-
----
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-<p align="center">
-  <a href="https://sethdford.github.io/claude-fleet/">Website</a> •
-  <a href="https://www.npmjs.com/package/claude-fleet">NPM</a> •
-  <a href="https://github.com/sethdford/claude-fleet">GitHub</a>
-</p>
+MIT — see [LICENSE](LICENSE).

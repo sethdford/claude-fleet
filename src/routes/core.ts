@@ -135,6 +135,9 @@ export function createAuthHandler(deps: RouteDependencies) {
 
     await deps.storage.team.insertUser(agent);
 
+    // Notify server to start watching this team's native resources
+    deps.onTeamRegistered?.(teamName);
+
     const token = jwt.sign(
       { uid, handle, teamName, agentType: agent.agentType },
       deps.config.jwtSecret,

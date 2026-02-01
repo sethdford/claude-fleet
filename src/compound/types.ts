@@ -53,6 +53,16 @@ export interface GateResultSummary {
 }
 
 // ============================================================================
+// GATE RESULTS (from mission validation API)
+// ============================================================================
+
+export interface GateResult {
+  gateId: string;
+  status: 'passed' | 'failed' | 'error';
+  output: string;
+}
+
+// ============================================================================
 // GATE CONFIGURATION
 // ============================================================================
 

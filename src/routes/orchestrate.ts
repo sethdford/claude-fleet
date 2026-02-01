@@ -29,11 +29,30 @@ export function createSpawnWorkerHandler(deps: RouteDependencies, broadcastToAll
       return;
     }
 
+    // Advisory task routing — suggest optimal model based on task complexity
+    let routing: { complexity: string; strategy: string; model: string; confidence: number } | null = null;
+    if (validation.data.initialPrompt) {
+      try {
+        routing = deps.workerManager.getRoutingRecommendation({
+          subject: validation.data.handle,
+          description: validation.data.initialPrompt,
+        });
+      } catch {
+        // Non-blocking — proceed without routing recommendation
+      }
+    }
+
+    // Apply routing model if no explicit model was specified
+    const spawnData = { ...validation.data };
+    if (routing && !spawnData.model) {
+      spawnData.model = routing.model;
+    }
+
     try {
-      const worker = await deps.workerManager.spawnWorker(validation.data);
+      const worker = await deps.workerManager.spawnWorker(spawnData);
       workerSpawns.inc();
       broadcastToAll({ type: 'worker_spawned', worker });
-      res.json(worker);
+      res.json({ ...worker, routing });
     } catch (error) {
       res.status(400).json({ error: (error as Error).message } as ErrorResponse);
     }
@@ -84,10 +103,14 @@ export function createGetWorkersHandler(deps: RouteDependencies) {
       handle: w.handle,
       teamName: w.teamName,
       state: w.state,
+      health: w.health,
       workingDir: w.workingDir,
       sessionId: w.sessionId,
       spawnedAt: w.spawnedAt,
       currentTaskId: w.currentTaskId,
+      restartCount: w.restartCount,
+      swarmId: w.swarmId ?? null,
+      depthLevel: w.depthLevel ?? 1,
     }));
     res.json(workers);
   };
@@ -108,6 +131,53 @@ export function createGetWorkerOutputHandler(deps: RouteDependencies) {
       state: worker.state,
       output: worker.recentOutput,
     });
+  };
+}
+
+// ============================================================================
+// EXTERNAL WORKER HANDLERS
+// ============================================================================
+
+export function createRegisterExternalWorkerHandler(deps: RouteDependencies, broadcastToAll: BroadcastToAll) {
+  return asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { handle, teamName, workingDir, swarmId } = req.body;
+
+    if (!handle || typeof handle !== 'string') {
+      res.status(400).json({ error: 'handle is required' } as ErrorResponse);
+      return;
+    }
+
+    try {
+      const worker = deps.workerManager.registerExternalWorker(
+        handle,
+        teamName ?? 'compound-team',
+        workingDir ?? process.cwd(),
+        swarmId,
+      );
+      broadcastToAll({ type: 'worker_spawned', worker });
+      res.json(worker);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message } as ErrorResponse);
+    }
+  });
+}
+
+export function createInjectWorkerOutputHandler(deps: RouteDependencies) {
+  return (req: Request, res: Response): void => {
+    const { handle } = req.params;
+    const { event, events } = req.body;
+
+    // Support both single event and batch
+    const eventList = events ?? (event ? [event] : []);
+    if (eventList.length === 0) {
+      res.status(400).json({ error: 'event or events is required' } as ErrorResponse);
+      return;
+    }
+
+    for (const evt of eventList) {
+      deps.workerManager.injectWorkerOutput(handle, evt);
+    }
+    res.json({ success: true, count: eventList.length });
   };
 }
 

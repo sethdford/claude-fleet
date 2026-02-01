@@ -399,13 +399,11 @@ describe('NotificationService', () => {
 });
 
 describe('ConfigLoader', () => {
-  let loadConfig: typeof import('../src/scheduler/config-loader.js').loadConfig;
   let validateConfig: typeof import('../src/scheduler/config-loader.js').validateConfig;
 
   beforeEach(async () => {
     vi.resetModules();
     const module = await import('../src/scheduler/config-loader.js');
-    loadConfig = module.loadConfig;
     validateConfig = module.validateConfig;
   });
 

@@ -12,6 +12,8 @@ import type {
   BlackboardMessageType,
   MessagePriority,
 } from '../types.js';
+import { createMessageBus } from '../workers/message-bus.js';
+import type { MessageBus } from '../workers/message-bus.js';
 
 // ============================================================================
 // INTERFACES
@@ -63,9 +65,11 @@ interface BlackboardRow {
 
 export class BlackboardStorage {
   private storage: SQLiteStorage;
+  private bus: MessageBus;
 
   constructor(storage: SQLiteStorage) {
     this.storage = storage;
+    this.bus = createMessageBus();
   }
 
   /**
@@ -99,6 +103,11 @@ export class BlackboardStorage {
       '[]',
       now
     );
+
+    // Write-through to in-memory ring bus for fast reads
+    const priorityNum = priority === 'critical' ? 3 : priority === 'high' ? 2 : priority === 'normal' ? 1 : 0;
+    const busTopic = `bb:${swarmId}:${messageType}`;
+    this.bus.publish(busTopic, senderHandle, priorityNum, JSON.stringify(payload));
 
     return {
       id,

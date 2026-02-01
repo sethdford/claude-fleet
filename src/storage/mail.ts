@@ -7,12 +7,33 @@
 
 import type { SQLiteStorage } from './sqlite.js';
 import type { MailMessage, Handoff, SendMailOptions } from '../types.js';
+import { InboxBridge } from '../workers/inbox-bridge.js';
 
 export class MailStorage {
   private storage: SQLiteStorage;
+  private inboxBridge: InboxBridge | null = null;
+  private defaultTeamName = 'default';
 
   constructor(storage: SQLiteStorage) {
     this.storage = storage;
+  }
+
+  /**
+   * Enable dual-write to native file-based inbox.
+   * When set, all sends also write to ~/.claude/teams/{team}/messages/.
+   */
+  enableNativeInbox(teamName?: string): void {
+    this.inboxBridge = new InboxBridge();
+    if (teamName) {
+      this.defaultTeamName = teamName;
+    }
+  }
+
+  /**
+   * Set the default team name for dual-write operations.
+   */
+  setDefaultTeamName(teamName: string): void {
+    this.defaultTeamName = teamName;
   }
 
   // ============================================================================
@@ -20,7 +41,8 @@ export class MailStorage {
   // ============================================================================
 
   /**
-   * Send a mail message
+   * Send a mail message.
+   * Also writes to the native file-based inbox if enabled.
    */
   send(
     fromHandle: string,
@@ -28,7 +50,7 @@ export class MailStorage {
     body: string,
     options: SendMailOptions = {}
   ): number {
-    return this.storage.insertMail({
+    const result = this.storage.insertMail({
       fromHandle,
       toHandle,
       subject: options.subject ?? null,
@@ -36,6 +58,14 @@ export class MailStorage {
       readAt: null,
       createdAt: Math.floor(Date.now() / 1000),
     });
+
+    // Dual-write to native inbox
+    if (this.inboxBridge) {
+      const text = options.subject ? `**${options.subject}**\n\n${body}` : body;
+      this.inboxBridge.send(this.defaultTeamName, toHandle, fromHandle, text);
+    }
+
+    return result;
   }
 
   /**

@@ -45,6 +45,8 @@ export {
   createSendToWorkerHandler,
   createGetWorkersHandler,
   createGetWorkerOutputHandler,
+  createRegisterExternalWorkerHandler,
+  createInjectWorkerOutputHandler,
   createWorktreeCommitHandler,
   createWorktreePushHandler,
   createWorktreePRHandler,
@@ -219,3 +221,26 @@ export {
 export {
   createCompoundSnapshotHandler,
 } from './compound.js';
+
+// Search routes (Tantivy native / SQLite FTS5 fallback)
+export {
+  createSearchHandler,
+  createSearchIndexHandler,
+  createSearchDeleteHandler,
+  createSearchStatsHandler,
+} from './search.js';
+
+// LMSH routes (natural language → shell translation)
+export {
+  createLmshTranslateHandler,
+  createLmshGetAliasesHandler,
+  createLmshAddAliasHandler,
+} from './lmsh.js';
+
+// DAG routes (task dependency solver)
+export {
+  createDagSortHandler,
+  createDagCyclesHandler,
+  createDagCriticalPathHandler,
+  createDagReadyHandler,
+} from './dag.js';

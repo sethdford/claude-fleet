@@ -33,7 +33,8 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-SERVER_URL="${CLAUDE_FLEET_URL:-http://localhost:3847}"
+PORT=${PORT:-4797}
+SERVER_URL="${CLAUDE_FLEET_URL:-http://localhost:$PORT}"
 SERVER_PID=""
 DB_PATH="/tmp/e2e-crash-recovery-fleet.db"
 
@@ -79,7 +80,15 @@ wait_for_server() {
 
 start_server() {
   # Use append mode to keep logs from before crash for debugging
-  DB_PATH="$DB_PATH" PORT=3847 node "$PROJECT_ROOT/dist/index.js" >> /tmp/e2e-crash-server.log 2>&1 &
+  # Kill any stale process on our port
+  STALE_PID=$(lsof -ti :$PORT 2>/dev/null) || true
+  if [[ -n "$STALE_PID" ]]; then
+    echo "[E2E] Killing stale process $STALE_PID on port $PORT"
+    kill "$STALE_PID" 2>/dev/null || true
+    sleep 1
+  fi
+
+  DB_PATH="$DB_PATH" PORT=$PORT node "$PROJECT_ROOT/dist/index.js" >> /tmp/e2e-crash-server.log 2>&1 &
   SERVER_PID=$!
   wait_for_server
 }

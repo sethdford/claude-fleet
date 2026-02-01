@@ -53,6 +53,7 @@ export class SQLiteStorage implements TeamStorage {
     getTask: Database.Statement;
     getTasksByTeam: Database.Statement;
     updateTaskStatus: Database.Statement;
+    updateTaskAssignment: Database.Statement;
     // Workers (Phase 1)
     insertWorker: Database.Statement;
     getWorker: Database.Statement;
@@ -105,6 +106,18 @@ export class SQLiteStorage implements TeamStorage {
     getUserTemplates: Database.Statement;
     updateTemplate: Database.Statement;
     deleteTemplate: Database.Statement;
+    // Routing History (Phase 4)
+    insertRoutingHistory: Database.Statement;
+    getRoutingHistory: Database.Statement;
+    getRoutingHistoryByComplexity: Database.Statement;
+    // Agent Memory (Phase 5)
+    insertAgentMemory: Database.Statement;
+    getAgentMemory: Database.Statement;
+    getAgentMemoriesByAgent: Database.Statement;
+    getAgentMemoryByKey: Database.Statement;
+    updateAgentMemoryAccess: Database.Statement;
+    updateAgentMemoryRelevance: Database.Statement;
+    deleteAgentMemory: Database.Statement;
   };
 
   constructor(dbPath: string) {
@@ -129,6 +142,54 @@ export class SQLiteStorage implements TeamStorage {
       this.db.exec('ALTER TABLE workers ADD COLUMN pane_id TEXT');
     } catch {
       // Column already exists, ignore
+    }
+
+    // Routing history table (Phase 4: Intelligent Task Router)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS routing_history (
+        id TEXT PRIMARY KEY,
+        task_id TEXT,
+        complexity TEXT NOT NULL,
+        strategy TEXT NOT NULL,
+        model TEXT NOT NULL,
+        outcome TEXT,
+        duration_ms INTEGER,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_routing_history_task ON routing_history(task_id);
+      CREATE INDEX IF NOT EXISTS idx_routing_history_complexity ON routing_history(complexity);
+    `);
+
+    // Agent memory tables (Phase 5: Persistent Memory)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS agent_memory_content (
+        id TEXT PRIMARY KEY,
+        agent_id TEXT NOT NULL,
+        key TEXT NOT NULL,
+        value TEXT NOT NULL,
+        tags TEXT,
+        memory_type TEXT NOT NULL DEFAULT 'fact',
+        relevance REAL DEFAULT 1.0,
+        access_count INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        last_accessed TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_agent_memory_agent ON agent_memory_content(agent_id);
+      CREATE INDEX IF NOT EXISTS idx_agent_memory_type ON agent_memory_content(memory_type);
+      CREATE INDEX IF NOT EXISTS idx_agent_memory_key ON agent_memory_content(key);
+    `);
+
+    // FTS5 virtual table for full-text search across agent memories
+    // Standalone FTS5 table (not content-synced) for simplicity
+    try {
+      this.db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS agent_memory_fts USING fts5(
+          memory_id, agent_id, key, value, tags, memory_type
+        );
+      `);
+    } catch {
+      // FTS5 may not be available in all SQLite builds
+      console.warn('[STORAGE] FTS5 not available — agent memory search will use LIKE fallback');
     }
   }
 
@@ -674,6 +735,9 @@ export class SQLiteStorage implements TeamStorage {
         'SELECT * FROM tasks WHERE team_name = ? ORDER BY created_at DESC'
       ),
       updateTaskStatus: this.db.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?'),
+      updateTaskAssignment: this.db.prepare(
+        'UPDATE tasks SET owner_handle = ?, blocked_by = ?, status = ?, updated_at = ? WHERE id = ?'
+      ),
 
       // Workers (Phase 1)
       insertWorker: this.db.prepare(`
@@ -777,6 +841,38 @@ export class SQLiteStorage implements TeamStorage {
         WHERE id = ? AND is_builtin = 0
       `),
       deleteTemplate: this.db.prepare('DELETE FROM swarm_templates WHERE id = ? AND is_builtin = 0'),
+
+      // Routing History (Phase 4)
+      insertRoutingHistory: this.db.prepare(`
+        INSERT INTO routing_history (id, task_id, complexity, strategy, model, outcome, duration_ms, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `),
+      getRoutingHistory: this.db.prepare(
+        'SELECT * FROM routing_history WHERE task_id = ? ORDER BY created_at DESC'
+      ),
+      getRoutingHistoryByComplexity: this.db.prepare(
+        'SELECT * FROM routing_history WHERE complexity = ? ORDER BY created_at DESC LIMIT ?'
+      ),
+
+      // Agent Memory (Phase 5)
+      insertAgentMemory: this.db.prepare(`
+        INSERT INTO agent_memory_content (id, agent_id, key, value, tags, memory_type, relevance, access_count, created_at, last_accessed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `),
+      getAgentMemory: this.db.prepare('SELECT * FROM agent_memory_content WHERE id = ?'),
+      getAgentMemoriesByAgent: this.db.prepare(
+        'SELECT * FROM agent_memory_content WHERE agent_id = ? ORDER BY relevance DESC, last_accessed DESC LIMIT ?'
+      ),
+      getAgentMemoryByKey: this.db.prepare(
+        'SELECT * FROM agent_memory_content WHERE agent_id = ? AND key = ?'
+      ),
+      updateAgentMemoryAccess: this.db.prepare(
+        'UPDATE agent_memory_content SET access_count = access_count + 1, last_accessed = ? WHERE id = ?'
+      ),
+      updateAgentMemoryRelevance: this.db.prepare(
+        'UPDATE agent_memory_content SET relevance = ? WHERE id = ?'
+      ),
+      deleteAgentMemory: this.db.prepare('DELETE FROM agent_memory_content WHERE id = ?'),
     };
   }
 
@@ -1073,6 +1169,22 @@ export class SQLiteStorage implements TeamStorage {
 
   updateTaskStatus(taskId: string, status: TaskStatus, updatedAt: string): void {
     this.stmts.updateTaskStatus.run(status, updatedAt, taskId);
+  }
+
+  updateTaskAssignment(
+    taskId: string,
+    ownerHandle: string | null,
+    blockedBy: string[],
+    status: TaskStatus,
+    updatedAt: string
+  ): void {
+    this.stmts.updateTaskAssignment.run(
+      ownerHandle,
+      JSON.stringify(blockedBy),
+      status,
+      updatedAt,
+      taskId
+    );
   }
 
   // ============================================================================
@@ -1910,6 +2022,264 @@ export class SQLiteStorage implements TeamStorage {
         updatedAt: t.updated_at,
       })),
     };
+  }
+
+  // ============================================================================
+  // Routing History (Phase 4)
+  // ============================================================================
+
+  insertRoutingHistory(entry: {
+    id: string;
+    taskId: string | null;
+    complexity: string;
+    strategy: string;
+    model: string;
+    outcome: string | null;
+    durationMs: number | null;
+    createdAt: string;
+  }): void {
+    this.stmts.insertRoutingHistory.run(
+      entry.id, entry.taskId, entry.complexity,
+      entry.strategy, entry.model, entry.outcome,
+      entry.durationMs, entry.createdAt
+    );
+  }
+
+  getRoutingHistoryByTask(taskId: string): Array<{
+    id: string;
+    task_id: string;
+    complexity: string;
+    strategy: string;
+    model: string;
+    outcome: string | null;
+    duration_ms: number | null;
+    created_at: string;
+  }> {
+    return this.stmts.getRoutingHistory.all(taskId) as Array<{
+      id: string;
+      task_id: string;
+      complexity: string;
+      strategy: string;
+      model: string;
+      outcome: string | null;
+      duration_ms: number | null;
+      created_at: string;
+    }>;
+  }
+
+  getRoutingHistoryByComplexity(complexity: string, limit = 50): Array<{
+    id: string;
+    task_id: string;
+    complexity: string;
+    strategy: string;
+    model: string;
+    outcome: string | null;
+    duration_ms: number | null;
+    created_at: string;
+  }> {
+    return this.stmts.getRoutingHistoryByComplexity.all(complexity, limit) as Array<{
+      id: string;
+      task_id: string;
+      complexity: string;
+      strategy: string;
+      model: string;
+      outcome: string | null;
+      duration_ms: number | null;
+      created_at: string;
+    }>;
+  }
+
+  // ============================================================================
+  // Agent Memory (Phase 5)
+  // ============================================================================
+
+  insertAgentMemory(memory: {
+    id: string;
+    agentId: string;
+    key: string;
+    value: string;
+    tags: string | null;
+    memoryType: string;
+    relevance: number;
+    accessCount: number;
+    createdAt: string;
+    lastAccessed: string;
+  }): void {
+    this.stmts.insertAgentMemory.run(
+      memory.id, memory.agentId, memory.key, memory.value,
+      memory.tags, memory.memoryType, memory.relevance,
+      memory.accessCount, memory.createdAt, memory.lastAccessed
+    );
+
+    // Sync to FTS5 index
+    try {
+      this.db.exec(`
+        INSERT INTO agent_memory_fts (memory_id, agent_id, key, value, tags, memory_type)
+        VALUES ('${memory.id.replace(/'/g, "''")}', '${memory.agentId.replace(/'/g, "''")}',
+                '${memory.key.replace(/'/g, "''")}', '${memory.value.replace(/'/g, "''")}',
+                '${(memory.tags ?? '').replace(/'/g, "''")}', '${memory.memoryType.replace(/'/g, "''")}')
+      `);
+    } catch {
+      // FTS5 not available, skip
+    }
+  }
+
+  getAgentMemory(memoryId: string): {
+    id: string;
+    agent_id: string;
+    key: string;
+    value: string;
+    tags: string | null;
+    memory_type: string;
+    relevance: number;
+    access_count: number;
+    created_at: string;
+    last_accessed: string;
+  } | undefined {
+    return this.stmts.getAgentMemory.get(memoryId) as {
+      id: string;
+      agent_id: string;
+      key: string;
+      value: string;
+      tags: string | null;
+      memory_type: string;
+      relevance: number;
+      access_count: number;
+      created_at: string;
+      last_accessed: string;
+    } | undefined;
+  }
+
+  getAgentMemoriesByAgent(agentId: string, limit = 50): Array<{
+    id: string;
+    agent_id: string;
+    key: string;
+    value: string;
+    tags: string | null;
+    memory_type: string;
+    relevance: number;
+    access_count: number;
+    created_at: string;
+    last_accessed: string;
+  }> {
+    return this.stmts.getAgentMemoriesByAgent.all(agentId, limit) as Array<{
+      id: string;
+      agent_id: string;
+      key: string;
+      value: string;
+      tags: string | null;
+      memory_type: string;
+      relevance: number;
+      access_count: number;
+      created_at: string;
+      last_accessed: string;
+    }>;
+  }
+
+  getAgentMemoryByKey(agentId: string, key: string): {
+    id: string;
+    agent_id: string;
+    key: string;
+    value: string;
+    tags: string | null;
+    memory_type: string;
+    relevance: number;
+    access_count: number;
+    created_at: string;
+    last_accessed: string;
+  } | undefined {
+    return this.stmts.getAgentMemoryByKey.get(agentId, key) as {
+      id: string;
+      agent_id: string;
+      key: string;
+      value: string;
+      tags: string | null;
+      memory_type: string;
+      relevance: number;
+      access_count: number;
+      created_at: string;
+      last_accessed: string;
+    } | undefined;
+  }
+
+  updateAgentMemoryAccess(memoryId: string): void {
+    this.stmts.updateAgentMemoryAccess.run(new Date().toISOString(), memoryId);
+  }
+
+  updateAgentMemoryRelevance(memoryId: string, relevance: number): void {
+    this.stmts.updateAgentMemoryRelevance.run(relevance, memoryId);
+  }
+
+  deleteAgentMemory(memoryId: string): void {
+    // Remove from FTS5 first
+    try {
+      this.db.exec(`
+        DELETE FROM agent_memory_fts WHERE memory_id = '${memoryId.replace(/'/g, "''")}'
+      `);
+    } catch {
+      // FTS5 not available
+    }
+    this.stmts.deleteAgentMemory.run(memoryId);
+  }
+
+  /**
+   * Full-text search across agent memories using FTS5.
+   * Falls back to LIKE query if FTS5 is not available.
+   */
+  searchAgentMemory(agentId: string, query: string, limit = 20): Array<{
+    id: string;
+    agent_id: string;
+    key: string;
+    value: string;
+    tags: string | null;
+    memory_type: string;
+    relevance: number;
+    access_count: number;
+    created_at: string;
+    last_accessed: string;
+  }> {
+    try {
+      // Try FTS5 search first
+      return this.db.prepare(`
+        SELECT c.*
+        FROM agent_memory_fts f
+        JOIN agent_memory_content c ON f.memory_id = c.id
+        WHERE agent_memory_fts MATCH ? AND c.agent_id = ?
+        ORDER BY rank
+        LIMIT ?
+      `).all(query, agentId, limit) as Array<{
+        id: string;
+        agent_id: string;
+        key: string;
+        value: string;
+        tags: string | null;
+        memory_type: string;
+        relevance: number;
+        access_count: number;
+        created_at: string;
+        last_accessed: string;
+      }>;
+    } catch {
+      // FTS5 not available — fall back to LIKE
+      const likeQuery = `%${query}%`;
+      return this.db.prepare(`
+        SELECT * FROM agent_memory_content
+        WHERE agent_id = ? AND (key LIKE ? OR value LIKE ? OR tags LIKE ?)
+        ORDER BY relevance DESC, last_accessed DESC
+        LIMIT ?
+      `).all(agentId, likeQuery, likeQuery, likeQuery, limit) as Array<{
+        id: string;
+        agent_id: string;
+        key: string;
+        value: string;
+        tags: string | null;
+        memory_type: string;
+        relevance: number;
+        access_count: number;
+        created_at: string;
+        last_accessed: string;
+      }>;
+    }
   }
 
   // ============================================================================

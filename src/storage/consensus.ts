@@ -16,6 +16,8 @@ import type {
   VotingMethod,
   ProposalStatus,
 } from '../types.js';
+import { createSwarmAccelerator } from '../workers/swarm-accelerator.js';
+import type { SwarmAccelerator } from '../workers/swarm-accelerator.js';
 
 // ============================================================================
 // INTERFACES
@@ -89,9 +91,11 @@ interface VoteRow {
 
 export class ConsensusStorage {
   private storage: SQLiteStorage;
+  private accelerator: SwarmAccelerator;
 
   constructor(storage: SQLiteStorage) {
     this.storage = storage;
+    this.accelerator = createSwarmAccelerator();
   }
 
   // ============================================================================
@@ -323,87 +327,49 @@ export class ConsensusStorage {
   }
 
   /**
-   * Calculate result based on voting method
+   * Calculate result based on voting method.
+   * Delegates computation to native Rust accelerator when available.
    */
   private calculateResult(proposal: ConsensusProposal, votes: ConsensusVote[]): ConsensusResult {
-    // Count votes (weighted)
+    // Delegate tallying to native accelerator
+    const voteInput = votes.map((v) => ({
+      voterHandle: v.voterHandle,
+      voteValue: v.voteValue,
+      voteWeight: v.voteWeight,
+    }));
+
+    const nativeResult = this.accelerator.tallyVotes(
+      voteInput,
+      proposal.options,
+      proposal.votingMethod,
+      proposal.quorumValue
+    );
+
+    // Convert tally array back to record
     const tally: Record<string, number> = {};
-    for (const option of proposal.options) {
-      tally[option] = 0;
+    for (const entry of nativeResult.tally) {
+      tally[entry.option] = entry.count;
     }
 
-    let totalWeight = 0;
-    for (const vote of votes) {
-      if (proposal.votingMethod === 'ranked') {
-        // Ranked choice: parse rankings and apply Borda count
-        try {
-          const rankings = JSON.parse(vote.voteValue) as string[];
-          const weight = vote.voteWeight;
-          for (let i = 0; i < rankings.length; i++) {
-            const points = (rankings.length - i) * weight;
-            tally[rankings[i]] = (tally[rankings[i]] ?? 0) + points;
-          }
-          totalWeight += weight;
-        } catch {
-          // Skip invalid ranked votes
-        }
-      } else {
-        tally[vote.voteValue] = (tally[vote.voteValue] ?? 0) + vote.voteWeight;
-        totalWeight += vote.voteWeight;
-      }
-    }
-
-    // Find winner
-    let winner: string | null = null;
-    let maxVotes = 0;
-    for (const [option, count] of Object.entries(tally)) {
-      if (count > maxVotes) {
-        maxVotes = count;
-        winner = option;
-      }
-    }
-
-    // Check quorum
-    let quorumMet = false;
-    const participationRate = votes.length > 0 ? votes.length / (totalWeight || 1) : 0;
+    // Apply quorum type checks (native only does voting method thresholds)
+    let quorumMet = nativeResult.quorumMet;
+    const participationRate = votes.length > 0 ? votes.length / (nativeResult.weightedTotal || 1) : 0;
 
     if (proposal.quorumType === 'none') {
-      quorumMet = votes.length > 0;
+      quorumMet = votes.length > 0 && nativeResult.quorumMet;
     } else if (proposal.quorumType === 'absolute') {
-      quorumMet = votes.length >= proposal.quorumValue;
+      quorumMet = votes.length >= proposal.quorumValue && nativeResult.quorumMet;
     } else {
-      // percentage - would need total eligible voters
-      // For now, assume quorum met if we have any votes
-      quorumMet = participationRate >= proposal.quorumValue || votes.length >= 2;
-    }
-
-    // Check voting method thresholds
-    if (quorumMet && totalWeight > 0) {
-      const winnerRatio = maxVotes / totalWeight;
-
-      switch (proposal.votingMethod) {
-        case 'supermajority':
-          quorumMet = winnerRatio >= 0.667;
-          break;
-        case 'unanimous':
-          quorumMet = winnerRatio >= 1.0;
-          break;
-        case 'majority':
-        case 'ranked':
-        case 'weighted':
-        default:
-          quorumMet = winnerRatio > 0.5 || Object.keys(tally).length <= 2;
-          break;
-      }
+      quorumMet = (participationRate >= proposal.quorumValue || votes.length >= 2) && nativeResult.quorumMet;
     }
 
     return {
-      winner: quorumMet ? winner : null,
+      winner: quorumMet ? nativeResult.winner : null,
       tally,
       quorumMet,
       participationRate,
       totalVotes: votes.length,
-      weightedVotes: totalWeight,
+      weightedVotes: nativeResult.weightedTotal,
     };
   }
 

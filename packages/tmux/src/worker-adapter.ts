@@ -228,7 +228,7 @@ If you encounter issues, describe them clearly so they can be resolved.`;
         // Update health based on heartbeat
         this.updateWorkerHealth(worker);
 
-      } catch (_error) {
+      } catch {
         // Pane might have been killed
         const worker = this.workers.get(handle);
         if (worker) {
@@ -467,7 +467,7 @@ Please work on this task. When complete, say "TASK COMPLETE".`;
   /**
    * Wait for worker to become idle
    */
-  async waitForIdle(handle: string, options?: { timeout?: number; stableTime?: number }): Promise<boolean> {
+  async waitForIdle(handle: string, options?: { timeout?: number; stableTime?: number }): Promise<{ idle: boolean; content: string; duration: number }> {
     return this.tmuxManager.waitForWorkerIdle(handle, options);
   }
 

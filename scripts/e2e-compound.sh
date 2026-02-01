@@ -8,7 +8,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-SERVER_URL="${CLAUDE_FLEET_URL:-http://localhost:3849}"
+PORT=${PORT:-4799}
+SERVER_URL="${CLAUDE_FLEET_URL:-http://localhost:$PORT}"
 SERVER_PID=""
 DB_PATH="/tmp/e2e-compound-fleet.db"
 LOG_FILE="/tmp/e2e-compound-server.log"
@@ -183,7 +184,15 @@ echo ""
 # Step 1: Start server
 echo "[E2E] Starting server with fresh database..."
 rm -f "$DB_PATH" "$DB_PATH-shm" "$DB_PATH-wal"
-DB_PATH="$DB_PATH" PORT=3849 node "$PROJECT_ROOT/dist/index.js" > "$LOG_FILE" 2>&1 &
+# Kill any stale process on our port
+STALE_PID=$(lsof -ti :$PORT 2>/dev/null) || true
+if [[ -n "$STALE_PID" ]]; then
+  echo "[E2E] Killing stale process $STALE_PID on port $PORT"
+  kill "$STALE_PID" 2>/dev/null || true
+  sleep 1
+fi
+
+DB_PATH="$DB_PATH" PORT=$PORT node "$PROJECT_ROOT/dist/index.js" > "$LOG_FILE" 2>&1 &
 SERVER_PID=$!
 wait_for_server
 

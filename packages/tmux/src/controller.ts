@@ -16,6 +16,8 @@ import type {
   CaptureOptions,
   ExecuteResult,
   WaitOptions,
+  WaitIdleResult,
+  CaptureProgressiveOptions,
 } from './types.js';
 
 export class TmuxController {
@@ -502,8 +504,8 @@ export class TmuxController {
 
       // Content unchanged - Enter may not have been received
       if (attempt < maxRetries - 1) {
-        // Wait before retry (exponential backoff)
-        await this.sleep(500 * (attempt + 1));
+        // Wait before retry (exponential backoff: 300ms, 600ms, 1200ms, ...)
+        await this.sleep(300 * Math.pow(2, attempt));
       }
     }
   }
@@ -746,27 +748,32 @@ export class TmuxController {
 
   /**
    * Wait for pane output to stop changing (idle detection)
+   *
+   * Returns a WaitIdleResult with the idle state, final captured content,
+   * and duration spent waiting.
    */
   async waitForIdle(
     target: string,
     options: WaitOptions & { stableTime?: number } = {}
-  ): Promise<boolean> {
+  ): Promise<WaitIdleResult> {
     const { timeout = 30000, interval = 200, stableTime = 1000 } = options;
     const resolved = this.resolveTarget(target);
-    const deadline = Date.now() + timeout;
+    const startTime = Date.now();
+    const deadline = startTime + timeout;
 
     let lastHash = '';
     let stableSince = 0;
+    let lastContent = '';
 
     while (Date.now() < deadline) {
-      const captured = this.capture(resolved);
-      const currentHash = this.hash(captured);
+      lastContent = this.capture(resolved);
+      const currentHash = this.hash(lastContent);
 
       if (currentHash === lastHash) {
         if (stableSince === 0) {
           stableSince = Date.now();
         } else if (Date.now() - stableSince >= stableTime) {
-          return true;
+          return { idle: true, content: lastContent, duration: Date.now() - startTime };
         }
       } else {
         lastHash = currentHash;
@@ -776,7 +783,7 @@ export class TmuxController {
       await this.sleep(interval);
     }
 
-    return false;
+    return { idle: false, content: lastContent, duration: Date.now() - startTime };
   }
 
   // ============ Pane Control ============
@@ -814,6 +821,52 @@ export class TmuxController {
   setPaneTitle(target: string, title: string): void {
     const resolved = this.resolveTarget(target);
     this.runTmux(['select-pane', '-t', resolved, '-T', title]);
+  }
+
+  // ============ Progressive Capture ============
+
+  /**
+   * Capture pane content with progressive buffer expansion.
+   *
+   * Starts with a small capture and expands if the optional search string
+   * isn't found. Useful for finding output that may have scrolled off the
+   * visible buffer.
+   *
+   * If no searchString is provided, returns the first (smallest) capture.
+   * If searchString is provided, returns the smallest capture that contains it,
+   * or the largest capture if it's never found (within timeout).
+   */
+  async captureProgressive(options: CaptureProgressiveOptions): Promise<{ content: string; found: boolean; lines: number | undefined }> {
+    const { target, searchString, timeout = 30000, interval = 500 } = options;
+    const resolved = this.resolveTarget(target);
+    const deadline = Date.now() + timeout;
+
+    while (Date.now() < deadline) {
+      for (const lines of TmuxController.EXPANSION_LEVELS) {
+        const content = this.capture(resolved, { lines });
+
+        if (!searchString) {
+          // No search needed — return smallest capture
+          return { content, found: true, lines };
+        }
+
+        if (content.includes(searchString)) {
+          return { content, found: true, lines };
+        }
+      }
+
+      // Search string not found at any expansion level — wait and retry
+      if (searchString && Date.now() < deadline) {
+        await this.sleep(interval);
+      } else {
+        break;
+      }
+    }
+
+    // Final attempt with full capture
+    const content = this.capture(resolved, { lines: undefined });
+    const found = searchString ? content.includes(searchString) : true;
+    return { content, found, lines: undefined };
   }
 
   // ============ Utilities ============

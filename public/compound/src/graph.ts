@@ -5,7 +5,6 @@ import type {
   GraphEdge,
   CompoundSnapshot,
   WorkerData,
-  SwarmData,
   NodeStatus,
 } from './types';
 

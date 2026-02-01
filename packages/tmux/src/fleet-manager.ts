@@ -10,6 +10,7 @@ import type {
   FleetPaneMapping,
   CreatePaneOptions,
   ExecuteResult,
+  WaitIdleResult,
 } from './types.js';
 
 export interface FleetWorkerOptions {
@@ -307,7 +308,7 @@ export class FleetTmuxManager {
   async waitForWorkerIdle(
     handle: string,
     options?: { timeout?: number; stableTime?: number }
-  ): Promise<boolean> {
+  ): Promise<WaitIdleResult> {
     const worker = this.workers.get(handle);
     if (!worker) {
       throw new Error(`Worker "${handle}" not found`);

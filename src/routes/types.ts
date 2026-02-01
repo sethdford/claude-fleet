@@ -34,6 +34,8 @@ export interface RouteDependencies {
   startTime: number;
   /** Optional: WebSocket broadcast function for real-time events */
   broadcastToAll?: BroadcastToAll;
+  /** Called when a new team is registered (e.g., via /auth) to start watching its native resources */
+  onTeamRegistered?: (teamName: string) => void;
 }
 
 /**

@@ -7,6 +7,7 @@
  * and swarms without requiring custom CLI patches.
  */
 
+import { fileURLToPath } from 'node:url';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -200,7 +201,7 @@ function formatResponse(data: unknown, isError = false): ToolResponse {
 /**
  * Create the MCP server
  */
-function createServer(): Server {
+export function createServer(): Server {
   const server = new Server(
     {
       name: 'claude-fleet',
@@ -1630,6 +1631,187 @@ function createServer(): Server {
         },
       },
 
+      // ── Compound / Mission Tools ──────────────────────────────────────────
+      {
+        name: 'mission_status',
+        description: 'Get the current mission status, including iteration count, gate pass/fail summary, and overall progress. Use this to check whether gates passed or failed after validation.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            mission_id: { type: 'string', description: 'Mission ID. Falls back to CLAUDE_CODE_MISSION_ID env var.' },
+          },
+        },
+      },
+      {
+        name: 'mission_gates',
+        description: 'List all quality gates configured for the current mission, including their names, types, and pass/fail status from the most recent validation.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            mission_id: { type: 'string', description: 'Mission ID. Falls back to CLAUDE_CODE_MISSION_ID env var.' },
+          },
+        },
+      },
+      {
+        name: 'mission_iterations',
+        description: 'List iteration history for a mission, showing gate results per iteration. Useful for understanding what changed between iterations and tracking progress.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            mission_id: { type: 'string', description: 'Mission ID. Falls back to CLAUDE_CODE_MISSION_ID env var.' },
+            iteration_number: { type: 'number', description: 'Specific iteration number to fetch. Omit for all iterations.' },
+          },
+        },
+      },
+      {
+        name: 'gate_results',
+        description: 'Get detailed gate results from the most recent validation, including raw command output and error details for each gate. Useful for understanding exactly what failed.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            mission_id: { type: 'string', description: 'Mission ID. Falls back to CLAUDE_CODE_MISSION_ID env var.' },
+            gate_name: { type: 'string', description: 'Filter to a specific gate by name (e.g., "typecheck", "lint", "tests").' },
+          },
+        },
+      },
+      {
+        name: 'compound_snapshot',
+        description: 'Get an aggregate snapshot of the entire fleet state: workers, swarms, tasks, beliefs, pheromones, and compound rates. Useful for understanding the big picture.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+
+      // ============================================================================
+      // LMSH (Natural Language → Shell)
+      // ============================================================================
+      {
+        name: 'lmsh_translate',
+        description: 'Translate natural language to a shell command. Returns the command, confidence score, alternatives, and explanation.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            input: { type: 'string', description: 'Natural language description of what you want to do (e.g., "list all files", "show git status")' },
+          },
+          required: ['input'],
+        },
+      },
+
+      // ============================================================================
+      // Search (Full-text search)
+      // ============================================================================
+      {
+        name: 'search_sessions',
+        description: 'Search indexed sessions by text query. Returns matching sessions with relevance scores.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'The search query string' },
+            limit: { type: 'number', description: 'Maximum results to return (default 20)' },
+          },
+          required: ['query'],
+        },
+      },
+
+      // ============================================================================
+      // DAG (Task Dependency Solver)
+      // ============================================================================
+      {
+        name: 'dag_sort',
+        description: 'Topologically sort tasks by dependencies. Returns execution order and parallelizable levels.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            nodes: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  priority: { type: 'number' },
+                  estimatedDuration: { type: 'number' },
+                  dependsOn: { type: 'array', items: { type: 'string' } },
+                },
+                required: ['id'],
+              },
+              description: 'Array of task nodes with optional dependencies',
+            },
+          },
+          required: ['nodes'],
+        },
+      },
+
+      // ============================================================================
+      // Agent Memory (Phase 5)
+      // ============================================================================
+      {
+        name: 'memory_store',
+        description: 'Store a memory (fact, decision, pattern, or error) that persists across sessions',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', description: 'Short identifier for the memory (e.g., "auth-pattern", "db-schema-decision")' },
+            value: { type: 'string', description: 'The memory content to store' },
+            memory_type: {
+              type: 'string',
+              enum: ['fact', 'decision', 'pattern', 'error'],
+              description: 'Type of memory: fact (learned info), decision (choice + rationale), pattern (recurring observation), error (issue + resolution)',
+            },
+            tags: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Tags for categorization and search',
+            },
+          },
+          required: ['key', 'value'],
+        },
+      },
+      {
+        name: 'memory_recall',
+        description: 'Recall a specific memory by key',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', description: 'The memory key to recall' },
+          },
+          required: ['key'],
+        },
+      },
+      {
+        name: 'memory_search',
+        description: 'Search memories using full-text search',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'Search query (supports full-text search)' },
+            memory_type: {
+              type: 'string',
+              enum: ['fact', 'decision', 'pattern', 'error'],
+              description: 'Filter by memory type (optional)',
+            },
+            limit: { type: 'number', description: 'Maximum results (default: 20)' },
+          },
+          required: ['query'],
+        },
+      },
+
+      // ============================================================================
+      // Task Routing (Phase 4)
+      // ============================================================================
+      {
+        name: 'task_route',
+        description: 'Get a routing recommendation for a task: complexity classification, execution strategy, and suggested model',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            subject: { type: 'string', description: 'Task subject/title' },
+            description: { type: 'string', description: 'Task description (optional)' },
+          },
+          required: ['subject'],
+        },
+      },
+
     ],
   }));
 
@@ -3050,6 +3232,182 @@ function createServer(): Server {
           return formatResponse(result);
         }
 
+        // ── Compound / Mission Tools ──────────────────────────────────────
+
+        case 'mission_status': {
+          const missionId = (args as { mission_id?: string }).mission_id
+            ?? process.env.CLAUDE_CODE_MISSION_ID;
+          if (!missionId) {
+            return formatResponse(
+              'Mission ID required. Either pass mission_id or set CLAUDE_CODE_MISSION_ID env var.',
+              true,
+            );
+          }
+          const mission = await callApi('GET', `/missions/${encodeURIComponent(missionId)}`);
+          const status = await callApi('GET', `/missions/${encodeURIComponent(missionId)}/status`);
+          return formatResponse({ mission, status });
+        }
+
+        case 'mission_gates': {
+          const missionId = (args as { mission_id?: string }).mission_id
+            ?? process.env.CLAUDE_CODE_MISSION_ID;
+          if (!missionId) {
+            return formatResponse(
+              'Mission ID required. Either pass mission_id or set CLAUDE_CODE_MISSION_ID env var.',
+              true,
+            );
+          }
+          const gates = await callApi('GET', `/missions/${encodeURIComponent(missionId)}/gates`);
+          return formatResponse(gates);
+        }
+
+        case 'mission_iterations': {
+          const { mission_id, iteration_number } = args as {
+            mission_id?: string;
+            iteration_number?: number;
+          };
+          const missionId = mission_id ?? process.env.CLAUDE_CODE_MISSION_ID;
+          if (!missionId) {
+            return formatResponse(
+              'Mission ID required. Either pass mission_id or set CLAUDE_CODE_MISSION_ID env var.',
+              true,
+            );
+          }
+          if (iteration_number !== undefined) {
+            const iter = await callApi(
+              'GET',
+              `/missions/${encodeURIComponent(missionId)}/iterations/${iteration_number}`,
+            );
+            return formatResponse(iter);
+          }
+          const iterations = await callApi(
+            'GET',
+            `/missions/${encodeURIComponent(missionId)}/iterations`,
+          );
+          return formatResponse(iterations);
+        }
+
+        case 'gate_results': {
+          const { mission_id, gate_name } = args as {
+            mission_id?: string;
+            gate_name?: string;
+          };
+          const missionId = mission_id ?? process.env.CLAUDE_CODE_MISSION_ID;
+          if (!missionId) {
+            return formatResponse(
+              'Mission ID required. Either pass mission_id or set CLAUDE_CODE_MISSION_ID env var.',
+              true,
+            );
+          }
+          // Fetch mission status which includes latest gate results
+          const status = await callApi(
+            'GET',
+            `/missions/${encodeURIComponent(missionId)}/status`,
+          ) as { gateResults?: Array<{ gateId: string; name?: string; status: string; output?: string }> };
+
+          // Also fetch gate definitions for name mapping
+          const gates = await callApi(
+            'GET',
+            `/missions/${encodeURIComponent(missionId)}/gates`,
+          ) as Array<{ id: string; name: string }>;
+
+          const gateNameMap = new Map(
+            (Array.isArray(gates) ? gates : []).map(
+              (g: { id: string; name: string }) => [g.id, g.name],
+            ),
+          );
+
+          // Enrich results with gate names
+          const results = Array.isArray(status?.gateResults) ? status.gateResults : [];
+          const enrichedResults = results.map(r => ({
+            ...r,
+            name: r.name ?? gateNameMap.get(r.gateId) ?? r.gateId,
+          }));
+
+          // Filter by gate name if requested
+          const filtered = gate_name
+            ? enrichedResults.filter(r => r.name === gate_name)
+            : enrichedResults;
+
+          return formatResponse({
+            missionId,
+            gateCount: filtered.length,
+            results: filtered,
+          });
+        }
+
+        case 'compound_snapshot': {
+          const snapshot = await callApi('GET', '/compound/snapshot');
+          return formatResponse(snapshot);
+        }
+
+        case 'lmsh_translate': {
+          const { input } = args as { input: string };
+          const result = await callApi('POST', '/lmsh/translate', { input });
+          return formatResponse(result);
+        }
+
+        case 'search_sessions': {
+          const { query, limit } = args as { query: string; limit?: number };
+          const result = await callApi('POST', '/search', { query, limit });
+          return formatResponse(result);
+        }
+
+        case 'dag_sort': {
+          const { nodes } = args as { nodes: Array<{ id: string; priority?: number; estimatedDuration?: number; dependsOn?: string[] }> };
+          const result = await callApi('POST', '/dag/sort', { nodes });
+          return formatResponse(result);
+        }
+
+        // ============================================================
+        // Agent Memory (Phase 5)
+        // ============================================================
+
+        case 'memory_store': {
+          const memArgs = args as { key: string; value: string; memory_type?: string; tags?: string[] };
+          const agentName = process.env.CLAUDE_CODE_AGENT_NAME ?? 'unknown';
+          const result = await callApi('POST', '/memory/store', {
+            agentId: agentName,
+            key: memArgs.key,
+            value: memArgs.value,
+            memoryType: memArgs.memory_type ?? 'fact',
+            tags: memArgs.tags ?? [],
+          });
+          return formatResponse(result);
+        }
+
+        case 'memory_recall': {
+          const recallArgs = args as { key: string };
+          const recallAgent = process.env.CLAUDE_CODE_AGENT_NAME ?? 'unknown';
+          const recalled = await callApi('GET', `/memory/recall/${recallAgent}/${encodeURIComponent(recallArgs.key)}`);
+          return formatResponse(recalled);
+        }
+
+        case 'memory_search': {
+          const searchArgs = args as { query: string; memory_type?: string; limit?: number };
+          const searchAgent = process.env.CLAUDE_CODE_AGENT_NAME ?? 'unknown';
+          const searchResults = await callApi('POST', '/memory/search', {
+            agentId: searchAgent,
+            query: searchArgs.query,
+            memoryType: searchArgs.memory_type,
+            limit: searchArgs.limit ?? 20,
+          });
+          return formatResponse(searchResults);
+        }
+
+        // ============================================================
+        // Task Routing (Phase 4)
+        // ============================================================
+
+        case 'task_route': {
+          const routeArgs = args as { subject: string; description?: string };
+          const routing = await callApi('POST', '/routing/classify', {
+            subject: routeArgs.subject,
+            description: routeArgs.description,
+          });
+          return formatResponse(routing);
+        }
+
         default:
           return formatResponse(`Unknown tool: ${name}`, true);
       }
@@ -3069,10 +3427,16 @@ async function main(): Promise<void> {
   const server = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('[MCP] Claude Code Collab MCP server running');
+  console.error('[MCP] Claude Fleet MCP server running');
 }
 
-main().catch((error) => {
-  console.error('[MCP] Fatal error:', error);
-  process.exit(1);
-});
+// Only auto-run when executed directly (not when imported for testing)
+const isDirectRun = process.argv[1] === fileURLToPath(import.meta.url)
+  || process.argv[1]?.endsWith('/mcp/server.js');
+
+if (isDirectRun) {
+  main().catch((error) => {
+    console.error('[MCP] Fatal error:', error);
+    process.exit(1);
+  });
+}

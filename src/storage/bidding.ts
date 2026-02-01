@@ -13,6 +13,8 @@ import type {
   BidStatus,
   BidEvaluation,
 } from '../types.js';
+import { createSwarmAccelerator } from '../workers/swarm-accelerator.js';
+import type { SwarmAccelerator } from '../workers/swarm-accelerator.js';
 
 // ============================================================================
 // INTERFACES
@@ -67,9 +69,11 @@ interface BidRow {
 
 export class BiddingStorage {
   private storage: SQLiteStorage;
+  private accelerator: SwarmAccelerator;
 
   constructor(storage: SQLiteStorage) {
     this.storage = storage;
+    this.accelerator = createSwarmAccelerator();
   }
 
   // ============================================================================
@@ -219,8 +223,8 @@ export class BiddingStorage {
   // ============================================================================
 
   /**
-   * Evaluate bids for a task and return scored rankings
-   * Considers bid amount, confidence, and optionally agent reputation
+   * Evaluate bids for a task and return scored rankings.
+   * Uses native Rust accelerator for multi-factor scoring when available.
    */
   evaluateBids(
     taskId: string,
@@ -238,33 +242,28 @@ export class BiddingStorage {
     const bidWeight = options.bidWeight ?? 0.5;
     const preferLower = options.preferLowerBids ?? false;
 
-    // Normalize bid amounts
-    const bidAmounts = bids.map((b) => b.bidAmount);
-    const maxBid = Math.max(...bidAmounts);
-    const minBid = Math.min(...bidAmounts);
-    const bidRange = maxBid - minBid || 1;
+    // Delegate scoring to native accelerator
+    const bidInput = bids.map((bid) => ({
+      id: bid.id,
+      bidderHandle: bid.bidderHandle,
+      bidAmount: bid.bidAmount,
+      confidence: bid.confidence,
+      reputation: agentReputations.get(bid.bidderHandle) ?? 0.5,
+      estimatedDuration: bid.estimatedDuration ?? 0,
+    }));
 
-    const evaluations: BidEvaluation[] = bids.map((bid) => {
-      const reputation = agentReputations.get(bid.bidderHandle) ?? 0.5;
+    const result = this.accelerator.evaluateBids(
+      bidInput,
+      reputationWeight,
+      confidenceWeight,
+      bidWeight,
+      preferLower
+    );
 
-      // Normalize bid (0-1 scale)
-      const normalizedBid = (bid.bidAmount - minBid) / bidRange;
-      const bidScore = preferLower ? (1 - normalizedBid) : normalizedBid;
+    // Map native result back to BidEvaluation format
+    return result.rankedBids.map((scored) => {
+      const score = scored.compositeScore;
 
-      // Calculate weighted score
-      const score =
-        bidScore * bidWeight +
-        bid.confidence * confidenceWeight +
-        reputation * reputationWeight;
-
-      const factors: Record<string, number> = {
-        bidAmount: bid.bidAmount,
-        normalizedBid: bidScore,
-        confidence: bid.confidence,
-        reputation,
-      };
-
-      // Recommendation based on score threshold
       let recommendation: 'accept' | 'consider' | 'reject';
       if (score >= 0.7) {
         recommendation = 'accept';
@@ -274,18 +273,20 @@ export class BiddingStorage {
         recommendation = 'reject';
       }
 
+      const bid = bids.find((b) => b.id === scored.id);
+
       return {
-        bidId: bid.id,
+        bidId: scored.id,
         score,
-        factors,
+        factors: {
+          bidAmount: bid?.bidAmount ?? 0,
+          normalizedBid: scored.bidComponent,
+          confidence: bid?.confidence ?? 0,
+          reputation: scored.reputationComponent,
+        },
         recommendation,
       };
     });
-
-    // Sort by score descending
-    evaluations.sort((a, b) => b.score - a.score);
-
-    return evaluations;
   }
 
   /**

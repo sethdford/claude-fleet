@@ -1,16 +1,21 @@
 # Architecture
 
-Claude Code Collab v2.0 - Enterprise-ready multi-agent orchestration for Claude Code.
+Claude Fleet v2.2 - Enterprise-ready multi-agent orchestration for Claude Code.
 
 ## Overview
 
-Claude Code Collab is a TypeScript server that enables team collaboration, task management, and worker orchestration across multiple Claude Code instances. It provides:
+Claude Fleet is a TypeScript server that enables team collaboration, task management, and worker orchestration across multiple Claude Code instances. It provides:
 
 - **REST API**: Express-based HTTP API for all coordination operations
 - **WebSocket**: Real-time notifications for messages, tasks, and worker events
 - **Worker Orchestration**: Spawn and control Claude Code instances programmatically
-- **MCP Integration**: 25+ tools accessible via Model Context Protocol
-- **Persistent Storage**: SQLite database for durable state
+- **MCP Integration**: 94 tools accessible via Model Context Protocol
+- **Persistent Storage**: SQLite with optional PostgreSQL, DynamoDB, Firestore, S3 backends
+- **Swarm Intelligence**: Pheromone trails, belief consensus, credit auctions, governance
+- **Knowledge & RAG**: FTS5-powered knowledge base with chunked ingestion and recency scoring
+- **Policy & Safety**: Regex-based operation guardrails with block/ask/allow decisions
+- **Session Lineage**: Worker context trim/continue chains with token accounting
+- **Autonomous Ops**: Cron scheduling, webhook triggers, priority queues with retry
 
 ```
                            Architecture Overview
@@ -140,19 +145,21 @@ Persistence layer using better-sqlite3.
 
 Model Context Protocol bridge exposing coordination tools.
 
-**Tool Categories:**
+**Tool Categories (94 tools):**
 
-| Category | Tools | Description |
-|----------|-------|-------------|
-| Team Status | `team_status`, `team_broadcast` | Team health and communication |
-| Tasks | `team_tasks`, `team_assign`, `team_complete` | Task management |
-| Files | `team_claim` | File conflict prevention |
-| Workers | `team_spawn`, `team_dismiss`, `team_workers`, `team_send` | Worker orchestration |
-| Work Items | `workitem_create`, `workitem_update`, `workitem_list` | Structured work tracking |
-| Batches | `batch_create`, `batch_dispatch` | Bundled work distribution |
-| Mail | `mail_send`, `mail_read` | Persistent messaging |
-| Handoffs | `team_handoff` | Context transfer |
-| Worktree | `worktree_commit`, `worktree_push`, `worktree_pr` | Git operations |
+| Category | Count | Tools |
+|----------|-------|-------|
+| Team Management | 11 | `team_status`, `team_broadcast`, `team_tasks`, `team_assign`, `team_complete`, `team_claim`, `team_spawn`, `team_dismiss`, `team_workers`, `team_send`, `team_handoff` |
+| Work Items & Batches | 5 | `workitem_create`, `workitem_update`, `workitem_list`, `batch_create`, `batch_dispatch` |
+| Communication | 6 | `mail_send`, `mail_read`, `blackboard_post`, `blackboard_read`, `blackboard_mark_read`, `blackboard_archive` |
+| Git Integration | 3 | `worktree_commit`, `worktree_push`, `worktree_pr` |
+| Checkpoints | 3 | `checkpoint_create`, `checkpoint_load`, `checkpoint_list` |
+| Swarm Intelligence | 10 | `swarm_create`, `swarm_list`, `swarm_kill`, `swarm_broadcast`, `pheromone_deposit`, `pheromone_query`, `pheromone_hot_resources`, `belief_set`, `belief_get`, `belief_consensus` |
+| Governance & Auctions | 15 | `proposal_create/list/vote/close`, `bid_submit/list/accept/withdraw`, `auction_run`, `payoff_define/calculate`, `credits_transfer/balance/history/leaderboard` |
+| TLDR Summaries | 6 | `tldr_get_summary`, `tldr_store_summary`, `tldr_get_codebase`, `tldr_store_codebase`, `tldr_dependency_graph`, `tldr_stats` |
+| Spawn Management | 3 | `spawn_request`, `spawn_status`, `spawn_cancel` |
+| Templates & Audit | 8 | `template_list/get/run`, `audit_status/output/start/stop/quick` |
+| Workflows & Executions | 11 | `workflow_list/get/start`, `execution_list/get/steps/pause/resume/cancel`, `step_complete/retry` |
 
 **Permission System:**
 - Role-based access control (RBAC)
@@ -308,8 +315,65 @@ Agent A          CollabServer              SQLite            Agents B, C, D
 |----------|--------|-------------|---------------|
 | `/health` | GET | Server health + stats | No |
 | `/metrics` | GET | Prometheus metrics | No |
-| `/metrics/json` | GET | JSON metrics | No |
-| `/debug` | GET | Debug information | No |
+| `/metrics/json` | GET | JSON metrics | Yes |
+| `/debug` | GET | Debug information | Yes (lead) |
+
+### Swarm Intelligence
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/swarms` | POST | Create swarm | Yes (lead) |
+| `/swarms` | GET | List swarms | Yes |
+| `/swarms/:id` | DELETE | Kill swarm | Yes (lead) |
+| `/pheromones` | POST | Deposit pheromone trail | Yes |
+| `/pheromones/query` | POST | Query trails | Yes |
+| `/pheromones/hot` | GET | Hot resources | Yes |
+| `/beliefs` | POST | Set belief | Yes |
+| `/beliefs/:swarmId/:handle` | GET | Get beliefs | Yes |
+| `/beliefs/:swarmId/consensus` | GET | Consensus query | Yes |
+
+### Knowledge & RAG
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/knowledge/ingest` | POST | Ingest document | Yes |
+| `/knowledge/search` | POST | FTS5 search | Yes |
+| `/knowledge/sources` | GET | List sources | Yes |
+
+### Policy & Safety (Phase 8)
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/policies` | POST/GET | Create/list rules | Yes |
+| `/policies/:id` | GET/PATCH/DELETE | Get/update/delete rule | Yes |
+| `/policies/evaluate` | POST | Evaluate operation | Yes |
+| `/policies/violations` | GET | List violations | Yes (lead) |
+| `/policies/stats` | GET | Policy stats | Yes |
+
+### Session Lineage (Phase 8)
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/sessions` | POST | Create session | Yes |
+| `/sessions/:id` | GET | Get session | Yes |
+| `/sessions/worker/:handle` | GET | Worker sessions | Yes |
+| `/sessions/:id/trim` | POST | Trim session | Yes |
+| `/sessions/:id/continue` | POST | Continue session | Yes |
+| `/sessions/:id/lineage` | GET | Full lineage chain | Yes |
+| `/sessions/search` | POST | Search session content | Yes |
+
+### Workflows & Executions
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/workflows` | POST/GET | Create/list workflows | Yes |
+| `/workflows/:id` | GET/PATCH/DELETE | Get/update/delete | Yes |
+| `/workflows/:id/start` | POST | Start execution | Yes |
+| `/executions` | GET | List executions | Yes |
+| `/executions/:id` | GET | Get execution | Yes |
+| `/executions/:id/pause` | POST | Pause execution | Yes |
+| `/executions/:id/resume` | POST | Resume execution | Yes |
+| `/executions/:id/cancel` | POST | Cancel execution | Yes |
 
 ## Types
 
@@ -401,14 +465,14 @@ interface ServerConfig {
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PORT` | Server port | `3847` |
-| `DB_PATH` | SQLite database path | `./collab.db` |
+| `DB_PATH` | SQLite database path | `./fleet.db` |
 | `JWT_SECRET` | JWT signing secret | Auto-generated |
 | `JWT_EXPIRES_IN` | Token expiration | `24h` |
 | `MAX_WORKERS` | Maximum concurrent workers | `5` |
 | `CLAUDE_CODE_TEAM_NAME` | Team identifier | `dev-team` |
 | `CLAUDE_CODE_AGENT_TYPE` | Agent role | `worker` |
 | `CLAUDE_CODE_AGENT_NAME` | Agent display name | - |
-| `COLLAB_SERVER_URL` | Server URL for MCP | `http://localhost:3847` |
+| `CLAUDE_FLEET_URL` | Server URL for MCP | `http://localhost:3847` |
 | `LOG_LEVEL` | Logging verbosity | `info` |
 
 ## Swarm Intelligence Features
@@ -452,7 +516,11 @@ Agents bid for tasks based on capability:
 
 ## See Also
 
-- [README.md](README.md) - Quick start and usage
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment guide
-- [TMUX-AUTOMATION.md](TMUX-AUTOMATION.md) - Tmux integration for worker panes
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Development guidelines
+- [Documentation Index](README.md) - Full documentation overview
+- [README](../README.md) - Quick start and usage
+- [API Reference](api.md) - Complete REST API documentation
+- [DEPLOYMENT](DEPLOYMENT.md) - Production deployment guide
+- [TMUX-AUTOMATION](TMUX-AUTOMATION.md) - Tmux integration for worker panes
+- [NATIVE-INTEGRATION](NATIVE-INTEGRATION.md) - Claude Code native features integration
+- [FEATURE-FLAGS](FEATURE-FLAGS.md) - Environment variables and configuration
+- [CONTRIBUTING](../CONTRIBUTING.md) - Development guidelines

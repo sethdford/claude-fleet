@@ -85,7 +85,7 @@ The loop continues until ALL criteria are met:
 |-----------|---------------|----------------|
 | Code compiles | `npm run typecheck` | No errors |
 | Code is clean | `npm run lint` | No warnings |
-| Tests pass | `npm test` | 311/311 pass |
+| Tests pass | `npm test` | 372/372 pass |
 | Build works | `npm run build` | Compiles |
 | E2E works | `npm run e2e:all` | All pass |
 | No unsafe types | `grep ": any" src/` | No matches |
@@ -124,7 +124,7 @@ The loop continues until ALL criteria are met:
 
 | Suite | Command | Coverage |
 |-------|---------|----------|
-| Unit | `npm test` | 311 tests |
+| Unit | `npm test` | 372 tests |
 | E2E Core | `npm run e2e` | Auth, tasks, chat |
 | E2E Phase 2-3 | `npm run e2e:phase2-3` | Work items, mail |
 | E2E Security | `./scripts/e2e-security.sh` | Auth, RBAC |
@@ -155,7 +155,7 @@ Example output:
 
   Checking TypeScript... ✓ pass
   Checking ESLint...     ✓ pass
-  Running unit tests...  ✓ pass (311 tests)
+  Running unit tests...  ✓ pass (372 tests)
   Checking build...      ✓ pass
 
 ────────────────────────────────────────────────────

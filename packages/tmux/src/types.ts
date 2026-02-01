@@ -86,6 +86,26 @@ export interface WaitOptions {
   interval?: number;
 }
 
+export interface WaitIdleResult {
+  /** Whether the pane reached a stable/idle state */
+  idle: boolean;
+  /** Final captured pane content */
+  content: string;
+  /** Time taken in ms to reach idle (or timeout) */
+  duration: number;
+}
+
+export interface CaptureProgressiveOptions {
+  /** Target pane identifier */
+  target: string;
+  /** Optional string to search for in the captured output */
+  searchString?: string;
+  /** Timeout in ms for the overall operation (default: 30000) */
+  timeout?: number;
+  /** Poll interval in ms between capture attempts (default: 500) */
+  interval?: number;
+}
+
 export interface FleetPaneMapping {
   workerId: string;
   handle: string;

@@ -6,8 +6,7 @@
  * file:line references from compiler/linter output.
  */
 
-import type { GateResult } from '../types.js';
-import type { ProjectType, StructuredFeedback, GateFeedback, GateConfig } from './types.js';
+import type { GateResult, ProjectType, StructuredFeedback, GateFeedback, GateConfig } from './types.js';
 
 const MAX_ERRORS_PER_GATE = 20;
 const RAW_TAIL_LINES = 15;

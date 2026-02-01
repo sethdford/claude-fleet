@@ -293,10 +293,10 @@ export function getCheckCommands(projectType: ProjectType, dir: string): string 
     case 'node': {
       const info = detectNodeProject(dir);
       const commands: string[] = [];
-      if (info.hasTypeScript) commands.push(`npx tsc --noEmit`);
-      if (info.hasEslint) commands.push(`npx eslint src/ --max-warnings 0`);
-      if (info.hasVitest) commands.push(`npx vitest run`);
-      else if (info.hasJest) commands.push(`npx jest`);
+      if (info.hasTypeScript) commands.push('npx tsc --noEmit');
+      if (info.hasEslint) commands.push('npx eslint src/ --max-warnings 0');
+      if (info.hasVitest) commands.push('npx vitest run');
+      else if (info.hasJest) commands.push('npx jest');
       return commands.join('\n');
     }
     case 'rust':

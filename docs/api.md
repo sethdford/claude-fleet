@@ -1,6 +1,6 @@
 # Claude Fleet API Reference
 
-Complete API documentation for Claude Fleet v2.0.
+Complete API documentation for Claude Fleet v2.2.
 
 ## Base URL
 
@@ -582,3 +582,12 @@ Common HTTP status codes:
 - `404` - Not found
 - `429` - Too many requests (rate limited)
 - `500` - Internal server error
+
+---
+
+## See Also
+
+- [Documentation Index](README.md) - Full documentation overview
+- [ARCHITECTURE](ARCHITECTURE.md) - System architecture and components
+- [DEPLOYMENT](DEPLOYMENT.md) - Production deployment guide
+- [FEATURE-FLAGS](FEATURE-FLAGS.md) - Environment variables and configuration
