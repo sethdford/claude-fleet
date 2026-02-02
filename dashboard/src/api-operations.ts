@@ -33,9 +33,7 @@ import type {
   WebhookStatus,
 } from './types';
 
-// ---------------------------------------------------------------------------
 // Workflows CRUD
-// ---------------------------------------------------------------------------
 
 export function createWorkflow(data: { name: string; description?: string; steps?: unknown[] }): Promise<unknown> {
   return request('/workflows', { method: 'POST', body: JSON.stringify(data) });
@@ -57,9 +55,7 @@ export function startWorkflow(id: string): Promise<unknown> {
   return request(`/workflows/${id}/start`, { method: 'POST' });
 }
 
-// ---------------------------------------------------------------------------
 // Workflow Triggers
-// ---------------------------------------------------------------------------
 
 export function createTrigger(workflowId: string, data: { triggerType: string; config?: Record<string, unknown> }): Promise<unknown> {
   return request(`/workflows/${workflowId}/triggers`, { method: 'POST', body: JSON.stringify(data) });
@@ -73,9 +69,7 @@ export function deleteTrigger(triggerId: string): Promise<unknown> {
   return request(`/triggers/${triggerId}`, { method: 'DELETE' });
 }
 
-// ---------------------------------------------------------------------------
 // Workflow Executions
-// ---------------------------------------------------------------------------
 
 export function getExecutions(params?: { workflowId?: string; status?: string; limit?: number }): Promise<ExecutionDetail[]> {
   const qp = new URLSearchParams();
@@ -110,9 +104,7 @@ export function getExecutionEvents(executionId: string): Promise<ExecutionEvent[
   return request(`/executions/${executionId}/events`);
 }
 
-// ---------------------------------------------------------------------------
 // Workflow Steps
-// ---------------------------------------------------------------------------
 
 export function retryStep(stepId: string): Promise<unknown> {
   return request(`/steps/${stepId}/retry`, { method: 'POST' });
@@ -122,9 +114,7 @@ export function completeStep(stepId: string): Promise<unknown> {
   return request(`/steps/${stepId}/complete`, { method: 'POST' });
 }
 
-// ---------------------------------------------------------------------------
 // Checkpoints
-// ---------------------------------------------------------------------------
 
 export function createCheckpoint(handle: string, data?: Record<string, unknown>): Promise<Checkpoint> {
   return request('/checkpoints', { method: 'POST', body: JSON.stringify({ handle, ...data }) });
@@ -150,9 +140,7 @@ export function rejectCheckpoint(id: string): Promise<unknown> {
   return request(`/checkpoints/${id}/reject`, { method: 'POST' });
 }
 
-// ---------------------------------------------------------------------------
 // Handoffs
-// ---------------------------------------------------------------------------
 
 export function createHandoff(data: { fromHandle: string; toHandle: string; reason?: string; data?: Record<string, unknown> }): Promise<Handoff> {
   return request('/handoffs', { method: 'POST', body: JSON.stringify(data) });
@@ -162,9 +150,7 @@ export function getHandoffs(handle: string): Promise<Handoff[]> {
   return request(`/handoffs/${handle}`);
 }
 
-// ---------------------------------------------------------------------------
 // Waves
-// ---------------------------------------------------------------------------
 
 export function createWave(data: { phases: unknown[] }): Promise<Wave> {
   return request('/orchestrate/waves', { method: 'POST', body: JSON.stringify(data) });
@@ -182,9 +168,7 @@ export function cancelWave(id: string): Promise<unknown> {
   return request(`/orchestrate/waves/${id}/cancel`, { method: 'POST' });
 }
 
-// ---------------------------------------------------------------------------
 // Multi-Repo Operations
-// ---------------------------------------------------------------------------
 
 export function startMultiRepo(data: { operation: string; repos: string[] }): Promise<MultiRepoOp> {
   return request('/orchestrate/multi-repo', { method: 'POST', body: JSON.stringify(data) });
@@ -214,9 +198,7 @@ export function multiRepoRunTests(repos: string[]): Promise<MultiRepoOp> {
   return request('/orchestrate/multi-repo/run-tests', { method: 'POST', body: JSON.stringify({ repos }) });
 }
 
-// ---------------------------------------------------------------------------
 // Batches & Work Items
-// ---------------------------------------------------------------------------
 
 export function createBatch(data: { name?: string }): Promise<Batch> {
   return request('/batches', { method: 'POST', body: JSON.stringify(data) });
@@ -255,9 +237,7 @@ export function updateWorkItem(id: string, data: { status?: string }): Promise<W
   return request(`/workitems/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 
-// ---------------------------------------------------------------------------
 // Worktree
-// ---------------------------------------------------------------------------
 
 export function getWorktreeStatus(handle: string): Promise<WorktreeStatus> {
   return request(`/orchestrate/worktree/${handle}/status`);
@@ -275,9 +255,7 @@ export function worktreeCreatePR(handle: string, data: { title: string; body?: s
   return request(`/orchestrate/worktree/${handle}/pr`, { method: 'POST', body: JSON.stringify(data) });
 }
 
-// ---------------------------------------------------------------------------
 // Audit
-// ---------------------------------------------------------------------------
 
 export function getAuditStatus(): Promise<AuditStatus> {
   return request('/audit/status');
@@ -303,9 +281,7 @@ export function quickAudit(): Promise<unknown> {
   return request('/audit/quick', { method: 'POST' });
 }
 
-// ---------------------------------------------------------------------------
 // Search
-// ---------------------------------------------------------------------------
 
 export function search(query: string): Promise<SearchResult[]> {
   return request('/search', { method: 'POST', body: JSON.stringify({ query }) });
@@ -323,9 +299,7 @@ export function deleteSearchSession(sessionId: string): Promise<unknown> {
   return request(`/search/${sessionId}`, { method: 'DELETE' });
 }
 
-// ---------------------------------------------------------------------------
 // DAG
-// ---------------------------------------------------------------------------
 
 export function dagSort(tasks: { id: string; dependencies?: string[] }[]): Promise<DAGSortResult> {
   return request('/dag/sort', { method: 'POST', body: JSON.stringify({ tasks }) });
@@ -343,9 +317,7 @@ export function dagReady(tasks: { id: string; dependencies?: string[]; status?: 
   return request('/dag/ready', { method: 'POST', body: JSON.stringify({ tasks }) });
 }
 
-// ---------------------------------------------------------------------------
 // LMSH
-// ---------------------------------------------------------------------------
 
 export function lmshTranslate(input: string): Promise<LMSHTranslation> {
   return request('/lmsh/translate', { method: 'POST', body: JSON.stringify({ input }) });
@@ -359,9 +331,7 @@ export function lmshCreateAlias(data: { name: string; command: string; descripti
   return request('/lmsh/aliases', { method: 'POST', body: JSON.stringify(data) });
 }
 
-// ---------------------------------------------------------------------------
 // Templates
-// ---------------------------------------------------------------------------
 
 export function getTemplates(params?: { category?: string }): Promise<Template[]> {
   const qp = new URLSearchParams();
@@ -390,9 +360,7 @@ export function executeTemplate(id: string): Promise<unknown> {
   return request(`/workflows/${id}/start`, { method: 'POST' });
 }
 
-// ---------------------------------------------------------------------------
 // Chats
-// ---------------------------------------------------------------------------
 
 export function createChat(participants: string[]): Promise<Chat> {
   return request('/chats', { method: 'POST', body: JSON.stringify({ participants }) });
@@ -414,9 +382,7 @@ export function markChatRead(chatId: string): Promise<unknown> {
   return request(`/chats/${chatId}/read`, { method: 'POST' });
 }
 
-// ---------------------------------------------------------------------------
 // Users
-// ---------------------------------------------------------------------------
 
 export function getUserDetail(uid: string): Promise<unknown> {
   return request(`/users/${uid}`);
@@ -430,9 +396,7 @@ export function getTeamAgents(teamName: string): Promise<unknown[]> {
   return request(`/teams/${teamName}/agents`);
 }
 
-// ---------------------------------------------------------------------------
 // Coordination
-// ---------------------------------------------------------------------------
 
 export function getCoordinationStatus(): Promise<CoordinationStatus> {
   return request('/coordination/status');
@@ -442,9 +406,7 @@ export function getCoordinationHealth(): Promise<CoordinationHealth> {
   return request('/coordination/health');
 }
 
-// ---------------------------------------------------------------------------
 // Webhooks
-// ---------------------------------------------------------------------------
 
 export function getWebhookStatus(): Promise<WebhookStatus> {
   return request('/webhooks/status');
@@ -454,25 +416,19 @@ export function getWebhookHistory(): Promise<WebhookEvent[]> {
   return request('/webhooks/history');
 }
 
-// ---------------------------------------------------------------------------
 // Compound
-// ---------------------------------------------------------------------------
 
 export function getCompoundSnapshot(): Promise<unknown> {
   return request('/compound/snapshot');
 }
 
-// ---------------------------------------------------------------------------
 // Worker extras
-// ---------------------------------------------------------------------------
 
 export function injectWorkerOutput(handle: string, output: unknown): Promise<unknown> {
   return request(`/orchestrate/workers/${handle}/output`, { method: 'POST', body: JSON.stringify({ output }) });
 }
 
-// ---------------------------------------------------------------------------
 // Scheduler (extended)
-// ---------------------------------------------------------------------------
 
 export function createSchedule(data: { name: string; cron: string; repository?: string; tasks?: unknown[] }): Promise<unknown> {
   return request('/scheduler/schedules', { method: 'POST', body: JSON.stringify(data) });
@@ -498,9 +454,7 @@ export function disableNotifications(): Promise<unknown> {
   return request('/scheduler/notifications/disable', { method: 'POST' });
 }
 
-// ---------------------------------------------------------------------------
 // Blackboard archive
-// ---------------------------------------------------------------------------
 
 export function archiveBlackboard(swarmId: string): Promise<unknown> {
   return request(`/swarm-intelligence/${swarmId}/blackboard/archive`, { method: 'POST' });

@@ -4,7 +4,30 @@
  * Extracted from worker.ts to keep files under 500 lines.
  */
 
-import type { Terminal } from '@xterm/xterm';
+import type { Terminal, ITheme } from '@xterm/xterm';
+
+/** Shared xterm.js theme for worker terminals */
+export const TERMINAL_THEME: ITheme = {
+  background: '#0d1117',
+  foreground: '#c9d1d9',
+  cursor: '#58a6ff',
+  black: '#0d1117',
+  red: '#f85149',
+  green: '#3fb950',
+  yellow: '#d29922',
+  blue: '#58a6ff',
+  magenta: '#a371f7',
+  cyan: '#39c5cf',
+  white: '#c9d1d9',
+  brightBlack: '#6e7681',
+  brightRed: '#f85149',
+  brightGreen: '#3fb950',
+  brightYellow: '#d29922',
+  brightBlue: '#58a6ff',
+  brightMagenta: '#a371f7',
+  brightCyan: '#39c5cf',
+  brightWhite: '#ffffff',
+};
 
 interface ContentBlock {
   type: string;

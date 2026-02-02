@@ -234,6 +234,13 @@ export async function renderSwarm(container: HTMLElement, swarmId: string): Prom
     }
   });
 
+  // Spawn button in queue panel — uses delegation since panel re-renders
+  container.addEventListener('click', (e: MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.request-spawn-btn')) {
+      window.fleetDashboard?.showSpawnModal();
+    }
+  });
+
   // Subscribe to worker updates to refresh graph
   unsubWorkers = store.subscribe('workers', (workers: unknown) => {
     const updated = ((workers as WorkerData[] | undefined) || []).filter((w: WorkerData) => w.swarmId === swarmId);

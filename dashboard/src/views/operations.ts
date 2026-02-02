@@ -9,7 +9,7 @@ import toast from '@/components/toast';
 import { escapeHtml } from '@/utils/escape-html';
 import store from '@/store';
 import {
-  getWaves, cancelWave,
+  createWave, getWaves, cancelWave,
   getMultiRepoOps,
   multiRepoUpdateDeps, multiRepoSecurityAudit, multiRepoFormatCode, multiRepoRunTests,
   createBatch, getBatches, dispatchBatch, createWorkItem, getWorkItems,
@@ -201,6 +201,16 @@ export async function renderOperations(container: HTMLElement): Promise<() => vo
   // Event delegation
   container.addEventListener('click', async (e: MouseEvent) => {
     const target = e.target as HTMLElement;
+
+    // Create wave
+    if (target.closest('#create-wave')) {
+      const phasesStr = prompt('Number of phases:');
+      if (!phasesStr) return;
+      const count = parseInt(phasesStr, 10) || 1;
+      const phases = Array.from({ length: count }, (_, i) => ({ name: `Phase ${i + 1}` }));
+      try { await createWave({ phases }); toast.success('Wave created'); await loadTab('waves'); } catch (err) { toast.error((err as Error).message); }
+      return;
+    }
 
     // Cancel wave
     const cancelBtn = target.closest('.cancel-wave') as HTMLElement | null;

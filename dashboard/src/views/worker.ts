@@ -13,13 +13,20 @@ import {
   getLatestCheckpoint,
   acceptCheckpoint,
   rejectCheckpoint,
+  getUserChats,
+  getChatMessages,
+  sendChatMessage,
+  createChat,
+  markChatRead,
+  injectWorkerOutput,
 } from '@/api-operations';
 import wsManager from '@/websocket';
 import toast from '@/components/toast';
 import { confirm as confirmDialog } from '@/components/confirm';
 import { escapeHtml } from '@/utils/escape-html';
-import { writeToTerminal } from './worker-terminal';
-import type { Checkpoint } from '@/types';
+import { writeToTerminal, TERMINAL_THEME } from './worker-terminal';
+import { renderChatPanel } from './worker-chat';
+import type { Checkpoint, Chat, ChatMessage } from '@/types';
 
 interface WorkerData {
   handle: string;
@@ -32,9 +39,6 @@ interface WorkerData {
   currentTaskId?: string;
 }
 
-/**
- * Format state badge color
- */
 function getStateBadgeClass(state: string): string {
   switch (state) {
     case 'working': return 'green';
@@ -46,9 +50,6 @@ function getStateBadgeClass(state: string): string {
   }
 }
 
-/**
- * Format health status
- */
 function getHealthClass(health: string): string {
   switch (health) {
     case 'healthy': return 'green';
@@ -58,23 +59,9 @@ function getHealthClass(health: string): string {
   }
 }
 
-/**
- * Render worker info card
- */
 function renderWorkerInfo(worker: WorkerData | undefined): string {
   if (!worker) {
-    return `
-      <div class="card">
-        <div class="empty-state">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 16v-4M12 8h.01"/>
-          </svg>
-          <div class="empty-state-title">Worker Not Found</div>
-          <div class="empty-state-text">This worker may have been dismissed</div>
-        </div>
-      </div>
-    `;
+    return '<div class="card"><div class="empty-state"><div class="empty-state-title">Worker Not Found</div><div class="empty-state-text">This worker may have been dismissed</div></div></div>';
   }
 
   const uptime = Date.now() - worker.spawnedAt;
@@ -125,9 +112,6 @@ function renderWorkerInfo(worker: WorkerData | undefined): string {
   `;
 }
 
-/**
- * Render checkpoints section
- */
 function renderCheckpoints(latest: Checkpoint | null, history: Checkpoint[]): string {
   return `
     <div class="card">
@@ -165,11 +149,12 @@ function renderCheckpoints(latest: Checkpoint | null, history: Checkpoint[]): st
   `;
 }
 
-/**
- * Render the worker view
- */
 export async function renderWorker(container: HTMLElement, handle: string): Promise<() => void> {
   let worker = (store.get('workers') as WorkerData[] | undefined)?.find((w: WorkerData) => w.handle === handle);
+  let workerTab = 'terminal';
+  let chats: Chat[] = [];
+  let chatMessages: ChatMessage[] = [];
+  let activeChatId: string | null = null;
 
   container.innerHTML = `
     <div class="grid grid-cols-1 gap-lg">
@@ -179,33 +164,28 @@ export async function renderWorker(container: HTMLElement, handle: string): Prom
 
       <div>
         <div class="flex items-center justify-between mb-md">
-          <h2 class="card-subtitle">Terminal Output</h2>
+          <div class="flex gap-xs">
+            <button class="worker-tab-btn active border-b-2 border-b-blue text-fg font-semibold py-xs px-md bg-transparent border-0 cursor-pointer" data-worker-tab="terminal">Terminal</button>
+            <button class="worker-tab-btn py-xs px-md bg-transparent border-0 border-b-2 border-b-transparent text-fg-secondary cursor-pointer" data-worker-tab="chat">Chat</button>
+          </div>
           <div class="flex gap-sm">
-            <button class="btn btn-secondary btn-sm" id="clear-terminal">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-              </svg>
-              Clear
-            </button>
-            <button class="btn btn-danger btn-sm" id="dismiss-worker">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 6L6 18M6 6l12 12"/>
-              </svg>
-              Dismiss
-            </button>
+            <button class="btn btn-secondary btn-sm" id="clear-terminal">Clear</button>
+            <button class="btn btn-danger btn-sm" id="dismiss-worker">Dismiss</button>
           </div>
         </div>
 
-        <div class="terminal-container">
-          <div class="terminal-header">
-            <div class="terminal-dots">
-              <span class="terminal-dot red"></span>
-              <span class="terminal-dot yellow"></span>
-              <span class="terminal-dot green"></span>
+        <div id="worker-tab-content">
+          <div class="terminal-container">
+            <div class="terminal-header">
+              <div class="terminal-dots">
+                <span class="terminal-dot red"></span>
+                <span class="terminal-dot yellow"></span>
+                <span class="terminal-dot green"></span>
+              </div>
+              <span class="terminal-title">${escapeHtml(handle)}</span>
             </div>
-            <span class="terminal-title">${escapeHtml(handle)}</span>
+            <div class="terminal-body" id="terminal"></div>
           </div>
-          <div class="terminal-body" id="terminal"></div>
         </div>
       </div>
 
@@ -222,6 +202,7 @@ export async function renderWorker(container: HTMLElement, handle: string): Prom
           <form id="send-message-form" class="flex gap-sm">
             <input type="text" class="form-input flex-1" id="message-input" placeholder="Enter message to send to worker...">
             <button type="submit" class="btn btn-primary">Send</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="inject-output-btn" title="Inject test output">Inject</button>
           </form>
         </div>
       </div>
@@ -246,33 +227,66 @@ export async function renderWorker(container: HTMLElement, handle: string): Prom
     }
   }
 
+  // Load chats for this worker
+  async function loadChats(): Promise<void> {
+    try {
+      chats = await getUserChats(handle).catch(() => []);
+    } catch { chats = []; }
+  }
+
+  async function loadChatMessages(chatId: string): Promise<void> {
+    activeChatId = chatId;
+    try {
+      chatMessages = await getChatMessages(chatId, { limit: 50 });
+    } catch { chatMessages = []; }
+    renderChatView();
+  }
+
+  function renderChatView(): void {
+    const el = document.getElementById('worker-tab-content');
+    if (el && workerTab === 'chat') {
+      el.innerHTML = renderChatPanel(chats, chatMessages, activeChatId);
+    }
+  }
+
+  // Tab switching for terminal vs chat
+  container.querySelectorAll('.worker-tab-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const tab = (btn as HTMLElement).dataset.workerTab!;
+      if (tab === workerTab) return;
+      container.querySelectorAll('.worker-tab-btn').forEach((b) => {
+        b.classList.remove('active', 'border-b-blue', 'text-fg', 'font-semibold');
+        b.classList.add('border-b-transparent', 'text-fg-secondary');
+      });
+      btn.classList.add('active', 'border-b-blue', 'text-fg', 'font-semibold');
+      btn.classList.remove('border-b-transparent', 'text-fg-secondary');
+      workerTab = tab;
+      const contentEl = document.getElementById('worker-tab-content')!;
+      if (tab === 'terminal') {
+        contentEl.innerHTML = `
+          <div class="terminal-container">
+            <div class="terminal-header">
+              <div class="terminal-dots"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span></div>
+              <span class="terminal-title">${escapeHtml(handle)}</span>
+            </div>
+            <div class="terminal-body" id="terminal"></div>
+          </div>`;
+        term.open(document.getElementById('terminal')!);
+        fitAddon.fit();
+      } else if (tab === 'chat') {
+        await loadChats();
+        renderChatView();
+      }
+    });
+  });
+
   // Initialize xterm.js terminal
   const term = new Terminal({
     cursorBlink: false,
     disableStdin: true,
     fontSize: 13,
     fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-    theme: {
-      background: '#0d1117',
-      foreground: '#c9d1d9',
-      cursor: '#58a6ff',
-      black: '#0d1117',
-      red: '#f85149',
-      green: '#3fb950',
-      yellow: '#d29922',
-      blue: '#58a6ff',
-      magenta: '#a371f7',
-      cyan: '#39c5cf',
-      white: '#c9d1d9',
-      brightBlack: '#6e7681',
-      brightRed: '#f85149',
-      brightGreen: '#3fb950',
-      brightYellow: '#d29922',
-      brightBlue: '#58a6ff',
-      brightMagenta: '#a371f7',
-      brightCyan: '#39c5cf',
-      brightWhite: '#ffffff',
-    },
+    theme: TERMINAL_THEME,
   });
 
   const fitAddon = new FitAddon();
@@ -389,6 +403,61 @@ export async function renderWorker(container: HTMLElement, handle: string): Prom
       }
       return;
     }
+
+    // Inject output
+    if (target.closest('#inject-output-btn')) {
+      const input = document.getElementById('message-input') as HTMLInputElement;
+      const text = input?.value.trim();
+      if (text) {
+        try { await injectWorkerOutput(handle, text); toast.success('Output injected'); input.value = ''; } catch (err) { toast.error((err as Error).message); }
+      }
+      return;
+    }
+
+    // Chat: select a chat from the list
+    const chatItem = target.closest('.chat-list-item') as HTMLElement | null;
+    if (chatItem?.dataset.chatId) {
+      await loadChatMessages(chatItem.dataset.chatId);
+      await markChatRead(chatItem.dataset.chatId).catch(() => {});
+      return;
+    }
+
+    // Chat: create new chat
+    if (target.closest('#create-chat-btn')) {
+      try {
+        const chat = await createChat([handle]);
+        chats.unshift(chat);
+        activeChatId = chat.id;
+        chatMessages = [];
+        renderChatView();
+      } catch (err) { toast.error('Failed to create chat: ' + (err as Error).message); }
+      return;
+    }
+
+    // Chat: mark read
+    const markReadBtn = target.closest('.mark-chat-read-btn') as HTMLElement | null;
+    if (markReadBtn?.dataset.chatId) {
+      try {
+        await markChatRead(markReadBtn.dataset.chatId);
+        toast.success('Marked as read');
+      } catch (err) { toast.error((err as Error).message); }
+      return;
+    }
+  });
+
+  // Chat: send message form (uses event delegation since form is dynamically created)
+  container.addEventListener('submit', async (e: Event) => {
+    const form = (e.target as HTMLElement);
+    if (form.id !== 'chat-send-form') return;
+    e.preventDefault();
+    const input = document.getElementById('chat-message-input') as HTMLInputElement;
+    const body = input?.value.trim();
+    if (!body || !activeChatId) return;
+    try {
+      const msg = await sendChatMessage(activeChatId, body);
+      chatMessages.push(msg);
+      renderChatView();
+    } catch (err) { toast.error('Failed to send: ' + (err as Error).message); }
   });
 
   // Send message form

@@ -379,7 +379,10 @@ export function renderSpawnQueue(queue: SpawnQueueData | null): string {
 
   return `
     <div class="card">
-      <h3 class="card-title mb-md">Spawn Queue</h3>
+      <div class="flex items-center justify-between mb-md">
+        <h3 class="card-title">Spawn Queue</h3>
+        <button class="btn btn-primary btn-sm request-spawn-btn">+ Spawn</button>
+      </div>
       <div class="grid grid-cols-4 gap-md">
         <div>
           <div class="metric-label">Pending</div>

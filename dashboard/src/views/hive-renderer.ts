@@ -16,9 +16,7 @@ import {
 } from '@/utils/hex-geometry';
 import type { HiveNode, HiveConfig, WorkerActivity } from '@/types/hive';
 
-// ---------------------------------------------------------------------------
 // Constants (shared with hive.ts)
-// ---------------------------------------------------------------------------
 
 export const SWARM_COLORS = [
   '#58a6ff', '#3fb950', '#a371f7', '#d29922',
@@ -42,9 +40,7 @@ const STATE_ICONS: Record<string, string> = {
   stopped:  'M3 6h6',
 };
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 export function formatUptime(spawnedAt: number | undefined): string {
   if (!spawnedAt) return '—';
@@ -66,9 +62,7 @@ export function relativeTime(timestamp: number): string {
   return `${Math.floor(minutes / 60)}h ago`;
 }
 
-// ---------------------------------------------------------------------------
 // SVG Defs (gradients)
-// ---------------------------------------------------------------------------
 
 export function ensureGradientDefs(
   svg: Selection<SVGSVGElement, unknown, null, undefined>,
@@ -101,9 +95,7 @@ export function gradientUrl(swarmColor: string): string {
   return `url(#hive-grad-${index >= 0 ? index : 0})`;
 }
 
-// ---------------------------------------------------------------------------
 // Rendering
-// ---------------------------------------------------------------------------
 
 export function renderBackgroundGrid(
   g: Selection<SVGGElement, unknown, null, undefined>,

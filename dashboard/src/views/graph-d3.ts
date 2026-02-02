@@ -11,7 +11,7 @@ import { drag as d3Drag } from 'd3-drag';
 import 'd3-transition';
 import type { Simulation, SimulationNodeDatum, SimulationLinkDatum } from 'd3-force';
 import type { Selection } from 'd3-selection';
-import { getFileSummary } from '@/api';
+import { getFileSummary, getDependencies, getDependents } from '@/api';
 import toast from '@/components/toast';
 import { escapeHtml } from '@/utils/escape-html';
 
@@ -295,9 +295,12 @@ function showNodeDetail(nodeData: GraphNode): void {
           </p>
         ` : ''}
 
-        <button class="btn btn-secondary btn-sm mt-md" id="fetch-summary">
-          Fetch Full Summary
-        </button>
+        <div class="flex gap-sm mt-md">
+          <button class="btn btn-secondary btn-sm" id="fetch-summary">Summary</button>
+          <button class="btn btn-secondary btn-sm" id="fetch-deps">Dependencies</button>
+          <button class="btn btn-secondary btn-sm" id="fetch-dependents">Dependents</button>
+        </div>
+        <div id="node-extra-detail" class="mt-md"></div>
       </div>
     </div>
   `;
@@ -321,6 +324,26 @@ function showNodeDetail(nodeData: GraphNode): void {
     } catch (e) {
       toast.error('Failed to fetch summary: ' + (e as Error).message);
     }
+  });
+
+  document.getElementById('fetch-deps')?.addEventListener('click', async () => {
+    const extra = document.getElementById('node-extra-detail');
+    if (!extra) return;
+    try {
+      const data = await getDependencies(nodeData.path) as { dependencies?: string[] };
+      const deps = data.dependencies || [];
+      extra.innerHTML = `<div class="form-label">Dependencies (${deps.length})</div><div class="max-h-[200px] overflow-y-auto">${deps.map((d) => `<div class="font-mono text-xs py-xs border-b border-edge">${escapeHtml(d)}</div>`).join('') || '<div class="text-fg-muted text-sm">None</div>'}</div>`;
+    } catch (e) { toast.error('Failed: ' + (e as Error).message); }
+  });
+
+  document.getElementById('fetch-dependents')?.addEventListener('click', async () => {
+    const extra = document.getElementById('node-extra-detail');
+    if (!extra) return;
+    try {
+      const data = await getDependents(nodeData.path) as { dependents?: string[] };
+      const deps = data.dependents || [];
+      extra.innerHTML = `<div class="form-label">Dependents (${deps.length})</div><div class="max-h-[200px] overflow-y-auto">${deps.map((d) => `<div class="font-mono text-xs py-xs border-b border-edge">${escapeHtml(d)}</div>`).join('') || '<div class="text-fg-muted text-sm">None</div>'}</div>`;
+    } catch (e) { toast.error('Failed: ' + (e as Error).message); }
   });
 }
 

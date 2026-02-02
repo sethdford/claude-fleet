@@ -303,3 +303,23 @@ export async function definePayoff(
 export async function calculatePayoff(taskId: string): Promise<unknown> {
   return request(`/payoffs/${encodeURIComponent(taskId)}/calculate`);
 }
+
+// ---------------------------------------------------------------------------
+// Extended endpoints (Phase 1F)
+// ---------------------------------------------------------------------------
+
+export async function decayPheromones(swarmId: string): Promise<unknown> {
+  return request(`/swarm-intelligence/${encodeURIComponent(swarmId)}/pheromones/decay`, { method: 'POST' });
+}
+
+export async function getResourcePheromones(swarmId: string, resourceId: string): Promise<PheromoneTrail[]> {
+  return request(`/swarm-intelligence/${encodeURIComponent(swarmId)}/pheromones/resource/${encodeURIComponent(resourceId)}`);
+}
+
+export async function getCreditHistory(swarmId: string, handle: string): Promise<unknown[]> {
+  return request(`/swarm-intelligence/${encodeURIComponent(swarmId)}/credits/${encodeURIComponent(handle)}/history`);
+}
+
+export async function evaluateTaskBids(taskId: string): Promise<unknown> {
+  return request(`/swarm-intelligence/bids/${encodeURIComponent(taskId)}/evaluate`, { method: 'POST' });
+}

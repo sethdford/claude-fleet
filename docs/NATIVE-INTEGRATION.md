@@ -143,6 +143,32 @@ Key Statsig flags to monitor (use `scripts/flag-monitor.sh`):
 | `tengu_agent_swarms` | Native swarm coordination |
 | `tengu_scratch` | Working memory / scratchpad |
 
+### Codename Feature Gates
+
+These opaque, randomly-named Statsig gates control feature availability.
+Use `claude-patcher gates` to detect and patch them.
+
+| Flag | Codename | Patchable? | Purpose |
+|------|----------|------------|---------|
+| `tengu_brass_pebble` | swarm-mode | Yes | Swarm/TeammateTool/delegate gate |
+| `tengu_marble_anvil` | marble-anvil | No | Unknown feature gate |
+| `tengu_marble_kite` | marble-kite | No | Unknown feature gate |
+| `tengu_coral_fern` | coral-fern | No | Unknown feature gate |
+| `tengu_quiet_fern` | quiet-fern | No | Unknown feature gate |
+| `tengu_plank_river_frost` | plank-river-frost | No | Unknown feature gate |
+| `tengu_quartz_lantern` | quartz-lantern | No | Unknown feature gate |
+| `tengu_scarf_coffee` | scarf-coffee | No | Unknown feature gate |
+| `tengu_cache_plum_violet` | cache-plum-violet | No | Cache feature |
+| `tengu_flicker` | flicker | No | Unknown feature gate |
+| `tengu_tool_pear` | tool-pear | No | Unknown feature gate |
+| `tengu_cork_m4q` | cork-m4q | No | Unknown feature gate |
+| `tengu_tst_kx7` | tst-kx7 | No | Unknown/test gate |
+| `tengu_plum_vx3` | plum-vx3 | No | Unknown feature gate |
+| `tengu_kv7_prompt_sort` | kv7-prompt-sort | No | Prompt sorting feature |
+| `tengu_workout` | workout | No | Unknown feature gate |
+
+For the complete 572-flag reference, see [TENGU-FLAGS.md](../../docs/TENGU-FLAGS.md).
+
 ### Monitoring Flag Changes
 
 ```bash
@@ -151,6 +177,9 @@ Key Statsig flags to monitor (use `scripts/flag-monitor.sh`):
 
 # Update baseline after Claude Code update
 ./scripts/flag-monitor.sh --update
+
+# Scan via patcher CLI
+claude-patcher gates scan
 ```
 
 ## Testing

@@ -7,12 +7,17 @@ import dayjs from 'dayjs';
 import store from '@/store';
 import { escapeHtml } from '@/utils/escape-html';
 import { formatUptime } from '@/utils/format';
+import {
+  getCoordinationStatus,
+  getCoordinationHealth,
+  getCompoundSnapshot,
+} from '@/api-operations';
 import type {
   ServerMetrics,
   WorkerInfo,
   SwarmInfo,
-} from '@/types';
-import type {
+  CoordinationStatus,
+  CoordinationHealth,
   MetricsHistoryEntry,
   Activity,
 } from '@/types';
@@ -324,6 +329,13 @@ export async function renderOverview(container: HTMLElement): Promise<() => void
       </div>
     </section>
 
+    <!-- System Status: Coordination + Compound -->
+    <div class="grid grid-cols-3 gap-sm mb-md" id="system-status-container">
+      <div class="card p-sm"><div class="text-xs text-fg-muted">Coordination</div><div id="coord-status" class="text-sm">Loading...</div></div>
+      <div class="card p-sm"><div class="text-xs text-fg-muted">Health</div><div id="coord-health" class="text-sm">Loading...</div></div>
+      <div class="card p-sm"><div class="text-xs text-fg-muted">Compound</div><button class="btn btn-secondary btn-sm" id="compound-snapshot-btn">Snapshot</button></div>
+    </div>
+
     <!-- Row 2: Health heatmap + Swarms -->
     <div class="grid-2-col mb-md">
       <section>
@@ -372,13 +384,41 @@ export async function renderOverview(container: HTMLElement): Promise<() => void
     </div>
   `;
 
+  // Load system status
+  Promise.allSettled([getCoordinationStatus(), getCoordinationHealth()]).then((results) => {
+    if (results[0].status === 'fulfilled') {
+      const cs = results[0].value as CoordinationStatus;
+      const running = [cs.taskSync?.running, cs.inbox?.running, cs.discovery?.running].filter(Boolean).length;
+      const el = document.getElementById('coord-status');
+      if (el) el.innerHTML = `<span class="badge ${running > 0 ? 'green' : ''}">${running}/3 running</span>`;
+    }
+    if (results[1].status === 'fulfilled') {
+      const ch = results[1].value as CoordinationHealth;
+      const el = document.getElementById('coord-health');
+      if (el) el.innerHTML = `<span class="badge ${ch.status === 'healthy' ? 'green' : ch.status === 'degraded' ? 'yellow' : 'red'}">${escapeHtml(ch.status || 'unknown')}</span>`;
+    }
+  });
+
   // Delegated click handler for overview interactions
-  container.addEventListener('click', (e: MouseEvent) => {
+  container.addEventListener('click', async (e: MouseEvent) => {
     const target = e.target as HTMLElement;
 
     // Create swarm button
     if (target.closest('#create-swarm-btn')) {
       window.fleetDashboard?.showSwarmModal();
+      return;
+    }
+
+    // Compound snapshot
+    if (target.closest('#compound-snapshot-btn')) {
+      try {
+        const snap = await getCompoundSnapshot();
+        const el = target.closest('.card');
+        if (el) el.innerHTML = `<div class="text-xs text-fg-muted">Compound</div><pre class="text-xs overflow-auto max-h-[200px]">${escapeHtml(JSON.stringify(snap, null, 2))}</pre>`;
+      } catch (err) {
+        const { default: toast } = await import('@/components/toast');
+        toast.error((err as Error).message);
+      }
       return;
     }
 

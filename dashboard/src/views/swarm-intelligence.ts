@@ -16,6 +16,9 @@ import {
   closeProposal,
   acceptBid,
   runAuction,
+  decayPheromones,
+  getCreditHistory,
+  evaluateTaskBids,
 } from '@/api-intelligence';
 import toast from '@/components/toast';
 import type {
@@ -247,6 +250,71 @@ function setupSwarmIntelEventDelegation(container: HTMLElement, swarmId: string)
           toast.success(`Auction complete! Winner: ${result.winner?.bidderHandle || 'No winner'}`);
         } catch (e) {
           toast.error('Failed to run auction: ' + (e as Error).message);
+        }
+      }
+      return;
+    }
+
+    // Decay pheromones button
+    if (target.closest('.decay-pheromones-btn')) {
+      try {
+        await decayPheromones(swarmId);
+        toast.success('Pheromone decay triggered');
+      } catch (e) {
+        toast.error('Failed to decay pheromones: ' + (e as Error).message);
+      }
+      return;
+    }
+
+    // Credit history button
+    const historyBtn = target.closest('.credit-history-btn') as HTMLElement | null;
+    if (historyBtn) {
+      const row = historyBtn.closest('.leaderboard-item') as HTMLElement | null;
+      const handle = row?.dataset.handle;
+      if (handle) {
+        try {
+          const history = await getCreditHistory(swarmId, handle);
+          const detail = container.querySelector('.credit-history-detail');
+          const html = `
+            <div class="credit-history-detail card mt-md">
+              <div class="card-header">
+                <h3 class="card-title">Credit History: ${handle}</h3>
+              </div>
+              <div class="max-h-[300px] overflow-y-auto">
+                ${(history as Array<{ type?: string; amount?: number; description?: string; createdAt?: string }>).length === 0
+                  ? '<div class="empty-state p-md"><div class="empty-state-text">No history</div></div>'
+                  : (history as Array<{ type?: string; amount?: number; description?: string; createdAt?: string }>).map((h) => `
+                    <div class="flex items-center gap-sm p-sm border-b border-edge">
+                      <span class="badge ${(h.amount || 0) >= 0 ? 'green' : 'red'}">${(h.amount || 0) >= 0 ? '+' : ''}${h.amount || 0}</span>
+                      <span class="text-sm flex-1">${h.description || h.type || 'transaction'}</span>
+                      <span class="text-xs text-fg-muted">${h.createdAt || ''}</span>
+                    </div>
+                  `).join('')}
+              </div>
+            </div>`;
+          if (detail) {
+            detail.outerHTML = html;
+          } else {
+            const leaderboardCard = row?.closest('.card');
+            if (leaderboardCard) leaderboardCard.insertAdjacentHTML('afterend', html);
+          }
+        } catch (e) {
+          toast.error('Failed to load credit history: ' + (e as Error).message);
+        }
+      }
+      return;
+    }
+
+    // Evaluate bids button
+    const evalBtn = target.closest('.evaluate-bids-btn') as HTMLElement | null;
+    if (evalBtn) {
+      const taskId = evalBtn.dataset.taskId;
+      if (taskId) {
+        try {
+          await evaluateTaskBids(taskId);
+          toast.success('Bids evaluated');
+        } catch (e) {
+          toast.error('Failed to evaluate bids: ' + (e as Error).message);
         }
       }
     }

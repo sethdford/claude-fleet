@@ -27,9 +27,7 @@ export const MESSAGE_PRIORITIES = ['low', 'normal', 'high', 'critical'] as const
 const TOKEN_KEY = 'fleet_token';
 const USER_KEY = 'fleet_user';
 
-// ---------------------------------------------------------------------------
 // Auth helpers
-// ---------------------------------------------------------------------------
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -53,9 +51,7 @@ export function logout(): void {
   localStorage.removeItem(USER_KEY);
 }
 
-// ---------------------------------------------------------------------------
 // Generic request helper
-// ---------------------------------------------------------------------------
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -102,9 +98,7 @@ export async function request<T = unknown>(endpoint: string, options: RequestIni
   }
 }
 
-// ---------------------------------------------------------------------------
 // Auth
-// ---------------------------------------------------------------------------
 
 export async function login(handle: string, teamName: string, agentType = 'team-lead'): Promise<AuthResponse> {
   const data = await request<AuthResponse>('/auth', {
@@ -123,9 +117,7 @@ export async function login(handle: string, teamName: string, agentType = 'team-
   return data;
 }
 
-// ---------------------------------------------------------------------------
 // Health & Metrics
-// ---------------------------------------------------------------------------
 
 export async function getHealth(): Promise<unknown> {
   return request('/health');
@@ -135,9 +127,7 @@ export async function getMetrics(): Promise<ServerMetrics> {
   return request<ServerMetrics>('/metrics/json');
 }
 
-// ---------------------------------------------------------------------------
 // Workers
-// ---------------------------------------------------------------------------
 
 export async function getWorkers(): Promise<WorkerInfo[]> {
   return request<WorkerInfo[]>('/orchestrate/workers');
@@ -178,9 +168,7 @@ export async function spawnWorker(
   });
 }
 
-// ---------------------------------------------------------------------------
 // External Workers (Connections)
-// ---------------------------------------------------------------------------
 
 export async function generateConnectionToken(
   handle: string,
@@ -208,9 +196,7 @@ export async function registerExternalWorker(
   });
 }
 
-// ---------------------------------------------------------------------------
 // Swarms
-// ---------------------------------------------------------------------------
 
 export async function getSwarms(includeAgents = true): Promise<SwarmInfo[]> {
   const query = includeAgents ? '?includeAgents=true' : '';
@@ -232,9 +218,7 @@ export async function killSwarm(swarmId: string): Promise<unknown> {
   return request(`/swarms/${encodeURIComponent(swarmId)}/kill`, { method: 'POST' });
 }
 
-// ---------------------------------------------------------------------------
 // Blackboard
-// ---------------------------------------------------------------------------
 
 export interface BlackboardQueryOptions {
   limit?: number;
@@ -284,17 +268,13 @@ export async function markBlackboardRead(messageIds: string[], readerHandle: str
   });
 }
 
-// ---------------------------------------------------------------------------
 // Spawn Queue
-// ---------------------------------------------------------------------------
 
 export async function getSpawnQueue(): Promise<SpawnQueueStatus> {
   return request<SpawnQueueStatus>('/spawn-queue/status');
 }
 
-// ---------------------------------------------------------------------------
 // Tasks
-// ---------------------------------------------------------------------------
 
 export async function getTasks(teamName: string): Promise<TeamTask[]> {
   return request<TeamTask[]>(`/teams/${encodeURIComponent(teamName)}/tasks`);
@@ -326,9 +306,7 @@ export async function createTask(payload: CreateTaskPayload): Promise<TeamTask> 
   });
 }
 
-// ---------------------------------------------------------------------------
 // TLDR / Dependency Graph
-// ---------------------------------------------------------------------------
 
 export async function getDependencyGraph(rootFiles: string[] = [], depth = 3): Promise<GraphData> {
   if (!rootFiles || rootFiles.length === 0) {
@@ -377,9 +355,7 @@ export async function getDependents(filePath: string): Promise<unknown> {
   });
 }
 
-// ---------------------------------------------------------------------------
 // Scheduler
-// ---------------------------------------------------------------------------
 
 export async function getSchedulerStatus(): Promise<unknown> {
   return request('/scheduler/status');
@@ -424,9 +400,7 @@ export async function getTemplates(): Promise<unknown[]> {
   return request<unknown[]>('/scheduler/templates');
 }
 
-// ---------------------------------------------------------------------------
 // Mail
-// ---------------------------------------------------------------------------
 
 export async function getMail(handle: string): Promise<unknown[]> {
   return request<unknown[]>(`/mail/${encodeURIComponent(handle)}`);
@@ -453,9 +427,7 @@ export async function markMailRead(mailId: string): Promise<unknown> {
   return request(`/mail/${encodeURIComponent(mailId)}/read`, { method: 'POST' });
 }
 
-// ---------------------------------------------------------------------------
 // Workflows
-// ---------------------------------------------------------------------------
 
 export async function getWorkflows(): Promise<unknown[]> {
   return request<unknown[]>('/workflows');
@@ -481,9 +453,7 @@ export async function cancelExecution(executionId: string): Promise<unknown> {
   return request(`/executions/${encodeURIComponent(executionId)}/cancel`, { method: 'POST' });
 }
 
-// ---------------------------------------------------------------------------
 // Memory
-// ---------------------------------------------------------------------------
 
 export async function listMemories(agentId: string, limit = 50): Promise<{ memories: MemoryEntry[] }> {
   return request<{ memories: MemoryEntry[] }>(`/memory/${encodeURIComponent(agentId)}?limit=${limit}`);
@@ -507,9 +477,7 @@ export async function searchMemories(agentId: string, query: string, limit?: num
   });
 }
 
-// ---------------------------------------------------------------------------
 // Routing
-// ---------------------------------------------------------------------------
 
 export async function classifyTask(subject: string, description?: string): Promise<RoutingRecommendation> {
   return request<RoutingRecommendation>('/routing/classify', {
@@ -518,9 +486,7 @@ export async function classifyTask(subject: string, description?: string): Promi
   });
 }
 
-// ---------------------------------------------------------------------------
 // Debug
-// ---------------------------------------------------------------------------
 
 export async function getDebugInfo(): Promise<unknown> {
   return request('/debug');

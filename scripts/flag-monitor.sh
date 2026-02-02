@@ -126,6 +126,22 @@ main() {
     "tengu_swarm"
     "tengu_team"
     "tengu_agent"
+    "tengu_brass_pebble"
+    "tengu_marble_anvil"
+    "tengu_marble_kite"
+    "tengu_coral_fern"
+    "tengu_quiet_fern"
+    "tengu_plank_river_frost"
+    "tengu_quartz_lantern"
+    "tengu_scarf_coffee"
+    "tengu_cache_plum_violet"
+    "tengu_flicker"
+    "tengu_tool_pear"
+    "tengu_cork_m4q"
+    "tengu_tst_kx7"
+    "tengu_plum_vx3"
+    "tengu_kv7_prompt_sort"
+    "tengu_workout"
   )
 
   local relevant_changes=false
