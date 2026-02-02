@@ -10,6 +10,7 @@ import type {
   MetricsHistoryEntry,
 } from '@/types';
 import type { ServerMetrics } from '@/types';
+import { RingBuffer } from '@/utils/ring-buffer';
 
 type Subscriber<T = unknown> = (value: T) => void;
 
@@ -22,7 +23,7 @@ interface HistoryEntry {
 class Store {
   state: StoreState;
   private subscribers = new Map<string, Set<Subscriber>>();
-  private history: HistoryEntry[] = [];
+  private history = new RingBuffer<HistoryEntry>(50);
 
   constructor(initialState: StoreState) {
     this.state = initialState;
@@ -56,9 +57,6 @@ class Store {
     }
 
     this.history.push({ timestamp: Date.now(), prev: prevState, next: this.state });
-    if (this.history.length > 50) {
-      this.history.shift();
-    }
 
     this.notify(keyOrState);
   }
@@ -118,6 +116,11 @@ class Store {
   removeWorker(handle: string): void {
     const workers = this.get('workers') ?? [];
     this.set('workers', workers.filter(w => w.handle !== handle));
+    const workerOutput = this.get('workerOutput') ?? {};
+    if (workerOutput[handle]) {
+      delete workerOutput[handle];
+      this.set('workerOutput', { ...workerOutput });
+    }
   }
 
   appendWorkerOutput(handle: string, output: unknown): void {
@@ -135,10 +138,7 @@ class Store {
   addMetricsHistory(metrics: ServerMetrics): void {
     const history = this.get('metricsHistory') ?? [];
     history.push({ timestamp: Date.now(), ...metrics } satisfies MetricsHistoryEntry);
-    if (history.length > 60) {
-      history.shift();
-    }
-    this.set('metricsHistory', history);
+    this.set('metricsHistory', history.length > 60 ? history.slice(-60) : history);
   }
 
   // ---------------------------------------------------------------------------

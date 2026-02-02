@@ -79,22 +79,9 @@ function renderMetricCards(metrics: ServerMetrics | null, history: MetricsHistor
   const healthyTrend = trend(healthyData);
   const taskTrend = trend(taskData);
 
-  // Calculate total cost from activities
-  const activities: Activity[] = store.get('activities') || [];
-  const costActivities = activities.filter(a => a.preview && a.preview.includes('$'));
-  let totalCost = 0;
-  costActivities.forEach(a => {
-    const match = a.preview?.match(/\$(\d+\.?\d*)/);
-    if (match) totalCost += parseFloat(match[1]);
-  });
-  // totalCost is computed but not currently displayed — keeping for future use
-  void totalCost;
-
   const openTasks = metrics?.tasks?.byStatus?.open || 0;
   const inProgress = metrics?.tasks?.byStatus?.in_progress || 0;
   const blocked = metrics?.tasks?.byStatus?.blocked || 0;
-  const swarmCount = (store.get('swarms') || []).length;
-  void swarmCount;
 
   return `
     <div class="metric-card-dense">

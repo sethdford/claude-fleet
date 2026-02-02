@@ -185,6 +185,14 @@ export function createMockDeps(): RouteDependencies {
     }),
     getAgentMemory: vi.fn().mockReturnValue(null),
     getRoutingRecommendation: vi.fn().mockReturnValue(null),
+    getWorkerByHandle: vi.fn().mockReturnValue(null),
+    spawnWorker: vi.fn().mockResolvedValue({ id: 'w-1', handle: 'worker-1', state: 'starting' }),
+    dismissWorker: vi.fn().mockResolvedValue(undefined),
+    dismissWorkerByHandle: vi.fn().mockResolvedValue(undefined),
+    sendToWorkerByHandle: vi.fn().mockResolvedValue(true),
+    getWorktreeManager: vi.fn().mockReturnValue(null),
+    registerExternalWorker: vi.fn().mockReturnValue({ id: 'w-ext', handle: 'ext-1', state: 'ready' }),
+    injectWorkerOutput: vi.fn(),
   };
 
   const mockLegacyStorage = {
@@ -194,7 +202,44 @@ export function createMockDeps(): RouteDependencies {
         get: vi.fn(),
         run: vi.fn(),
       }),
+      exec: vi.fn(),
     }),
+    getTemplate: vi.fn().mockReturnValue(null),
+    getTemplateByName: vi.fn().mockReturnValue(null),
+    insertTemplate: vi.fn(),
+    getAllTemplates: vi.fn().mockReturnValue([]),
+    updateTemplate: vi.fn().mockReturnValue(null),
+    deleteTemplate: vi.fn().mockReturnValue(true),
+  };
+
+  const mockWorkflowStorage = {
+    createWorkflow: vi.fn().mockReturnValue({ id: 'wf-1', name: 'test', definition: {}, description: null, isTemplate: false, createdAt: Date.now(), updatedAt: Date.now() }),
+    getWorkflow: vi.fn().mockReturnValue(null),
+    getWorkflowByName: vi.fn().mockReturnValue(null),
+    listWorkflows: vi.fn().mockReturnValue([]),
+    updateWorkflow: vi.fn().mockReturnValue(true),
+    deleteWorkflow: vi.fn().mockReturnValue(true),
+    createExecution: vi.fn().mockReturnValue({ id: 'exec-1', workflowId: 'wf-1', status: 'pending', createdAt: Date.now() }),
+    getExecution: vi.fn().mockReturnValue(null),
+    listExecutions: vi.fn().mockReturnValue([]),
+    updateExecutionStatus: vi.fn().mockReturnValue(true),
+    createStep: vi.fn().mockReturnValue({ id: 'step-1', executionId: 'exec-1', name: 'test', status: 'pending' }),
+    getStepsByExecution: vi.fn().mockReturnValue([]),
+    updateStepStatus: vi.fn().mockReturnValue(true),
+    createTrigger: vi.fn().mockReturnValue({ id: 'trig-1', workflowId: 'wf-1', triggerType: 'manual', config: {}, enabled: true }),
+    getTriggersByWorkflow: vi.fn().mockReturnValue([]),
+    deleteTrigger: vi.fn().mockReturnValue(true),
+    getEvents: vi.fn().mockReturnValue([]),
+    addEvent: vi.fn(),
+  };
+
+  const mockWorkflowEngine = {
+    startWorkflow: vi.fn().mockResolvedValue({ id: 'exec-1', workflowId: 'wf-1', status: 'running', createdAt: Date.now() }),
+    pauseWorkflow: vi.fn().mockResolvedValue(true),
+    resumeWorkflow: vi.fn().mockResolvedValue(true),
+    cancelWorkflow: vi.fn().mockResolvedValue(true),
+    retryStep: vi.fn().mockResolvedValue(true),
+    completeStep: vi.fn().mockResolvedValue(true),
   };
 
   const mockSpawnController = {
@@ -206,6 +251,8 @@ export function createMockDeps(): RouteDependencies {
       pending: 0,
       approved: 0,
     }),
+    queueSpawn: vi.fn().mockResolvedValue('spawn-req-1'),
+    getQueueStats: vi.fn().mockReturnValue({ pending: 0, approved: 0, spawned: 0, rejected: 0, blocked: 0 }),
   };
 
   const config = {
@@ -226,6 +273,8 @@ export function createMockDeps(): RouteDependencies {
     legacyStorage: mockLegacyStorage,
     workerManager: mockWorkerManager,
     spawnController: mockSpawnController,
+    workflowStorage: mockWorkflowStorage,
+    workflowEngine: mockWorkflowEngine,
     swarms: new Map(),
     startTime: Date.now(),
     broadcastToAll: vi.fn(),

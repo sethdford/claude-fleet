@@ -21,6 +21,7 @@
     }
   },
   "include": ["**/*.ts"],
+  "exclude": ["e2e/**"],
   "references": [
     { "path": "../packages/common" },
     { "path": "../packages/storage" },

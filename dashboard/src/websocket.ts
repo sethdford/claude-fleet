@@ -185,6 +185,8 @@ class WebSocketManager {
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('[WS] Max reconnect attempts reached');
+      this.updateStatus('disconnected');
+      this.emit('reconnect:failed');
       return;
     }
 

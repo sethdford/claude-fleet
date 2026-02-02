@@ -1,16 +1,25 @@
 /**
  * Worker Detail View
- * Shows worker info, live terminal output, and actions
+ * Shows worker info, live terminal output, checkpoints, and actions
  */
 
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import dayjs from 'dayjs';
 import store from '@/store';
 import { getWorkerOutput, sendToWorker, dismissWorker } from '@/api';
+import {
+  listCheckpoints,
+  getLatestCheckpoint,
+  acceptCheckpoint,
+  rejectCheckpoint,
+} from '@/api-operations';
 import wsManager from '@/websocket';
 import toast from '@/components/toast';
 import { confirm as confirmDialog } from '@/components/confirm';
 import { escapeHtml } from '@/utils/escape-html';
+import { writeToTerminal } from './worker-terminal';
+import type { Checkpoint } from '@/types';
 
 interface WorkerData {
   handle: string;
@@ -21,27 +30,6 @@ interface WorkerData {
   restartCount?: number;
   swarmId?: string;
   currentTaskId?: string;
-}
-
-interface ContentBlock {
-  type: string;
-  text?: string;
-  name?: string;
-  input?: Record<string, unknown>;
-}
-
-interface ClaudeEvent {
-  type?: string;
-  message?: { content: ContentBlock[] };
-  result?: {
-    cost_usd?: number;
-    duration_ms?: number;
-    duration_api_ms?: number;
-    model?: string;
-    num_turns?: number;
-  };
-  error?: string;
-  subtype?: string;
 }
 
 /**
@@ -138,10 +126,49 @@ function renderWorkerInfo(worker: WorkerData | undefined): string {
 }
 
 /**
+ * Render checkpoints section
+ */
+function renderCheckpoints(latest: Checkpoint | null, history: Checkpoint[]): string {
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Checkpoints</h3>
+      </div>
+      ${latest ? `
+        <div class="p-md border-b border-edge">
+          <div class="flex items-center justify-between mb-sm">
+            <span class="badge ${latest.status === 'accepted' ? 'green' : latest.status === 'rejected' ? 'red' : 'yellow'}">${escapeHtml(latest.status)}</span>
+            <span class="text-xs text-fg-muted">${latest.createdAt ? dayjs(latest.createdAt).fromNow() : ''}</span>
+          </div>
+          ${latest.summary ? `<div class="text-sm text-fg-secondary mb-sm">${escapeHtml(latest.summary.slice(0, 200))}</div>` : ''}
+          ${latest.status === 'pending' ? `
+            <div class="flex gap-sm">
+              <button class="btn btn-primary btn-sm checkpoint-accept" data-checkpoint-id="${escapeHtml(latest.id)}">Accept</button>
+              <button class="btn btn-danger btn-sm checkpoint-reject" data-checkpoint-id="${escapeHtml(latest.id)}">Reject</button>
+            </div>
+          ` : ''}
+        </div>
+      ` : '<div class="p-md text-fg-muted text-sm">No checkpoints yet</div>'}
+      ${history.length > 1 ? `
+        <div class="p-md">
+          <div class="text-xs text-fg-muted mb-sm">History (${history.length})</div>
+          ${history.slice(0, 5).map(cp => `
+            <div class="flex items-center gap-sm p-xs border-b border-edge text-xs">
+              <span class="badge ${cp.status === 'accepted' ? 'green' : cp.status === 'rejected' ? 'red' : 'yellow'}">${escapeHtml(cp.status)}</span>
+              <span class="flex-1 text-fg-secondary">${escapeHtml((cp.summary || cp.id).slice(0, 60))}</span>
+              <span class="text-fg-muted">${cp.createdAt ? dayjs(cp.createdAt).fromNow() : ''}</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+/**
  * Render the worker view
  */
 export async function renderWorker(container: HTMLElement, handle: string): Promise<() => void> {
-  // Find worker in store
   let worker = (store.get('workers') as WorkerData[] | undefined)?.find((w: WorkerData) => w.handle === handle);
 
   container.innerHTML = `
@@ -182,6 +209,13 @@ export async function renderWorker(container: HTMLElement, handle: string): Prom
         </div>
       </div>
 
+      <div id="worker-checkpoints">
+        <h2 class="card-subtitle mb-md">Checkpoints</h2>
+        <div id="checkpoints-container">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+
       <div>
         <h2 class="card-subtitle mb-md">Send Message</h2>
         <div class="card">
@@ -193,6 +227,24 @@ export async function renderWorker(container: HTMLElement, handle: string): Prom
       </div>
     </div>
   `;
+
+  // Load checkpoints
+  async function loadCheckpoints(): Promise<void> {
+    const el = document.getElementById('checkpoints-container');
+    if (!el) return;
+    try {
+      const [latest, history] = await Promise.all([
+        getLatestCheckpoint(handle).catch(() => null),
+        listCheckpoints(handle).catch(() => []),
+      ]);
+      el.innerHTML = renderCheckpoints(
+        latest as Checkpoint | null,
+        Array.isArray(history) ? history as Checkpoint[] : [],
+      );
+    } catch {
+      el.innerHTML = renderCheckpoints(null, []);
+    }
+  }
 
   // Initialize xterm.js terminal
   const term = new Terminal({
@@ -235,7 +287,6 @@ export async function renderWorker(container: HTMLElement, handle: string): Prom
   });
 
   // Fetch current output from server
-  // Server returns: { handle, state, output: string[] }
   try {
     const data = await getWorkerOutput(handle) as { output?: string[] };
     if (data.output && Array.isArray(data.output)) {
@@ -246,6 +297,9 @@ export async function renderWorker(container: HTMLElement, handle: string): Prom
   } catch (e) {
     term.writeln(`\x1b[31mFailed to fetch output: ${(e as Error).message}\x1b[0m`);
   }
+
+  // Load checkpoints in parallel
+  await loadCheckpoints();
 
   // Handle window resize
   const handleResize = (): void => fitAddon.fit();
@@ -274,27 +328,66 @@ export async function renderWorker(container: HTMLElement, handle: string): Prom
     }
   });
 
-  // Clear terminal button
-  document.getElementById('clear-terminal')!.addEventListener('click', () => {
-    term.clear();
-  });
+  // Event delegation for all click actions
+  container.addEventListener('click', async (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
 
-  // Dismiss worker button
-  document.getElementById('dismiss-worker')!.addEventListener('click', async () => {
-    const confirmed = await confirmDialog({
-      title: 'Dismiss Worker',
-      message: `Are you sure you want to dismiss worker "${handle}"? This will terminate the worker process.`,
-      confirmText: 'Dismiss',
-      variant: 'danger',
-    });
-    if (confirmed) {
-      try {
-        await dismissWorker(handle);
-        toast.success(`Worker "${handle}" dismissed`);
-        window.location.hash = '/';
-      } catch (e) {
-        toast.error('Failed to dismiss worker: ' + (e as Error).message);
+    // Clear terminal
+    if (target.closest('#clear-terminal')) {
+      term.clear();
+      return;
+    }
+
+    // Dismiss worker
+    if (target.closest('#dismiss-worker')) {
+      const confirmed = await confirmDialog({
+        title: 'Dismiss Worker',
+        message: `Are you sure you want to dismiss worker "${handle}"? This will terminate the worker process.`,
+        confirmText: 'Dismiss',
+        variant: 'danger',
+      });
+      if (confirmed) {
+        try {
+          await dismissWorker(handle);
+          toast.success(`Worker "${handle}" dismissed`);
+          window.location.hash = '/';
+        } catch (err) {
+          toast.error('Failed to dismiss worker: ' + (err as Error).message);
+        }
       }
+      return;
+    }
+
+    // Accept checkpoint
+    const acceptBtn = target.closest('.checkpoint-accept') as HTMLElement | null;
+    if (acceptBtn) {
+      const cpId = acceptBtn.dataset.checkpointId;
+      if (cpId) {
+        try {
+          await acceptCheckpoint(cpId);
+          toast.success('Checkpoint accepted');
+          await loadCheckpoints();
+        } catch (err) {
+          toast.error('Failed to accept: ' + (err as Error).message);
+        }
+      }
+      return;
+    }
+
+    // Reject checkpoint
+    const rejectBtn = target.closest('.checkpoint-reject') as HTMLElement | null;
+    if (rejectBtn) {
+      const cpId = rejectBtn.dataset.checkpointId;
+      if (cpId) {
+        try {
+          await rejectCheckpoint(cpId);
+          toast.success('Checkpoint rejected');
+          await loadCheckpoints();
+        } catch (err) {
+          toast.error('Failed to reject: ' + (err as Error).message);
+        }
+      }
+      return;
     }
   });
 
@@ -311,8 +404,8 @@ export async function renderWorker(container: HTMLElement, handle: string): Prom
       term.writeln(`\x1b[34m> ${message}\x1b[0m`);
       input.value = '';
       toast.success('Message sent');
-    } catch (e) {
-      toast.error('Failed to send message: ' + (e as Error).message);
+    } catch (err) {
+      toast.error('Failed to send message: ' + (err as Error).message);
     }
   });
 
@@ -324,149 +417,4 @@ export async function renderWorker(container: HTMLElement, handle: string): Prom
     unsubWS();
     term.dispose();
   };
-}
-
-/**
- * Write content to terminal, handling JSON and plain text
- */
-function writeToTerminal(term: Terminal, content: unknown): void {
-  try {
-    if (typeof content === 'string') {
-      // Try to parse as JSON
-      try {
-        const parsed = JSON.parse(content) as ClaudeEvent;
-        formatEventToTerminal(term, parsed);
-      } catch {
-        // Plain text
-        term.writeln(content);
-      }
-    } else if (typeof content === 'object') {
-      formatEventToTerminal(term, content as ClaudeEvent);
-    }
-  } catch {
-    term.writeln(String(content));
-  }
-}
-
-/**
- * Format a timestamp prefix for terminal lines
- */
-function termTimestamp(): string {
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mm = String(now.getMinutes()).padStart(2, '0');
-  const ss = String(now.getSeconds()).padStart(2, '0');
-  return `\x1b[90m${hh}:${mm}:${ss}\x1b[0m`;
-}
-
-/**
- * Word-wrap text to a given width, returning an array of lines
- */
-function wordWrap(text: string, width: number): string[] {
-  if (!text) return [];
-  const lines: string[] = [];
-  for (const rawLine of text.split('\n')) {
-    if (rawLine.length <= width) {
-      lines.push(rawLine);
-      continue;
-    }
-    let remaining = rawLine;
-    while (remaining.length > width) {
-      let breakAt = remaining.lastIndexOf(' ', width);
-      if (breakAt <= 0) breakAt = width;
-      lines.push(remaining.slice(0, breakAt));
-      remaining = remaining.slice(breakAt).trimStart();
-    }
-    if (remaining) lines.push(remaining);
-  }
-  return lines;
-}
-
-/**
- * Format a tool_use input object into a compact parameter summary
- */
-function formatToolParams(input: Record<string, unknown> | undefined): string {
-  if (!input || typeof input !== 'object') return '';
-  // Show the most useful param per common tool
-  if (input.file_path) return ` ${input.file_path}`;
-  if (input.command) return ` $ ${String(input.command).slice(0, 80)}`;
-  if (input.pattern) return ` ${input.pattern}`;
-  if (input.query) return ` "${String(input.query).slice(0, 60)}"`;
-  if (input.url) return ` ${String(input.url).slice(0, 80)}`;
-  // Fallback: first string value
-  const firstStr = Object.values(input).find(v => typeof v === 'string');
-  return firstStr ? ` ${String(firstStr).slice(0, 60)}` : '';
-}
-
-/**
- * Format Claude Code event to terminal
- */
-function formatEventToTerminal(term: Terminal, event: ClaudeEvent): void {
-  if (!event || typeof event !== 'object') {
-    term.writeln(String(event));
-    return;
-  }
-
-  const ts = termTimestamp();
-  const type = event.type || 'unknown';
-  const WRAP_WIDTH = 100;
-
-  switch (type) {
-    case 'assistant':
-      if (event.message?.content) {
-        event.message.content.forEach((block: ContentBlock) => {
-          if (block.type === 'text') {
-            const wrapped = wordWrap(block.text || '', WRAP_WIDTH);
-            wrapped.forEach((line: string, i: number) => {
-              const prefix = i === 0 ? `${ts} \x1b[36m` : '         \x1b[36m';
-              term.writeln(`${prefix}${line}\x1b[0m`);
-            });
-          } else if (block.type === 'tool_use') {
-            const params = formatToolParams(block.input);
-            term.writeln(`${ts} \x1b[33m[Tool: ${block.name}${params}]\x1b[0m`);
-          }
-        });
-      }
-      break;
-
-    case 'result': {
-      const r = event.result || {};
-      const parts: string[] = [];
-      if (r.cost_usd !== null && r.cost_usd !== undefined) parts.push(`cost: $${r.cost_usd.toFixed(4)}`);
-      if (r.duration_ms !== null && r.duration_ms !== undefined) parts.push(`duration: ${(r.duration_ms / 1000).toFixed(1)}s`);
-      if (r.duration_api_ms !== null && r.duration_api_ms !== undefined) parts.push(`api: ${(r.duration_api_ms / 1000).toFixed(1)}s`);
-      if (r.model) parts.push(`model: ${r.model}`);
-      if (r.num_turns !== null && r.num_turns !== undefined) parts.push(`turns: ${r.num_turns}`);
-      const summary = parts.length ? parts.join(' | ') : JSON.stringify(r).slice(0, 150);
-      term.writeln(`${ts} \x1b[32m✓ Completed — ${summary}\x1b[0m`);
-      break;
-    }
-
-    case 'user':
-      if (event.message?.content) {
-        event.message.content.forEach((block: ContentBlock) => {
-          if (block.type === 'text') {
-            const wrapped = wordWrap(block.text || '', WRAP_WIDTH - 2);
-            wrapped.forEach((line: string, i: number) => {
-              const prefix = i === 0 ? `${ts} \x1b[34m> ` : '         \x1b[34m  ';
-              term.writeln(`${prefix}${line}\x1b[0m`);
-            });
-          }
-        });
-      }
-      break;
-
-    case 'error':
-      term.writeln(`${ts} \x1b[31m✗ Error: ${event.error || JSON.stringify(event)}\x1b[0m`);
-      break;
-
-    case 'system':
-      term.writeln(`${ts} \x1b[90m● ${event.subtype || 'system event'}\x1b[0m`);
-      break;
-
-    default: {
-      const preview = JSON.stringify(event).slice(0, 120);
-      term.writeln(`${ts} \x1b[90m[${type}] ${preview}${preview.length >= 120 ? '...' : ''}\x1b[0m`);
-    }
-  }
 }

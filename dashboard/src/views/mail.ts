@@ -1,7 +1,8 @@
 /**
  * Mail View
- * Inter-agent mail inbox with compose and read functionality
- * Wired to: POST /mail, GET /mail/:handle, GET /mail/:handle/unread, POST /mail/:id/read
+ * Inter-agent mail inbox with compose, handoffs, and read functionality
+ * Wired to: POST /mail, GET /mail/:handle, GET /mail/:handle/unread,
+ *           POST /mail/:id/read, GET /handoffs, POST /handoffs
  */
 
 import dayjs from 'dayjs';
@@ -11,34 +12,12 @@ import { escapeHtml } from '@/utils/escape-html';
 import {
   getUser,
   getMail,
+  getMailUnread,
   sendMail,
   markMailRead,
-  getToken,
 } from '@/api';
-import type { MailMessage, WorkerInfo } from '@/types';
-
-/**
- * Fetch unread mail for a handle.
- * This endpoint is not in the standard api.ts exports, so we use a local helper.
- */
-async function getMailUnread(handle: string): Promise<MailMessage[]> {
-  const token = getToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`/mail/${encodeURIComponent(handle)}/unread`, { headers });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error ?? `Request failed: ${response.status}`);
-  }
-  const text = await response.text();
-  if (!text) return [];
-  return JSON.parse(text) as MailMessage[];
-}
+import { getHandoffs, createHandoff } from '@/api-operations';
+import type { MailMessage, WorkerInfo, Handoff } from '@/types';
 
 /**
  * Render a single mail message
@@ -61,6 +40,29 @@ function renderMailItem(msg: MailMessage): string {
       ${msg.subject ? `<div class="mail-subject">${escapeHtml(msg.subject)}</div>` : ''}
       <div class="mail-body">${escapeHtml(msg.body?.slice(0, 200))}${(msg.body?.length || 0) > 200 ? '...' : ''}</div>
       ${isUnread ? `<button class="btn btn-secondary btn-sm mail-mark-read" data-mail-id="${msg.id}">Mark Read</button>` : ''}
+    </div>
+  `;
+}
+
+/**
+ * Render a handoff item
+ */
+function renderHandoffItem(h: Handoff): string {
+  return `
+    <div class="mail-item" data-handoff-id="${escapeHtml(h.id)}">
+      <div class="mail-item-header">
+        <div class="flex items-center gap-sm">
+          <span class="badge ${h.status === 'completed' ? 'green' : h.status === 'pending' ? 'yellow' : 'blue'}">${escapeHtml(h.status)}</span>
+          <span class="mail-from">${escapeHtml(h.fromHandle)}</span>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" class="text-fg-muted">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+          <span class="mail-to">${escapeHtml(h.toHandle)}</span>
+        </div>
+        <span class="mail-time">${h.createdAt ? dayjs(h.createdAt).fromNow() : ''}</span>
+      </div>
+      ${h.reason ? `<div class="mail-subject">${escapeHtml(h.reason.slice(0, 120))}</div>` : ''}
+      ${h.context ? `<div class="mail-body">${escapeHtml(JSON.stringify(h.context).slice(0, 200))}</div>` : ''}
     </div>
   `;
 }
@@ -115,6 +117,7 @@ export async function renderMail(container: HTMLElement): Promise<() => void> {
         <div class="mail-tabs">
           <button class="mail-tab active" data-tab="all">All</button>
           <button class="mail-tab" data-tab="unread">Unread</button>
+          <button class="mail-tab" data-tab="handoffs">Handoffs</button>
         </div>
         <div class="card p-0">
           <div id="mail-list">
@@ -133,6 +136,24 @@ export async function renderMail(container: HTMLElement): Promise<() => void> {
   // Fetch mail
   async function loadMail(): Promise<void> {
     try {
+      const listEl = document.getElementById('mail-list');
+      if (!listEl) return;
+
+      if (currentTab === 'handoffs') {
+        const handoffs = await getHandoffs(handle).catch(() => []);
+        const list: Handoff[] = Array.isArray(handoffs) ? handoffs : [];
+        if (list.length === 0) {
+          listEl.innerHTML = `
+            <div class="empty-state p-xl">
+              <div class="empty-state-text">No handoffs</div>
+            </div>
+          `;
+        } else {
+          listEl.innerHTML = list.map(renderHandoffItem).join('');
+        }
+        return;
+      }
+
       let messages: MailMessage[];
       if (currentTab === 'unread') {
         messages = await getMailUnread(handle);
@@ -140,8 +161,6 @@ export async function renderMail(container: HTMLElement): Promise<() => void> {
         messages = (await getMail(handle)) as MailMessage[];
       }
       const list: MailMessage[] = Array.isArray(messages) ? messages : [];
-      const listEl = document.getElementById('mail-list');
-      if (!listEl) return;
       if (list.length === 0) {
         listEl.innerHTML = `
           <div class="empty-state p-xl">
@@ -162,18 +181,21 @@ export async function renderMail(container: HTMLElement): Promise<() => void> {
 
   await loadMail();
 
-  // Tab switching
+  // Tab switching + mark read + handoff create
   container.addEventListener('click', async (e: MouseEvent) => {
-    const tab = (e.target as HTMLElement).closest('.mail-tab') as HTMLElement | null;
+    const target = e.target as HTMLElement;
+
+    const tab = target.closest('.mail-tab') as HTMLElement | null;
     if (tab) {
       currentTab = tab.dataset.tab || 'all';
       container.querySelectorAll('.mail-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       await loadMail();
+      return;
     }
 
     // Mark read
-    const markReadBtn = (e.target as HTMLElement).closest('.mail-mark-read') as HTMLElement | null;
+    const markReadBtn = target.closest('.mail-mark-read') as HTMLElement | null;
     if (markReadBtn) {
       const mailId = markReadBtn.dataset.mailId;
       if (!mailId) return;
@@ -184,11 +206,27 @@ export async function renderMail(container: HTMLElement): Promise<() => void> {
       } catch (err) {
         toast.error('Failed to mark as read: ' + (err as Error).message);
       }
+      return;
+    }
+
+    // Create handoff
+    if (target.closest('#create-handoff')) {
+      const fromHandle = prompt('From handle:');
+      if (!fromHandle) return;
+      const toHandle = prompt('To handle:');
+      if (!toHandle) return;
+      const reason = prompt('Reason:') || undefined;
+      try {
+        await createHandoff({ fromHandle, toHandle, reason });
+        toast.success('Handoff created');
+        if (currentTab === 'handoffs') await loadMail();
+      } catch (err) {
+        toast.error('Failed to create handoff: ' + (err as Error).message);
+      }
     }
   });
 
-  // Compose form — use event delegation on the compose container so the
-  // handler survives innerHTML replacement when the workers store updates.
+  // Compose form
   const composeContainer = document.getElementById('mail-compose');
   composeContainer?.addEventListener('submit', async (e: Event) => {
     e.preventDefault();
@@ -216,8 +254,7 @@ export async function renderMail(container: HTMLElement): Promise<() => void> {
     }
   });
 
-  // Update compose dropdown when workers change — the submit handler is on
-  // the parent #mail-compose div, so it survives this innerHTML replacement.
+  // Update compose dropdown when workers change
   const unsubWorkers = store.subscribe('workers', (updatedWorkers: WorkerInfo[]) => {
     const compose = document.getElementById('mail-compose');
     if (compose) compose.innerHTML = renderCompose(updatedWorkers);

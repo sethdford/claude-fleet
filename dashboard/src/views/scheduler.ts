@@ -19,6 +19,13 @@ import {
   cancelQueueTask as apiCancelQueueTask,
   getTemplates as apiGetTemplates,
 } from '@/api';
+import {
+  createSchedule as apiCreateSchedule,
+  enqueueTask as apiEnqueueTask,
+  enableNotifications,
+  disableNotifications,
+  testNotification,
+} from '@/api-operations';
 import type {
   SchedulerStatus,
   Schedule,
@@ -375,7 +382,10 @@ function renderContent(): void {
     <section class="mb-md">
       <div class="flex justify-between items-center mb-md">
         <h2 class="card-subtitle">Schedules</h2>
-        <button class="btn btn-secondary btn-sm" id="sched-load-defaults">Load Defaults</button>
+        <div class="flex gap-sm">
+          <button class="btn btn-primary btn-sm" id="sched-create">+ Create</button>
+          <button class="btn btn-secondary btn-sm" id="sched-load-defaults">Load Defaults</button>
+        </div>
       </div>
       <div id="sched-schedules-container">
         ${renderSchedulesList()}
@@ -384,7 +394,10 @@ function renderContent(): void {
 
     <div class="grid-2-col">
       <section>
-        <h2 class="card-subtitle mb-md">Task Queue</h2>
+        <div class="flex justify-between items-center mb-md">
+          <h2 class="card-subtitle">Task Queue</h2>
+          <button class="btn btn-secondary btn-sm" id="sched-enqueue">+ Enqueue Task</button>
+        </div>
         <div id="sched-queue-container">
           ${renderQueueSection()}
         </div>
@@ -397,6 +410,17 @@ function renderContent(): void {
         </div>
       </section>
     </div>
+
+    <section class="mt-md">
+      <h2 class="card-subtitle mb-md">Notifications</h2>
+      <div class="card">
+        <div class="flex gap-sm">
+          <button class="btn btn-secondary btn-sm" id="notif-enable">Enable</button>
+          <button class="btn btn-secondary btn-sm" id="notif-disable">Disable</button>
+          <button class="btn btn-secondary btn-sm" id="notif-test">Test</button>
+        </div>
+      </div>
+    </section>
   `;
 
 }
@@ -404,7 +428,7 @@ function renderContent(): void {
 function attachEventDelegation(): void {
   if (!containerEl) return;
 
-  containerEl.addEventListener('click', (e: MouseEvent) => {
+  containerEl.addEventListener('click', async (e: MouseEvent) => {
     const target = e.target as HTMLElement;
 
     // Start/Stop scheduler
@@ -413,6 +437,53 @@ function attachEventDelegation(): void {
 
     // Load defaults
     if (target.closest('#sched-load-defaults')) { loadDefaults(); return; }
+
+    // Create schedule
+    if (target.closest('#sched-create')) {
+      const name = prompt('Schedule name:');
+      if (!name) return;
+      const cron = prompt('Cron expression (e.g. 0 */6 * * *):');
+      if (!cron) return;
+      const repository = prompt('Repository (optional):') || undefined;
+      try {
+        await apiCreateSchedule({ name, cron, repository });
+        toast.success('Schedule created');
+        await fetchSchedules();
+        renderContent();
+      } catch (err) {
+        toast.error('Failed to create schedule: ' + (err as Error).message);
+      }
+      return;
+    }
+
+    // Enqueue task
+    if (target.closest('#sched-enqueue')) {
+      const name = prompt('Task name:');
+      if (!name) return;
+      try {
+        await apiEnqueueTask({ name });
+        toast.success('Task enqueued');
+        await fetchQueue();
+        renderContent();
+      } catch (err) {
+        toast.error('Failed to enqueue task: ' + (err as Error).message);
+      }
+      return;
+    }
+
+    // Notification controls
+    if (target.closest('#notif-enable')) {
+      try { await enableNotifications(); toast.success('Notifications enabled'); } catch (err) { toast.error((err as Error).message); }
+      return;
+    }
+    if (target.closest('#notif-disable')) {
+      try { await disableNotifications(); toast.success('Notifications disabled'); } catch (err) { toast.error((err as Error).message); }
+      return;
+    }
+    if (target.closest('#notif-test')) {
+      try { await testNotification(); toast.success('Test notification sent'); } catch (err) { toast.error((err as Error).message); }
+      return;
+    }
 
     // Schedule toggle
     const toggleBtn = target.closest('.schedule-toggle') as HTMLElement | null;

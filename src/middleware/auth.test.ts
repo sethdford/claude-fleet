@@ -9,6 +9,7 @@ import {
   createAuthMiddleware,
   createOptionalAuthMiddleware,
   requireRole,
+  requireTeamMembership,
   type AuthenticatedRequest,
 } from './auth.js';
 
@@ -253,6 +254,143 @@ describe('Auth Middleware', () => {
       middleware(mockReq as unknown as AuthenticatedRequest, mockRes as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(401);
+    });
+  });
+
+  describe('public route detection - prefix matches', () => {
+    it('allows routes under /public/ prefix without token', () => {
+      const middleware = createAuthMiddleware(TEST_SECRET);
+      mockReq.path = '/public/some-resource';
+
+      middleware(mockReq as unknown as AuthenticatedRequest, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockStatus).not.toHaveBeenCalled();
+    });
+
+    it('allows routes under /dashboard/ prefix without token', () => {
+      const middleware = createAuthMiddleware(TEST_SECRET);
+      mockReq.path = '/dashboard/overview';
+
+      middleware(mockReq as unknown as AuthenticatedRequest, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockStatus).not.toHaveBeenCalled();
+    });
+
+    it('allows routes under /compound/ prefix without token', () => {
+      const middleware = createAuthMiddleware(TEST_SECRET);
+      mockReq.path = '/compound/some-page';
+
+      middleware(mockReq as unknown as AuthenticatedRequest, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockStatus).not.toHaveBeenCalled();
+    });
+
+    it('requires auth for /compound/snapshot (protected under public prefix)', () => {
+      const middleware = createAuthMiddleware(TEST_SECRET);
+      mockReq.path = '/compound/snapshot';
+
+      middleware(mockReq as unknown as AuthenticatedRequest, mockRes as Response, mockNext);
+
+      expect(mockStatus).toHaveBeenCalledWith(401);
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('generic authentication error handling', () => {
+    it('should return 500 for non-JWT errors during verification', () => {
+      const middleware = createAuthMiddleware(TEST_SECRET);
+      // Create a token that will cause jwt.verify to throw a generic error
+      // by mocking jwt.verify to throw a non-JWT error
+      const originalVerify = jwt.verify;
+      vi.spyOn(jwt, 'verify').mockImplementation(() => {
+        throw new TypeError('Unexpected type error');
+      });
+
+      mockReq.headers = { authorization: 'Bearer some-token' };
+      mockReq.path = '/tasks';
+
+      middleware(mockReq as unknown as AuthenticatedRequest, mockRes as Response, mockNext);
+
+      expect(mockStatus).toHaveBeenCalledWith(500);
+      expect(mockJson).toHaveBeenCalledWith(
+        expect.objectContaining({ error: 'Authentication error' })
+      );
+      expect(mockNext).not.toHaveBeenCalled();
+
+      // Restore original
+      vi.mocked(jwt.verify).mockRestore();
+    });
+  });
+
+  describe('requireTeamMembership', () => {
+    it('should call next when user belongs to the team', () => {
+      const middleware = requireTeamMembership();
+      mockReq.user = {
+        uid: 'a'.repeat(24),
+        handle: 'test-agent',
+        teamName: 'alpha-team',
+        agentType: 'worker',
+      };
+      mockReq.params = { teamName: 'alpha-team' };
+
+      middleware(mockReq as unknown as AuthenticatedRequest, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockStatus).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when no user is attached', () => {
+      const middleware = requireTeamMembership();
+      mockReq.params = { teamName: 'alpha-team' };
+
+      middleware(mockReq as unknown as AuthenticatedRequest, mockRes as Response, mockNext);
+
+      expect(mockStatus).toHaveBeenCalledWith(401);
+      expect(mockJson).toHaveBeenCalledWith(
+        expect.objectContaining({ error: 'Authentication required' })
+      );
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should return 403 when user belongs to a different team', () => {
+      const middleware = requireTeamMembership();
+      mockReq.user = {
+        uid: 'a'.repeat(24),
+        handle: 'test-agent',
+        teamName: 'alpha-team',
+        agentType: 'worker',
+      };
+      mockReq.params = { teamName: 'beta-team' };
+
+      middleware(mockReq as unknown as AuthenticatedRequest, mockRes as Response, mockNext);
+
+      expect(mockStatus).toHaveBeenCalledWith(403);
+      expect(mockJson).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'Not a member of this team',
+          team: 'beta-team',
+        })
+      );
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should call next when teamName param is not present', () => {
+      const middleware = requireTeamMembership();
+      mockReq.user = {
+        uid: 'a'.repeat(24),
+        handle: 'test-agent',
+        teamName: 'alpha-team',
+        agentType: 'worker',
+      };
+      mockReq.params = {}; // no teamName param
+
+      middleware(mockReq as unknown as AuthenticatedRequest, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockStatus).not.toHaveBeenCalled();
     });
   });
 });

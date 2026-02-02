@@ -16,6 +16,7 @@ import {
   resumeExecution,
   cancelExecution,
 } from '@/api';
+import { createWorkflow, deleteWorkflow } from '@/api-operations';
 import type { Workflow, WorkflowExecution } from '@/types';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -32,7 +33,7 @@ const STATUS_COLORS: Record<string, string> = {
  */
 function renderWorkflowCard(wf: Workflow): string {
   return `
-    <div class="workflow-card" data-workflow-id="${escapeHtml(wf.id)}">
+    <div class="workflow-card cursor-pointer" data-workflow-id="${escapeHtml(wf.id)}">
       <div class="flex items-center justify-between mb-md">
         <div>
           <h3 class="text-[15px] font-semibold text-fg m-0">
@@ -40,12 +41,15 @@ function renderWorkflowCard(wf: Workflow): string {
           </h3>
           ${wf.description ? `<p class="text-xs text-fg-secondary mt-xs">${escapeHtml(wf.description.slice(0, 120))}</p>` : ''}
         </div>
-        <button class="btn btn-primary btn-sm workflow-start" data-workflow-id="${escapeHtml(wf.id)}" data-workflow-name="${escapeHtml(wf.name)}">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="5 3 19 12 5 21 5 3"/>
-          </svg>
-          Start
-        </button>
+        <div class="flex gap-sm">
+          <button class="btn btn-primary btn-sm workflow-start" data-workflow-id="${escapeHtml(wf.id)}" data-workflow-name="${escapeHtml(wf.name)}">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Start
+          </button>
+          <button class="btn btn-danger btn-sm workflow-delete" data-workflow-id="${escapeHtml(wf.id)}">\u2715</button>
+        </div>
       </div>
       <div class="flex gap-md text-xs text-fg-muted">
         <span>${wf.steps?.length || 0} steps</span>
@@ -97,7 +101,10 @@ export async function renderWorkflows(container: HTMLElement): Promise<() => voi
   container.innerHTML = `
     <div class="workflow-layout">
       <div>
-        <h2 class="card-subtitle mb-md">Workflow Templates</h2>
+        <div class="flex items-center justify-between mb-md">
+          <h2 class="card-subtitle">Workflow Templates</h2>
+          <button class="btn btn-primary btn-sm" id="create-workflow">+ Create Workflow</button>
+        </div>
         <div id="workflow-list">
           <div class="loading"><div class="spinner"></div></div>
         </div>
@@ -164,9 +171,27 @@ export async function renderWorkflows(container: HTMLElement): Promise<() => voi
 
   // Event delegation
   container.addEventListener('click', async (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+
+    // Create workflow
+    if (target.closest('#create-workflow')) {
+      const name = prompt('Workflow name:');
+      if (!name) return;
+      const description = prompt('Description (optional):') || undefined;
+      try {
+        await createWorkflow({ name, description });
+        toast.success('Workflow created');
+        await loadWorkflows();
+      } catch (err) {
+        toast.error('Failed to create workflow: ' + (err as Error).message);
+      }
+      return;
+    }
+
     // Start workflow
-    const startBtn = (e.target as HTMLElement).closest('.workflow-start') as HTMLElement | null;
+    const startBtn = target.closest('.workflow-start') as HTMLElement | null;
     if (startBtn) {
+      e.stopPropagation();
       const wfId = startBtn.dataset.workflowId;
       const wfName = startBtn.dataset.workflowName;
       if (!wfId) return;
@@ -185,10 +210,43 @@ export async function renderWorkflows(container: HTMLElement): Promise<() => voi
           toast.error('Failed to start workflow: ' + (err as Error).message);
         }
       }
+      return;
+    }
+
+    // Delete workflow
+    const delBtn = target.closest('.workflow-delete') as HTMLElement | null;
+    if (delBtn) {
+      e.stopPropagation();
+      const wfId = delBtn.dataset.workflowId;
+      if (!wfId) return;
+      const confirmed = await confirm({
+        title: 'Delete Workflow',
+        message: 'Are you sure? This will permanently delete this workflow.',
+        confirmText: 'Delete',
+        variant: 'danger',
+      });
+      if (confirmed) {
+        try {
+          await deleteWorkflow(wfId);
+          toast.success('Workflow deleted');
+          await loadWorkflows();
+        } catch (err) {
+          toast.error('Failed to delete: ' + (err as Error).message);
+        }
+      }
+      return;
+    }
+
+    // Click-through to workflow detail
+    const wfCard = target.closest('.workflow-card') as HTMLElement | null;
+    if (wfCard) {
+      const wfId = wfCard.dataset.workflowId;
+      if (wfId) window.location.hash = `/workflow/${wfId}`;
+      return;
     }
 
     // Pause execution
-    const pauseBtn = (e.target as HTMLElement).closest('.exec-pause') as HTMLElement | null;
+    const pauseBtn = target.closest('.exec-pause') as HTMLElement | null;
     if (pauseBtn) {
       const execId = pauseBtn.dataset.execId;
       if (!execId) return;
@@ -199,10 +257,11 @@ export async function renderWorkflows(container: HTMLElement): Promise<() => voi
       } catch (err) {
         toast.error('Failed to pause: ' + (err as Error).message);
       }
+      return;
     }
 
     // Resume execution
-    const resumeBtn = (e.target as HTMLElement).closest('.exec-resume') as HTMLElement | null;
+    const resumeBtn = target.closest('.exec-resume') as HTMLElement | null;
     if (resumeBtn) {
       const execId = resumeBtn.dataset.execId;
       if (!execId) return;
@@ -213,10 +272,11 @@ export async function renderWorkflows(container: HTMLElement): Promise<() => voi
       } catch (err) {
         toast.error('Failed to resume: ' + (err as Error).message);
       }
+      return;
     }
 
     // Cancel execution
-    const cancelBtn = (e.target as HTMLElement).closest('.exec-cancel') as HTMLElement | null;
+    const cancelBtn = target.closest('.exec-cancel') as HTMLElement | null;
     if (cancelBtn) {
       const execId = cancelBtn.dataset.execId;
       if (!execId) return;

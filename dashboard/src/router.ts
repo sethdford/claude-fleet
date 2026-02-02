@@ -76,9 +76,21 @@ export class Router {
 
     if (handler) {
       this.onNavigate?.(hash);
-      const cleanup = await handler(...routeParams);
-      if (typeof cleanup === 'function') {
-        this.currentCleanup = cleanup;
+      try {
+        const cleanup = await handler(...routeParams);
+        if (typeof cleanup === 'function') {
+          this.currentCleanup = cleanup;
+        }
+      } catch (err) {
+        console.error(`[Router] View handler error for ${hash}:`, err);
+        const mainView = document.getElementById('main-view');
+        if (mainView) {
+          mainView.innerHTML = `<div style="padding:2rem;color:var(--text-secondary)">
+            <h2 style="color:var(--danger)">View Error</h2>
+            <p>Failed to load this view. Try refreshing or navigating to another page.</p>
+            <pre style="font-size:0.85rem;opacity:0.7">${(err instanceof Error ? err.message : String(err)).replace(/</g, '&lt;')}</pre>
+          </div>`;
+        }
       }
     }
   }
